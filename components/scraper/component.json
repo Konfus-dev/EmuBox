@@ -1,0 +1,19 @@
+{
+  "title": "ScreenScraper account",
+  "question": "Save your ScreenScraper account (box art, videos and descriptions for your games)?",
+  "default": false,
+  "order": 32,
+  "ask": [
+    {"id": "user", "question": "ScreenScraper username (not your email address)"},
+    {"id": "password", "question": "ScreenScraper password", "secret": true}
+  ],
+  "es_settings": {
+    "Scraper": "ScreenScraper",
+    "ScreenScraperUser": "{user}",
+    "ScreenScraperPass": "{password}",
+    "ScrapperImageSrc": "mixrbv2",
+    "ScrapeManual": true,
+    "ScrapeVideos": true
+  },
+  "after": "Fetch the artwork in Batocera with Main menu > Scraper."
+}

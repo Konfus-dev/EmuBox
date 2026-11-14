@@ -20,6 +20,9 @@ from installer.prompts import parse_numbers  # noqa: E402
 from installer.target import Target  # noqa: E402
 
 
+COMPONENT_QUESTIONS = 9   # asked on a PC without the OMEN lights
+
+
 def make_drive(root: Path) -> Target:
     (root / "system").mkdir(parents=True)
     (root / "roms" / "ports").mkdir(parents=True)
@@ -126,11 +129,41 @@ class ComponentTests(Drive):
         self.assertNotIn("OMEN", out)
 
     def test_questions_are_asked_and_answered(self):
-        # look n, apple-music n, discord y, rom-patcher n, tweaks n, launchers n, bios n, games n, go ahead y
-        code, out = run(self.root, answers="n\nn\ny\nn\nn\nn\nn\nn\ny\n")
+        # look n, apple-music n, discord y, six more n, bios n, games n, go ahead y
+        code, out = run(self.root, answers="n\nn\ny\n" + "n\n" * 6 + "n\nn\ny\n")
         self.assertEqual(code, 0, out)
         self.assertTrue((self.root / "roms/ports/Discord.sh").exists())
         self.assertFalse((self.root / "themes/retrobox").exists())
+
+
+class TypedAnswerTests(Drive):
+    def test_wifi_is_asked_for_and_written(self):
+        # look n, apple-music n, discord n, wifi y + name + password, five more n, bios n, games n, go ahead y
+        code, out = run(self.root, answers="n\nn\nn\ny\nHome Net\np@ss {word}\n" + "n\n" * 5 + "n\nn\ny\n")
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.target.conf_get("wifi.ssid"), "Home Net")
+        self.assertEqual(self.target.conf_get("wifi.key"), "p@ss {word}")
+        self.assertEqual(self.target.conf_get("wifi.enabled"), "1")
+        self.assertNotIn("p@ss", (self.root / "system/retrobox/installed.json").read_text())
+
+    def test_answers_can_be_given_ahead(self):
+        with mock.patch.dict("os.environ", {"RETROBOX_SCRAPER_PASSWORD": "s3cret"}):
+            code, out = run(self.root, "--yes", "--with", "scraper", "--set", "scraper.user=me")
+        self.assertEqual(code, 0, out)
+        settings = (self.root / "system/configs/emulationstation/es_settings.cfg").read_text()
+        self.assertIn('<string name="ScreenScraperUser" value="me" />', settings)
+        self.assertIn('<string name="ScreenScraperPass" value="s3cret" />', settings)
+        self.assertIn('<bool name="ScrapeVideos" value="true" />', settings)
+
+    def test_missing_answers_stop_an_unattended_run(self):
+        code, out = run(self.root, "--yes", "--with", "achievements")
+        self.assertEqual(code, 1)
+        self.assertIsNone(self.target.conf_get("global.retroachievements"))
+
+    def test_a_password_batocera_cannot_store_is_refused(self):
+        code, out = run(self.root, "--yes", "--with", "wifi", "--set", "wifi.ssid=Home", "--set", "wifi.key=a\\b")
+        self.assertEqual(code, 1)
+        self.assertIn("backslash", out)
 
 
 class LibraryTests(Drive):
@@ -161,8 +194,8 @@ class LibraryTests(Drive):
         self.assertEqual([s.id for s in Library(self.games, "games").systems()], ["psx", "snes"])
 
     def test_one_game_brings_its_picture_and_list_entry(self):
-        # no to 6 components, bios n, games y, where, system 1 (psx), all games n, game 2 (Racer), go ahead y
-        code, out = run(self.root, answers="n\n" * 6 + f"n\ny\n{self.games}\n1\nn\n2\ny\n")
+        # no to every component, bios n, games y, where, system 1 (psx), all games n, game 2 (Racer), go ahead y
+        code, out = run(self.root, answers="n\n" * COMPONENT_QUESTIONS + f"n\ny\n{self.games}\n1\nn\n2\ny\n")
         self.assertEqual(code, 0, out)
         self.assertTrue((self.root / "roms/psx/Racer.chd").exists())
         self.assertTrue((self.root / "roms/psx/images/Racer-image.png").exists())

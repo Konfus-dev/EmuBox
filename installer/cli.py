@@ -40,6 +40,9 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--target", metavar="FOLDER", help="the Batocera data folder (default: found automatically)")
     p.add_argument("--yes", action="store_true", help="take the default answer to every question")
     p.add_argument("--with", dest="include", metavar="IDS", help="with --yes: install exactly these, comma-separated (see --list)")
+    p.add_argument("--set", dest="values", action="append", default=[], metavar="ID.FIELD=VALUE",
+                   help="answer a component's question in advance, e.g. --set wifi.ssid=Home "
+                        "(for passwords prefer the environment: RETROBOX_WIFI_KEY=...)")
     p.add_argument("--bios", metavar="WHERE", help="BIOS library: a folder or a repository address")
     p.add_argument("--games", metavar="WHERE", help="games library: a folder or a repository address")
     p.add_argument("--bios-systems", metavar="IDS", help="only these systems' BIOS files, comma-separated")
@@ -117,6 +120,37 @@ class Downloads:
 
 # --- the questions ----------------------------------------------------------------------
 
+def typed_answers(component: Component, args, ask: Prompts) -> dict[str, str]:
+    """What a component needs typed in (a network name, an account). Given ahead with --set or
+    RETROBOX_<ID>_<FIELD>, asked for otherwise."""
+    given = dict(item.split("=", 1) for item in args.values if "=" in item)
+    answers = {}
+    for wanted in component.spec.get("ask", []):
+        name = f"{component.id}.{wanted['id']}"
+        variable = "RETROBOX_" + name.upper().replace(".", "_").replace("-", "_")
+        while True:
+            if name in given:
+                answer = given[name]
+            elif variable in os.environ:
+                answer = os.environ[variable]
+            elif wanted.get("secret"):
+                answer = ask.secret(f"  {wanted['question']}")
+            else:
+                answer = ask.text(f"  {wanted['question']}") if not wanted.get("optional") else ask.text_or_empty(f"  {wanted['question']}")
+            problem = None
+            if not answer and not wanted.get("optional"):
+                problem = "This cannot be empty."
+            elif any(bad in answer for bad in [*wanted.get("reject", []), "\n"]):
+                problem = wanted.get("reject_message", "That contains a character that cannot be stored.")
+            if problem is None:
+                break
+            if name in given or variable in os.environ or ask.assume_defaults:
+                raise Stop(f"{name}: {problem}")
+            ask.say(f"  {problem}")
+        answers[wanted["id"]] = answer
+    return answers
+
+
 def choose_components(everything: dict[str, Component], env: Env, args, ask: Prompts) -> list[str]:
     offered = [c for c in everything.values() if not c.hidden and components.available(c, env)]
     if args.include is not None:
@@ -124,8 +158,17 @@ def choose_components(everything: dict[str, Component], env: Env, args, ask: Pro
         unknown = [i for i in wanted if i not in {c.id for c in offered}]
         if unknown:
             raise Stop(f"Not available here: {', '.join(unknown)}. See --list.")
-        return wanted
-    return [c.id for c in offered if ask.yes_no(c.question, c.default)]
+        chosen = [everything[i] for i in wanted]
+    else:
+        chosen = []
+        for component in offered:
+            if ask.yes_no(component.question, component.default):
+                env.answers[component.id] = typed_answers(component, args, ask)
+                chosen.append(component)
+        return [c.id for c in chosen]
+    for component in chosen:
+        env.answers[component.id] = typed_answers(component, args, ask)
+    return [c.id for c in chosen]
 
 
 def open_library(kind: str, where: str, downloads: Downloads) -> Library:

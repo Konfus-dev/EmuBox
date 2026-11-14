@@ -158,16 +158,18 @@ class Target:
 
     # --- EmulationStation settings ------------------------------------------------------
 
-    def es_setting(self, name: str, value: str) -> None:
-        """Set a text setting of the menu program (for example the theme)."""
+    def es_setting(self, name: str, value: str | bool | int) -> None:
+        """Set a setting of the menu program (the theme, the scraper account...)."""
         path = self.path("system/configs/emulationstation/es_settings.cfg")
-        line = f"\t<string name={quoteattr(name)} value={quoteattr(value)} />"
+        kind = "bool" if isinstance(value, bool) else "int" if isinstance(value, int) else "string"
+        shown = str(value).lower() if isinstance(value, bool) else str(value)
+        line = f"\t<{kind} name={quoteattr(name)} value={quoteattr(shown)} />"
         if path.exists():
             text = path.read_text()
         else:
             self.make_dir(path.parent)
             text = '<?xml version="1.0"?>\n<config>\n</config>\n'
-        pattern = re.compile(rf'^[ \t]*<string name="{re.escape(name)}" .*$', re.MULTILINE)
+        pattern = re.compile(rf'^[ \t]*<\w+ name="{re.escape(name)}" .*$', re.MULTILINE)
         if pattern.search(text):
             text = pattern.sub(lambda _: line, text)
         else:

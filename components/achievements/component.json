@@ -1,0 +1,16 @@
+{
+  "title": "RetroAchievements account",
+  "question": "Set up RetroAchievements (trophies for older games)?",
+  "default": false,
+  "order": 34,
+  "ask": [
+    {"id": "user", "question": "RetroAchievements username"},
+    {"id": "password", "question": "RetroAchievements password", "secret": true}
+  ],
+  "batocera_conf": {
+    "global.retroachievements": "1",
+    "global.retroachievements.username": "{user}",
+    "global.retroachievements.password": "{password}",
+    "global.retroachievements.hardcore": "0"
+  }
+}

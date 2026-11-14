@@ -1,0 +1,17 @@
+{
+  "title": "Wi-Fi",
+  "question": "Set up Wi-Fi now, so Batocera connects by itself?",
+  "default": false,
+  "order": 30,
+  "ask": [
+    {"id": "ssid", "question": "Network name"},
+    {"id": "key", "question": "Password (leave empty for an open network)", "secret": true, "optional": true,
+     "reject": ["\\"], "reject_message": "Batocera cannot store a password containing a backslash; set it in Batocera's menu instead."}
+  ],
+  "batocera_conf": {
+    "wifi.enabled": "1",
+    "wifi.ssid": "{ssid}",
+    "wifi.key": "{key}"
+  },
+  "after": "Batocera joins the network the next time it starts."
+}

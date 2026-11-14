@@ -1,6 +1,7 @@
 """Questions asked in the terminal. Nothing here knows about Batocera."""
 from __future__ import annotations
 
+import getpass
 import re
 import sys
 
@@ -46,6 +47,19 @@ class Prompts:
             answer = self._read(f"{question}{hint}: ") or default
             if answer:
                 return answer
+
+    def text_or_empty(self, question: str) -> str:
+        if self.assume_defaults:
+            return ""
+        return self._read(f"{question} (Enter to skip): ")
+
+    def secret(self, question: str) -> str:
+        """Like text(), but what is typed is not shown. May be left empty."""
+        if self.assume_defaults:
+            raise NoAnswer(question)
+        if sys.stdin.isatty():
+            return getpass.getpass(f"{question} (not shown as you type): ")
+        return self._read(f"{question}: ")
 
     def choose(self, heading: str, options: list[str]) -> list[int]:
         """Pick any number of options. Returns their positions; everything by default."""

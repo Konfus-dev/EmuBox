@@ -1,7 +1,7 @@
 {
-  "title": "Steam and Heroic",
-  "question": "Add the Steam and Heroic (Epic/GOG) installer to Ports?",
-  "default": false,
+  "title": "Game stores (Steam, Epic, GOG)",
+  "question": "Add the game stores to Ports (installs Steam, and Heroic for Epic and GOG, when you run it)?",
+  "default": true,
   "order": 60,
   "ports": [
     {

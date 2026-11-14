@@ -62,7 +62,10 @@ things or update; it only copies what is missing.
 | **Discord**, **Apple Music** | Open from Ports, or over a running game from the in-game menu's **Apps** tab. Each downloads itself the first time you open it |
 | **ROM-hack patcher** | Drop a `.ips`/`.bps`/`.ups` file in `patches` and it is applied at boot |
 | **Play settings** | Auto-save, rewind on 8/16-bit systems, a light CRT shader, a tidier network share |
-| **Steam and Heroic** | Adds their installer to Ports |
+| **Wi-Fi** | Asks for the network name and password, so Batocera connects by itself |
+| **ScreenScraper account** | For box art, videos and descriptions; with the picture style and extras already chosen |
+| **RetroAchievements account** | Trophies for older games |
+| **Game stores** | Adds the Steam and Heroic (Epic, GOG) installer to Ports |
 | **OMEN lights** | Only offered on an HP OMEN PC that has the lights; fetched from [its own repository](https://github.com/Konfus-dev/OmenRGB-Controller) |
 
 ### Controller buttons in the apps

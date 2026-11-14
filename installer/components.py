@@ -13,6 +13,11 @@ component.json:
     order          position in the list of questions
     hidden         true: never asked about; installed when another component requires it
     requires       ids of components this one needs
+    ask            things to type in when the component is chosen:
+                   [{"id": "user", "question": "Username", "secret": false, "optional": false,
+                     "reject": ["\\"], "reject_message": "..."}]
+                   Use an answer as {user} in batocera_conf and es_settings values.
+                   Answers are used once and never stored by the installer.
     files          [{"from": path here, "to": path on the drive, "mode": "755"}]
     ports          entries for the Ports menu: name, description, image,
                    and either "script" (a file here) or "command" (one line to run)
@@ -78,6 +83,7 @@ class Env:
     fetch: Callable[[str, str], Path]          # (address, name) -> folder with the downloaded repository
     component: Component | None = None
     say: Callable[[str], None] = print
+    answers: dict[str, dict[str, str]] = field(default_factory=dict)   # component id -> what was typed for "ask"
 
 
 @dataclass
@@ -174,6 +180,14 @@ def _add_port(component: Component, port: dict, target: Target, record: Record) 
     record.ports.append(name)
 
 
+def _fill(value, typed: dict[str, str]):
+    """Put typed answers into a setting: "{user}" becomes what was typed for "user"."""
+    if isinstance(value, str):
+        for field_id, answer in typed.items():
+            value = value.replace(f"{{{field_id}}}", answer)
+    return value
+
+
 def install(component: Component, env: Env) -> Record:
     target, spec, record = env.target, component.spec, Record()
     env.component = component
@@ -191,10 +205,11 @@ def install(component: Component, env: Env) -> Record:
         record.files += target.copy(component.folder / item["from"], item["to"], mode)
     for port in spec.get("ports", []):
         _add_port(component, port, target, record)
+    typed = env.answers.get(component.id, {})
     for key, value in spec.get("batocera_conf", {}).items():
-        target.conf_set(key, value)
+        target.conf_set(key, _fill(value, typed))
     for name, value in spec.get("es_settings", {}).items():
-        target.es_setting(name, value)
+        target.es_setting(name, _fill(value, typed))
 
     run = getattr(component.hooks, "install", None)
     if run:

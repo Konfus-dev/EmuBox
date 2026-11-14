@@ -74,6 +74,20 @@ Make a folder `components/<id>/` with a `component.json`:
 }
 ```
 
+To ask for something to type in (a network name, an account), add `ask` and use the answers in
+settings as `{id}`:
+
+```json
+"ask": [
+  {"id": "user", "question": "Username"},
+  {"id": "password", "question": "Password", "secret": true}
+],
+"batocera_conf": {"some.username": "{user}", "some.password": "{password}"}
+```
+
+Answers are used once and never recorded by the installer. For scripts they can be given ahead:
+`--set <component>.user=me`, or the environment variable `RETROBOX_<COMPONENT>_PASSWORD`.
+
 Every key but `title` is optional. Paths under `to` are relative to Batocera's data folder
 (`/userdata`). The full list of keys is at the top of `installer/components.py`.
 
