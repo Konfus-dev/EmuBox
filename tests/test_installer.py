@@ -88,9 +88,9 @@ class ComponentTests(Drive):
                     if key in port:
                         self.assertTrue((component.folder / port[key]).exists(), f"{component.id}: {port[key]}")
 
-    def test_apps_pull_in_the_runtime(self):
+    def test_apps_pull_in_the_console_tools(self):
         everything = components.discover(REPO)
-        self.assertEqual(components.with_requirements(["discord"], everything), ["runtime", "discord"])
+        self.assertEqual(components.with_requirements(["discord"], everything), ["console", "discord"])
 
     def test_install_everything_then_remove_an_app(self):
         code, out = run(self.root, "--yes", "--with", "look,discord,apple-music,rom-patcher,tweaks,pc-launchers")

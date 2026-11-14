@@ -24,6 +24,7 @@ component.json:
     services       Batocera services to switch on
     batocera_conf  {"key": "value"} settings for batocera.conf
     es_settings    {"name": "value"} settings of the menu program
+    renamed_from   ids this component had in older versions
     replaces       paths from older versions to delete
     retired_services  services from older versions to switch off
     after          a note printed when the installation is done
@@ -101,7 +102,7 @@ def _app_spec(app_id: str, app: dict) -> dict:
         "question": app.get("question", f"Install {app['name']}?"),
         "default": app.get("default", True),
         "order": app.get("order", 20),
-        "requires": ["runtime"],
+        "requires": ["console"],
         "files": [{"from": ".", "to": f"{APPS_ON_DRIVE}/{app_id}"}],
         "ports": [{
             "name": app["name"],
@@ -223,6 +224,8 @@ def install(component: Component, env: Env) -> Record:
 
 def remember(target: Target, component: Component, record: Record) -> None:
     manifest = target.manifest()
+    for old_id in component.spec.get("renamed_from", []):
+        manifest["components"].pop(old_id, None)
     manifest["components"][component.id] = {
         "title": component.title, "files": sorted(set(record.files)),
         "services": record.services, "ports": record.ports,

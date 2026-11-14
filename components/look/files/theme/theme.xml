@@ -89,7 +89,8 @@ System logos are borrowed at run time from Batocera's built-in Carbon theme.
       </storyboard>
     </image>
     <helpsystem name="help">
-      <pos>0.025 0.945</pos>
+      <pos>0.5 0.945</pos>
+      <origin>0.5 0</origin>
       <fontPath>${fontTextBold}</fontPath>
       <fontSize>0.03</fontSize>
       <textColor>${colText}</textColor>
@@ -691,21 +692,23 @@ System logos are borrowed at run time from Batocera's built-in Carbon theme.
     </datetime>
   </view>
 
-  <!-- ===================== always on screen: clock and controller lights ===================== -->
+  <!-- ===================== always on screen, top right: clock, and under it the controller lights ===================== -->
   <view name="screen">
     <text name="clock">
       <fontPath>${fontTitle}</fontPath>
       <fontSize>0.026</fontSize>
       <color>${colText}</color>
-      <pos>0.835 0.945</pos>
-      <size>0.14 0.05</size>
+      <!-- Top right, left of Batocera's network icon: the bottom line belongs to the button hints. -->
+      <pos>0.80 0.012</pos>
+      <size>0.145 0.05</size>
       <alignment>right</alignment>
       <verticalAlignment>center</verticalAlignment>
     </text>
     <!-- One small controller per connected pad: light green at rest, dark green while a button is held. -->
     <controllerActivity name="controllerActivity">
-      <pos>0.025 0.905</pos>
+      <pos>0.76 0.068</pos>
       <size>0.185 0.03</size>
+      <horizontalAlignment>right</horizontalAlignment>
       <itemSpacing>0.004</itemSpacing>
       <imagePath>${themePath}/art/gamepad.png</imagePath>
       <gunPath>${themePath}/art/gamepad.png</gunPath>

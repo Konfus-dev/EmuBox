@@ -290,9 +290,9 @@ def run_remove(ids: list[str], target: Target, ask: Prompts) -> None:
         done = components.uninstall(component_id, target)
         ask.say(f"Removed {component_id}." if done else f"{component_id} is not installed.")
     remaining = target.manifest()["components"]
-    if "runtime" in remaining and not any(f"system/retrobox/apps/" in f for e in remaining.values() for f in e["files"]):
-        components.uninstall("runtime", target)   # no apps left that need it
-        ask.say("Removed RetroBox app support (no apps left).")
+    if "console" in remaining and not any(f"system/retrobox/apps/" in f for e in remaining.values() for f in e["files"]):
+        components.uninstall("console", target)   # no apps left that need it
+        ask.say("Removed the console tools (no apps left).")
 
 
 def run_backup(folder: str, args, target: Target, ask: Prompts) -> None:

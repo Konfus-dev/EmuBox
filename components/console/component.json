@@ -1,0 +1,34 @@
+{
+  "title": "Console tools",
+  "hidden": true,
+  "files": [
+    {
+      "from": "files/bin",
+      "to": "system/retrobox/bin",
+      "mode": "755"
+    },
+    {
+      "from": "files/lib",
+      "to": "system/retrobox/lib"
+    },
+    {
+      "from": "files/services/retrobox",
+      "to": "system/services/retrobox",
+      "mode": "755"
+    }
+  ],
+  "services": [
+    "retrobox"
+  ],
+  "replaces": [
+    "system/console-apps",
+    "system/services/console_apps",
+    "roms/ports/Install Discord and Apple Music.sh"
+  ],
+  "retired_services": [
+    "console_apps"
+  ],
+  "renamed_from": [
+    "runtime"
+  ]
+}
