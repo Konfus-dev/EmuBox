@@ -51,7 +51,7 @@ Make a folder `apps/<id>/` with two files.
 
   Sticks (`left_stick`, `right_stick`) can be `"pointer"`, `"scroll"` or `"dpad"`.
 
-**`tile.png`**: the picture in the Ports menu. `python3 tools/tile.py "MY APP" apps/my-app/tile.png` draws one.
+**`tile.png`**: the picture in the Ports menu. `python3 tools/dev/tile.py "MY APP" apps/my-app/tile.png` draws one.
 
 That is all: `./install` now asks about it, adds it to Ports and to the Apps tab of the in-game menu.
 

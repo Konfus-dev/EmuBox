@@ -14,5 +14,5 @@ The pieces that make a desktop program behave like a console app on Batocera. Ev
 
 Set `RETROBOX_DEBUG=1` to log every button press to `/userdata/system/logs/retrobox.log`.
 
-To test without a real controller, `tools/fakepad.py` (in the repository's top-level `tools`)
+To test without a real controller, `tools/dev/fakepad.py` (at the top of the repository)
 creates a pretend Xbox pad that plays commands written to a pipe.

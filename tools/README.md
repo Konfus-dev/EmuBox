@@ -1,6 +1,6 @@
-# PC tools
+# Tools
 
-Helpers for looking after a Batocera drive from a Linux PC. `./install` links them into
+Commands for looking after a Batocera drive from a Linux PC. `./install` links them into
 `~/.local/bin`. Each explains itself with `--help` or in the comment at its top.
 
 | Tool | Does |
@@ -11,3 +11,6 @@ Helpers for looking after a Batocera drive from a Linux PC. `./install` links th
 | `batocera-scraper`, `batocera-achievements` | set the ScreenScraper / RetroAchievements account |
 | `batocera-vm` | boot the drive in a window (QEMU), without restarting the PC |
 | `batocera-preview` | preview a theme in a window (needs a `~/batocera-preview` folder with Batocera's files) |
+
+`dev/` holds two helpers for working on RetroBox itself: `fakepad.py` (a pretend controller for
+testing in a virtual machine) and `tile.py` (draws an app's menu picture).

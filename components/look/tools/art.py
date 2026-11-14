@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Generates every image and sound used by the RetroBox theme.  Usage: python3 art.py <theme folder>
+"""Generates every image used by the RetroBox theme.  Usage: python3 art.py <theme folder>
 All artwork and audio is original and procedural (no console maker's assets are used)."""
 import sys, math, random, struct, wave, os
 from PIL import Image, ImageDraw, ImageFilter, ImageOps, ImageChops, ImageFont
 ROOT = sys.argv[1]; OUT = f"{ROOT}/art"; W, H = 1920, 1080
-os.makedirs(f"{OUT}/help", exist_ok=True); os.makedirs(f"{OUT}/sounds", exist_ok=True)
+os.makedirs(f"{OUT}/help", exist_ok=True); 
 
 def radial(size, center, radius, inner, outer):
     g = Image.radial_gradient("L").resize((int(radius * 2), int(radius * 2)), Image.BICUBIC)
@@ -260,35 +260,4 @@ def gamepad():
     im.resize((96, 64), Image.LANCZOS).save(f"{OUT}/gamepad.png")
 gamepad()
 
-# ------------------------------------------------------------------ sounds (synthesized: soft, watery, low "alien machine" tones)
-RATE = 44100
-def synth(name, dur, voices, noise=0.0, echo=(0.0, 0.0), gain=0.85, seed=1):
-    """voices: (start Hz, end Hz, volume, attack s, decay rate, wobble Hz, wobble depth)"""
-    n = int(dur * RATE); out = [0.0] * n; rnd = random.Random(seed); lp = 0.0
-    for f0, f1, vol, att, dec, wob, depth in voices:
-        ph = 0.0
-        for i in range(n):
-            t = i / RATE; k = t / dur
-            f = f0 * (f1 / f0) ** k * (1 + depth * math.sin(6.283 * wob * t))
-            ph += 6.283185 * f / RATE
-            env = min(1.0, t / att) * math.exp(-dec * t)
-            out[i] += vol * env * (math.sin(ph) + 0.22 * math.sin(2 * ph) + 0.08 * math.sin(3 * ph))
-    if noise:
-        for i in range(n):
-            t = i / RATE; lp += 0.06 * (rnd.uniform(-1, 1) - lp)                 # low-passed noise = soft whoosh
-            out[i] += noise * lp * 4 * math.sin(math.pi * min(1.0, t / dur)) ** 2
-    d = int(echo[0] * RATE)
-    if d:
-        for i in range(d, n): out[i] += echo[1] * out[i - d]
-    fade = int(0.012 * RATE)
-    for i in range(fade): out[n - 1 - i] *= i / fade
-    peak = max(1e-9, max(abs(v) for v in out))
-    with wave.open(f"{OUT}/sounds/{name}.wav", "wb") as w:
-        w.setnchannels(1); w.setsampwidth(2); w.setframerate(RATE)
-        w.writeframes(b"".join(struct.pack("<h", int(v / peak * gain * 32767)) for v in out))
-synth("scroll", 0.16, [(430, 190, 1.0, 0.004, 26, 0, 0), (860, 380, 0.25, 0.003, 40, 0, 0), (95, 60, 0.6, 0.006, 30, 0, 0)], noise=0.10, gain=0.55)
-synth("select", 0.55, [(150, 330, 1.0, 0.02, 7, 9, 0.03), (300, 660, 0.35, 0.03, 9, 9, 0.03), (70, 52, 0.8, 0.01, 10, 0, 0)], noise=0.22, echo=(0.085, 0.35), gain=0.75)
-synth("back", 0.42, [(340, 130, 1.0, 0.012, 9, 7, 0.03), (680, 260, 0.25, 0.012, 13, 7, 0.03), (60, 45, 0.6, 0.01, 12, 0, 0)], noise=0.18, echo=(0.075, 0.3), gain=0.7)
-synth("menuopen", 0.36, [(210, 420, 1.0, 0.015, 10, 12, 0.04), (420, 840, 0.22, 0.02, 14, 12, 0.04)], noise=0.25, echo=(0.06, 0.3), gain=0.65)
-synth("launch", 1.25, [(90, 360, 1.0, 0.25, 2.2, 6, 0.05), (135, 540, 0.5, 0.3, 2.4, 6, 0.05), (180, 720, 0.3, 0.35, 2.6, 5, 0.05), (48, 40, 0.9, 0.05, 2.5, 0, 0)], noise=0.45, echo=(0.11, 0.42), gain=0.85)
-print("art + sounds written")
+print("art written (sounds: see sounds.py)")

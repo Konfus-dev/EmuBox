@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Draw the picture an app shows in the Ports menu: its name on a green tile.
 
-    python3 tools/tile.py "APPLE MUSIC" apps/apple-music/tile.png
+    python3 tools/dev/tile.py "APPLE MUSIC" apps/apple-music/tile.png
 
 Each word goes on its own line. Needs Pillow. Plain text only, no company logos.
 """
@@ -10,7 +10,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
-FONT = Path(__file__).resolve().parent.parent / "components/look/files/fonts/Michroma-Regular.ttf"
+FONT = Path(__file__).resolve().parents[2] / "components/look/files/fonts/Michroma-Regular.ttf"
 SIZE, LINE = 512, 84
 
 

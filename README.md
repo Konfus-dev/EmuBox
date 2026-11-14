@@ -111,8 +111,7 @@ installer/               the installer (plain Python, nothing to install)
 apps/<name>/             one app: app.json (what to start, controller buttons) and tile.png
 components/<name>/       everything else: component.json says what to copy and switch on
 components/console/      the console tools every app shares: launcher, controller mapper, keyboard, menu tab
-pc-tools/                helpers for looking after a drive from a Linux PC (see its README)
-tools/                   helpers for development
+tools/                   commands for looking after a drive from a Linux PC (see its README); dev/ for development
 tests/                   python3 -m unittest discover tests
 ```
 
