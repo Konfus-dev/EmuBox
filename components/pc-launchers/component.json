@@ -1,0 +1,15 @@
+{
+  "title": "Steam and Heroic",
+  "question": "Add the Steam and Heroic (Epic/GOG) installer to Ports?",
+  "default": false,
+  "order": 60,
+  "ports": [
+    {
+      "name": "Install Steam and Heroic",
+      "script": "files/Install Steam and Heroic.sh",
+      "image": "files/tile.png",
+      "genre": "Utility",
+      "description": "Run this once to add PC game launchers to Batocera. It installs Steam and the Heroic Games Launcher (for Epic, GOG and Amazon libraries). It needs an internet connection and takes a few minutes. When it finishes, the launchers and your installed PC games appear in the menu."
+    }
+  ]
+}

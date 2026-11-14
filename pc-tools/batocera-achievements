@@ -1,0 +1,102 @@
+#!/usr/bin/env python3
+"""Set the RetroAchievements account on the Batocera USB stick, from this PC.
+
+  batocera-achievements            asks for your RetroAchievements username and password
+  batocera-achievements NAME       asks for the password only
+  batocera-achievements --off      turn achievements off again
+  batocera-achievements --show     show what the stick is set to (password hidden)
+
+Make a free account at retroachievements.org first. Achievements then pop up in supported
+games on older consoles. Batocera must be shut down (stick plugged into this PC) when you run this.
+"""
+import argparse, getpass, os, re, subprocess, sys, tempfile
+
+P = "global.retroachievements"
+
+
+def find_drive(arg):
+    if arg:
+        return arg
+    path = "/run/media/%s/SHARE" % getpass.getuser()
+    conf = os.path.join(path, "system", "batocera.conf")
+    if not os.path.isfile(conf) and os.path.exists("/dev/disk/by-label/SHARE"):
+        subprocess.run(["udisksctl", "mount", "-b", "/dev/disk/by-label/SHARE"], capture_output=True)
+    if not os.path.isfile(conf):
+        sys.exit("Can't find the Batocera stick. Plug it in (or pass --drive /path/to/SHARE).")
+    return path
+
+
+def set_keys(lines, values):
+    """Set key=value lines, reusing an existing (even commented-out) line for each key."""
+    for key, val in values.items():
+        new = "%s=%s\n" % (key, val)
+        live = [i for i, l in enumerate(lines) if re.match(r"\s*%s\s*=" % re.escape(key), l)]
+        dead = [i for i, l in enumerate(lines) if re.match(r"\s*#\s*%s\s*=" % re.escape(key), l)]
+        if live:
+            lines[live[0]] = new
+            for i in reversed(live[1:]):
+                del lines[i]
+        elif dead:
+            lines[dead[0]] = new
+        else:
+            if lines and not lines[-1].endswith("\n"):
+                lines[-1] += "\n"
+            lines.append(new)
+    return lines
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("username", nargs="?", help="RetroAchievements username (asked for if left out)")
+    ap.add_argument("--hardcore", action="store_true", help="hardcore mode: no save states, rewind or cheats")
+    ap.add_argument("--off", action="store_true", help="turn achievements off")
+    ap.add_argument("--show", action="store_true", help="show the current setting")
+    ap.add_argument("--drive", help="path to the mounted SHARE partition")
+    a = ap.parse_args()
+    conf = os.path.join(find_drive(a.drive), "system", "batocera.conf")
+    with open(conf, errors="surrogateescape") as f:
+        lines = f.readlines()
+
+    if a.show:
+        shown = [l.rstrip() for l in lines if re.match(r"\s*%s[^=]*=" % re.escape(P), l)]
+        for l in shown:
+            print(re.sub(r"(password\s*=).+", r"\1<hidden>", l))
+        if not shown:
+            print("RetroAchievements is not set up on the stick.")
+        return 0
+    if a.off:
+        values = {P: "0"}
+    else:
+        user = (a.username or input("RetroAchievements username: ")).strip()
+        password = getpass.getpass("RetroAchievements password (not shown as you type): ")
+        if not user or not password:
+            sys.exit("Username and password are both needed. Nothing was changed.")
+        if "\n" in password:
+            sys.exit("That password can't be stored; set it in Batocera's menu instead.")
+        values = {P: "1", P + ".username": user, P + ".password": password,
+                  P + ".hardcore": "1" if a.hardcore else "0"}
+    text = "".join(set_keys(lines, values))
+
+    if os.access(conf, os.W_OK):
+        with open(conf, "w", errors="surrogateescape") as f:
+            f.write(text)
+    else:
+        # The file belongs to root on the stick. Write a private copy, then let root put it in place,
+        # so the password never appears on a command line.
+        fd, tmp = tempfile.mkstemp(prefix="batocera-achievements-", dir=os.environ.get("XDG_RUNTIME_DIR") or None)
+        try:
+            with os.fdopen(fd, "w", errors="surrogateescape") as f:
+                f.write(text)
+            r = subprocess.run(["pkexec", "/usr/bin/install", "-m", "644", "-o", "root", "-g", "root", tmp, conf])
+        finally:
+            os.unlink(tmp)
+        if r.returncode != 0:
+            sys.exit("Could not write the setting (the password prompt was cancelled or failed).")
+    os.sync()
+    print("Achievements turned off on the stick." if a.off else
+          'RetroAchievements account "%s" saved on the stick.' % values[P + ".username"])
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

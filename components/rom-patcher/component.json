@@ -1,0 +1,13 @@
+{
+  "title": "ROM-hack patcher",
+  "question": "Install the ROM-hack patcher (drop a .ips/.bps/.ups file in 'patches' and it is applied at boot)?",
+  "default": true,
+  "order": 40,
+  "files": [
+    {"from": "files/apply-patches.py", "to": "system/retrobox/tools/apply-patches.py", "mode": "755"},
+    {"from": "files/rom_patcher", "to": "system/services/rom_patcher", "mode": "755"},
+    {"from": "files/patches-README.txt", "to": "patches/README.txt"}
+  ],
+  "services": ["rom_patcher"],
+  "replaces": ["system/tools/apply-patches.py"]
+}

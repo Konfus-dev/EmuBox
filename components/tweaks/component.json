@@ -1,0 +1,24 @@
+{
+  "title": "Play settings",
+  "question": "Apply the RetroBox play settings (auto-save, rewind on 8/16-bit systems, zfast shader, tidy network share)?",
+  "default": true,
+  "order": 50,
+  "files": [
+    {"from": "files/tidy_folders", "to": "system/services/tidy_folders", "mode": "755"}
+  ],
+  "services": ["tidy_folders"],
+  "batocera_conf": {
+    "global.autosave": "1",
+    "global.bezel": "default",
+    "global.shaderset": "zfast",
+    "nes.rewind": "1",
+    "snes.rewind": "1",
+    "gb.rewind": "1",
+    "gbc.rewind": "1",
+    "gba.rewind": "1",
+    "megadrive.rewind": "1",
+    "mastersystem.rewind": "1",
+    "gamegear.rewind": "1",
+    "pcengine.rewind": "1"
+  }
+}

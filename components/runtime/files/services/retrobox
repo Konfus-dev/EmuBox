@@ -1,0 +1,19 @@
+#!/bin/bash
+# RetroBox for Batocera. Shows up as a switch under
+#   Main menu > System Settings > Services
+# and adds the "Apps" tab (your apps and music buttons) to the in-game menu.
+#
+# Batocera calls this with "start" or "stop".
+
+root=/userdata/system/retrobox
+
+case "$1" in
+    start)
+        # Rebuilt at every boot from Batocera's own menu, so it follows updates.
+        python3 "$root/lib/menu.py" >>/userdata/system/logs/retrobox.log 2>&1
+        ;;
+    stop)
+        for app in $("$root/bin/retrobox-app" list); do "$root/bin/retrobox-app" close "$app"; done
+        python3 "$root/lib/menu.py" --remove
+        ;;
+esac

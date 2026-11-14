@@ -1,0 +1,11 @@
+#!/bin/bash
+# Hides Batocera's internal folders when the BATOCERA-GAMES drive is browsed over the network, so only the
+# folders you actually use show up. Nothing is moved or renamed.
+[ "$1" = "start" ] || exit 0
+HIDE='hide files = /system/lost+found/extractions/library/kodi/splash/cheats/decorations/'
+for f in /etc/samba/smb.conf /etc/samba/smb-secure.conf; do
+    [ -f "$f" ] || continue
+    grep -q '^hide files' "$f" || sed -i "\|^path = /userdata\$|a $HIDE" "$f"
+done
+smbcontrol all reload-config >/dev/null 2>&1
+exit 0

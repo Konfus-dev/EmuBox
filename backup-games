@@ -1,0 +1,5 @@
+#!/bin/bash
+# Copy the games on a Batocera drive into a library folder:  ./backup-games /path/to/library
+[ -n "$1" ] || { echo "usage: ./backup-games <library folder> [--target <Batocera folder>] [--game-systems psx,snes]" >&2; exit 2; }
+folder=$(realpath -m "$1"); shift
+cd "$(dirname "$(readlink -f "$0")")" && exec python3 -m installer --backup-games "$folder" "$@"

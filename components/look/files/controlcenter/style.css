@@ -1,0 +1,485 @@
+/* RetroBox look for Batocera's Control Center (the menu that appears
+   over a running game). Batocera's own stylesheet, recoloured to the theme's
+   greens and set in the theme's fonts. Lives in
+   /userdata/system/configs/controlcenter/style.css; delete it to go back to
+   Batocera's default look. */
+/* Batocera Control Center - Dark Theme (GTK3 CSS) */
+
+/* Global */
+.scale-small * {
+    font-size: 10px;
+}
+
+.scale-full * {
+    font-size: 16px;
+}
+
+.scale-large * {
+    font-size: 24px;
+}
+
+.popup-root {
+  background-color: #020f02;
+  color: #d6f9b8;
+}
+
+/* Text styles */
+.header, .item-text, .group-title {
+  color: #d6f9b8;
+}
+.value {
+  color: #96f550;
+}
+
+/* Group Title Style */
+.group-title {
+  padding: 4px 6px;          /* left indent + vertical spacing */
+  background-color: #041c04;  /* background of the title label */
+  border-radius: 6px;         /* rounded corners */
+  color: #d6f9b8;
+}
+
+.scale-small .group-title {
+  padding: 2px 3px;          /* left indent + vertical spacing */
+  background-color: #041c04;  /* background of the title label */
+  border-radius: 3px;         /* rounded corners */
+  color: #d6f9b8;
+}
+
+/* 1) Remove default GTK frame border */
+frame {
+  border: none;
+  background: none;
+  box-shadow: none;
+}
+
+/* 2) Custom frame border container (the box that follows the title) */
+frame > border {
+  border: 1px solid #5c9a48;  /* custom border color */
+  padding: 2px 6px;           /* spacing between border and contents */
+  background-color: #041c04;  /* background of the framed box */
+  border-radius: 4px;         /* optional rounded corners */
+}
+
+/* Layout helpers */
+.vgroup-row { padding: 4px 0; }
+
+.scale-small .vgroup-row { padding: 2px 0; }
+
+.vgroup-cell {
+  background-color: #041c04;
+  padding: 8px 8px;
+  min-height: 50px;  /* Consistent row height for grid alignment */
+}
+
+.scale-small .vgroup-cell {
+  background-color: #041c04;
+  padding: 4px 4px;
+  min-height: 20px;  /* Consistent row height for grid alignment */
+}
+
+.vgroup-cell-first { min-width: 180px; }
+
+.scale-small .vgroup-cell-first { min-width: 80px; }
+
+.vgroup-row .header + .value, .vgroup-row .value { min-width: 200px; }
+
+.scale-small .vgroup-row .header + .value, .vgroup-row .value { min-width: 90px; }
+
+.section-separator { background-color: #0c3a0c; min-height: 2px; }
+
+.group-frame {
+  border: 2px solid #0c3a0c;
+  border-radius: 10px;
+  margin: 12px 0;
+  padding: 8px;
+  background-color: #041c04;
+}
+
+.scale-small .group-frame {
+  border: 2px solid #0c3a0c;
+  border-radius: 6px;
+  margin: 6px 0;
+  padding: 8px;
+  background-color: #041c04;
+}
+
+/* Base button surface: dark, no gradients */
+button {
+  border-radius: 10px;
+  padding: 8px 12px;
+  min-width: 80px;
+  border: 1px solid #0c3a0c;
+  background-color: #031603;
+  background-image: none;
+  color: #d6f9b8; /* fallback if no nested label */
+}
+
+.scale-small button {
+  border-radius: 6px;
+  padding: 4px 6px;
+  min-width: 40px;
+  border: 1px solid #0c3a0c;
+  background-color: #031603;
+  background-image: none;
+  color: #d6f9b8; /* fallback if no nested label */
+}
+
+
+/* Button label (GtkLabel) */
+button > label {
+  color: #d6f9b8;
+  font-weight: 400;
+  letter-spacing: 0.2px;
+}
+
+/* Neutral button classes explicitly kept dark */
+button.cc-button,
+button.cc-choice,
+button.choice-option {
+  background-color: #031603;
+  border-color: #0c3a0c;
+  color: #d6f9b8;
+}
+
+/* Hover: subtle lift but still dark */
+button.cc-button:hover,
+button.cc-choice:hover,
+button.choice-option:hover {
+  background-color: #062606;
+  border-color: #124a10;
+}
+button.cc-button:hover > label,
+button.cc-choice:hover > label,
+button.choice-option:hover > label {
+  color: #c8f03c;
+}
+
+/* Selected/focused: dark accent (never light) */
+button.cc-button.choice-selected,
+button.cc-button.focused-cell,
+button.cc-button:focus,
+button.cc-choice.choice-selected,
+button.choice-option.choice-selected,
+button.focused-cell {
+  background-color: #0b470b;
+  border-color: #82e846;
+  color: #c8f03c;
+  background-image: none;
+  box-shadow: 0 0 4px rgba(200, 240, 60, 0.8); /* cyan halo */
+}
+
+/* Specific rule for button_confirm highlighting - higher specificity */
+button.cc-button.cc-button-confirm.choice-selected,
+button.cc-button.cc-button-confirm.focused-cell,
+button.cc-button.cc-button-confirm:focus {
+  background-color: #0b470b;
+  border-color: #82e846;
+  color: #c8f03c;
+  background-image: none;
+  box-shadow: 0 0 4px rgba(200, 240, 60, 0.8); /* cyan halo */
+}
+button.cc-button.choice-selected > label,
+button.cc-button.focused-cell > label,
+button.cc-button:focus > label,
+button.cc-choice.choice-selected > label,
+button.choice-option.choice-selected > label,
+button.focused-cell > label {
+  color: #c8f03c;
+}
+
+/* Label highlighting for button_confirm - higher specificity */
+button.cc-button.cc-button-confirm.choice-selected > label,
+button.cc-button.cc-button-confirm.focused-cell > label,
+button.cc-button.cc-button-confirm:focus > label {
+  color: #c8f03c;
+}
+
+/* Disabled: darker and dim text */
+button:disabled,
+button.cc-button:disabled,
+button.cc-choice:disabled,
+button.choice-option:disabled {
+  background-color: #020c02;
+  color: #8fc878;
+  border-color: #072a07;
+}
+
+/* Toggles: dark base; checked is muted, not bright */
+button.cc-toggle {
+  background-color: #2c3a0c;
+  color: #f0ffd7;
+  border: 1px solid #3a4a10;
+  border-radius: 10px;
+  padding: 12px 20px;
+  min-width: 80px;
+  background-image: none;
+}
+
+.scale-small button.cc-toggle {
+  background-color: #2c3a0c;
+  color: #f0ffd7;
+  border: 1px solid #3a4a10;
+  border-radius: 10px;
+  padding: 6px 8px;
+  min-width: 40px;
+  background-image: none;
+}
+
+button.cc-toggle:checked {
+  background-color: #0b3a0b;
+  border-color: #82e846;
+  color: #96f550;
+}
+
+button.cc-toggle.choice-selected,
+button.cc-toggle.focused-cell,
+button.cc-toggle:focus {
+  background-color: #0b470b;
+  border-color: #c8f03c;
+  color: #f0ffd7;
+  box-shadow: 0 0 4px rgba(200, 240, 60, 0.8); /* cyan halo */
+}
+
+/* Switch focus highlighting - make selection much more obvious */
+.cc-switch.choice-selected,
+.cc-switch.focused-cell,
+.cc-switch:focus {
+  background-color: #c8f03c;  /* Bright cyan background when selected */
+  border-color: #f0ffd7;  /* White border for high contrast - keep same width */
+  box-shadow: 0 0 8px rgba(200, 240, 60, 1.0); /* Strong cyan glow */
+}
+
+/* Switch slider when selected - make it stand out */
+.cc-switch.choice-selected > slider,
+.cc-switch.focused-cell > slider,
+.cc-switch:focus > slider {
+  background-color: #f0ffd7;  /* White slider when switch is selected */
+  border-color: #020f02;  /* Dark border for contrast - keep same width */
+  box-shadow: 0 0 4px rgba(240, 255, 215, 0.8);  /* White glow on slider */
+}
+
+/* When switch is both checked AND selected - maximum visibility */
+.cc-switch:checked.choice-selected,
+.cc-switch:checked.focused-cell,
+.cc-switch:checked:focus {
+  background-color: #c8f03c;  /* Bright cyan */
+  border-color: #f0ffd7;  /* White border - keep same width */
+  box-shadow: 0 0 12px rgba(200, 240, 60, 1.0); /* Extra strong glow */
+}
+
+.cc-switch:checked.choice-selected > slider,
+.cc-switch:checked.focused-cell > slider,
+.cc-switch:checked:focus > slider {
+  background-color: #f0ffd7;  /* White slider */
+  border-color: #020f02;  /* Dark border - keep same width */
+  box-shadow: 0 0 6px rgba(240, 255, 215, 1.0);  /* Strong white glow */
+}
+
+/* Tabs: distinct tab-like styling, visually different from buttons */
+button.cc-tab {
+border: 2px solid #124a10;
+  border-bottom: 2px solid #041c04;
+  border-radius: 10px 10px 0 0;  /* Rounded top corners only */
+  padding: 10px 20px;
+  min-width: 120px;
+  background-image: none;
+  color: #6fa85c;
+  margin: 0 3px;
+  box-shadow: inset 0 -2px 4px rgba(0, 0, 0, 0.4);
+}
+
+.scale-small button.cc-tab {
+border: 2px solid #124a10;
+  border-bottom: 2px solid #041c04;
+  border-radius: 6px 6px 0 0;  /* Rounded top corners only */
+  padding: 6px 10px;
+  min-width: 80px;
+  background-image: none;
+  color: #6fa85c;
+  margin: 0 2px;
+  box-shadow: inset 0 -2px 4px rgba(0, 0, 0, 0.4);
+}
+button.cc-tab > label {
+  color: #6fa85c;
+  font-weight: 500;
+}
+button.cc-tab:hover {
+  border-color: #1a5a16;
+  color: #8fc878;
+}
+button.cc-tab:hover > label {
+  color: #8fc878;
+}
+/* Active/selected tab */
+button.cc-tab:checked {
+  border: 3px solid #82e846;  /* Blue border */
+  border-bottom: 3px solid #041c04;  /* Blend with content area */
+  margin-bottom: -3px;
+  padding: 10px 20px;
+  box-shadow: 0 0 6px rgba(130, 232, 70, 0.3);
+}
+
+.scale-small button.cc-tab:checked {
+  border: 3px solid #82e846;  /* Blue border */
+  border-bottom: 2px solid #041c04;  /* Blend with content area */
+  margin-bottom: -2px;
+  padding: 6px 10px;
+  box-shadow: 0 0 6px rgba(130, 232, 70, 0.3);
+}
+button.cc-tab:checked > label {
+  color: #f0ffd7;
+  font-weight: 700;
+  text-shadow: none;
+}
+
+/* Only show cyan when tab is both checked (active) AND focused */
+button.cc-tab:checked.choice-selected,
+button.cc-tab:checked.focused-cell {
+  border-color: #c8f03c;  /* Cyan border */
+  color: #c8f03c;
+  border-bottom: 3px solid #041c04;  /* Keep bottom blended */
+}
+
+/* Choice selection (non-button contexts that get the class) */
+.choice-selected {
+  background-color: #0b470b;
+  border-color: #82e846;
+  color: #f0ffd7;
+}
+
+/* Dialogs */
+.confirm-dialog {
+  border: 1px solid #82e846;
+  border-radius: 10px;
+  background-color: #020f02;
+}
+
+/* Hide dialog action area (bottom bar) - try multiple selectors */
+.dialog-action-area,
+dialog .dialog-action-area,
+.confirm-dialog .dialog-action-area {
+  min-height: 0px;
+  padding: 0px;
+  margin: 0px;
+  border: none;
+  background: transparent;
+  opacity: 0;
+}
+
+/* Focused row background stays transparent; only controls highlight */
+.focused { background-color: transparent; }
+
+/* Document Viewer Text Styling */
+.doc-viewer-text {
+  background-color: #020f02;
+  color: #d6f9b8;
+  font-family: monospace;
+  font-size: 14pt;
+  padding: 20px;
+}
+
+.scale-small .doc-viewer-text {
+  font-size: 8pt;
+  padding: 10px;
+}
+
+.scale-large .doc-viewer-text {
+    font-size: 22px;
+  padding: 30px;
+}
+
+.doc-viewer-text text {
+  background-color: #020f02;
+  color: #d6f9b8;
+}
+
+.cc-progressbar {
+  min-width: 200px;
+  min-height: 20px;
+  background-color: #031603;
+  border: 1px solid #0c3a0c;
+  border-radius: 10px;
+  padding: 2px;
+}
+
+.scale-small .cc-progressbar {
+  min-width: 120px;
+  min-height: 12px;
+  border-radius: 6px;
+  padding: 1px;
+}
+
+.cc-progressbar > trough {
+  background-color: #020f02;
+  border-radius: 8px;
+  border: none;
+}
+
+.scale-small .cc-progressbar > trough {
+  border-radius: 4px;
+}
+
+.cc-progressbar > trough > progress {
+  background-color: #96f550;
+  background-image: none;
+  border-radius: 6px;
+  border: none;
+  min-height: 16px;
+}
+
+.scale-small .cc-progressbar > trough > progress {
+  border-radius: 3px;
+  min-height: 10px;
+}
+
+.cc-progressbar-text {
+  color: #f0ffd7;
+  font-weight: 600;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.cc-switch {
+  background-color: #2c3a0c;
+  border: 2px solid #3a4a10;  /* Always 2px border to prevent layout shifts */
+  border-radius: 12px;
+  min-width: 48px;
+  min-height: 24px;
+}
+
+.scale-small .cc-switch {
+  border-radius: 8px;
+  min-width: 32px;
+  min-height: 16px;
+}
+
+.cc-switch:checked {
+  background-color: #96f550;
+  border-color: #82e846;
+}
+
+.cc-switch > slider {
+  background-color: #f0ffd7;
+  border: 1px solid #c6e8ac;
+  border-radius: 50%;
+  min-width: 20px;
+  min-height: 20px;
+  margin: 1px;
+}
+
+.scale-small .cc-switch > slider {
+  min-width: 12px;
+  min-height: 12px;
+}
+
+.cc-switch:checked > slider {
+  background-color: #f0ffd7;  /* Keep slider white when checked for contrast */
+  border-color: #82e846;
+}
+
+
+/* ---- RetroBox additions ---- */
+* { font-family: "Rajdhani", "Rajdhani Medium", sans-serif; }
+.group-title, button.cc-tab > label { font-family: "Michroma", "Rajdhani", sans-serif; letter-spacing: 1px; }
+/* The original dashboard was all straight edges and cut corners. */
+frame > border, .group-frame, button, button.cc-tab, .popup-root, .confirm-dialog { border-radius: 2px; }

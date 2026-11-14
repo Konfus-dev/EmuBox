@@ -1,0 +1,71 @@
+#!/bin/bash
+# Boot the Batocera USB stick in a window on this PC (a virtual machine), without restarting.
+#
+#   batocera-vm            test mode: nothing is written to the stick; changes vanish when you close it
+#   batocera-vm --write    changes made inside (settings, saves, scraped art) are kept on the stick
+#
+# It is for checking menus, settings and that games show up. Games run slowly here because the
+# virtual machine has no real graphics card; use reboot-to-batocera to actually play.
+# Keys: Ctrl+Alt+G releases the mouse, Ctrl+Alt+F toggles fullscreen. Close the window to stop.
+set -euo pipefail
+
+MODE=test
+case "${1:-}" in
+    --write) MODE=write ;;
+    ""|--test) ;;
+    *) sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+esac
+
+die() { echo "batocera-vm: $1" >&2; exit 1; }
+
+part=$(lsblk -rno PATH,LABEL | awk '$2 == "BATOCERA" { print $1; exit }')
+[ -n "$part" ] || die "No partition labelled BATOCERA found. Is the stick plugged in?"
+disk="/dev/$(lsblk -no PKNAME "$part" | head -n1)"
+[ "$(lsblk -dno RM "$disk")" = "1" ] || die "$disk is not a removable drive; refusing to use it."
+
+run=$(mktemp -d "${XDG_RUNTIME_DIR:-/tmp}/batocera-vm.XXXXXX")
+# Batocera's kernel is started directly (copied off the stick first), which is the way this was tested.
+bootmp=$(lsblk -no MOUNTPOINT "$part" | head -n1)
+if [ -z "$bootmp" ]; then udisksctl mount -b "$part" >/dev/null || die "Could not mount $part."; bootmp=$(lsblk -no MOUNTPOINT "$part" | head -n1); fi
+cp "$bootmp/boot/linux" "$bootmp/boot/initrd.gz" "$run/" || die "Could not read Batocera's kernel from $bootmp/boot."
+
+# The stick must not be in use by this PC while Batocera runs from it.
+mounted=()
+while read -r p mp; do
+    [ -n "$mp" ] || continue
+    udisksctl unmount -b "$p" >/dev/null || die "Could not unmount $p ($mp). Close anything using the stick."
+    mounted+=("$p")
+done < <(lsblk -rno PATH,MOUNTPOINT "$disk" | tail -n +2)
+
+need=r; [ "$MODE" = write ] && need=rw
+if ! { [ -r "$disk" ] && { [ "$MODE" = test ] || [ -w "$disk" ]; }; }; then
+    echo "Asking for your password to let this session read the stick directly..."
+    pkexec /usr/bin/setfacl -m "u:$(id -un):$need" "$disk" || die "Could not get access to $disk."
+fi
+
+cleanup() {
+    rm -rf "$run"
+    for p in "${mounted[@]}"; do udisksctl mount -b "$p" >/dev/null 2>&1 || true; done
+}
+trap cleanup EXIT
+
+snap=on
+if [ "$MODE" = write ]; then snap=off; echo "WRITE mode: changes are saved to the stick."
+else echo "Test mode: nothing is written to the stick."; fi
+
+cpus=$(( $(nproc) / 2 )); [ "$cpus" -gt 6 ] && cpus=6; [ "$cpus" -lt 2 ] && cpus=2
+
+# Batocera's menu needs accelerated graphics, so the virtual screen uses this PC's GPU (virgl).
+# BATOCERA_VM_DISPLAY and BATOCERA_VM_EXTRA are for troubleshooting, e.g.
+#   BATOCERA_VM_DISPLAY=sdl,gl=on batocera-vm
+qemu-system-x86_64 \
+    -name "Batocera ($MODE mode)" -machine q35,accel=kvm -cpu host -smp "$cpus" -m 6G \
+    -kernel "$run/linux" -initrd "$run/initrd.gz" \
+    -append "label=BATOCERA console=tty3 quiet loglevel=0 vt.global_cursor_default=0" \
+    -drive file="$disk",format=raw,if=none,id=stick,snapshot=$snap,cache=writeback \
+    -device ich9-ahci,id=ahci -device ide-hd,drive=stick,bus=ahci.0 \
+    -device qemu-xhci -device usb-kbd -device usb-tablet \
+    -nic user,model=e1000e \
+    -audiodev pipewire,id=snd -device ich9-intel-hda -device hda-duplex,audiodev=snd \
+    -device virtio-vga-gl -vga none -display "${BATOCERA_VM_DISPLAY:-gtk,gl=on,zoom-to-fit=on}" \
+    ${BATOCERA_VM_EXTRA:-}

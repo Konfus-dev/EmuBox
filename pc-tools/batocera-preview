@@ -1,0 +1,26 @@
+#!/bin/bash
+# Preview a Batocera menu theme in a window on this PC, using Batocera's own menu program.
+#   batocera-preview [theme-folder-name]     (default: retrobox)
+# Themes are read from ~/batocera-preview/themes. Games come from the stick if it is plugged in.
+# Keys: arrows move, Enter select, Esc back, Space menu, Backspace options. Close the window to quit.
+P="$HOME/batocera-preview"; R="$P/root"
+THEME="${1:-retrobox}"
+[ -d "$P/themes/$THEME" ] || { echo "No theme '$THEME' in $P/themes (have: $(ls "$P/themes" | tr '\n' ' '))"; exit 1; }
+ROMS="/run/media/$USER/SHARE/roms"; [ -d "$ROMS" ] || ROMS="$P/emptyroms"
+cat > "$P/userdata/system/configs/emulationstation/es_settings.cfg" <<CFG
+<?xml version="1.0"?>
+<config>
+	<string name="ThemeSet" value="$THEME" />
+	<bool name="audio.bgmusic" value="false" />
+	<bool name="EnableSounds" value="${PREVIEW_SOUND:-true}" />
+</config>
+CFG
+args=(--tmpfs / --ro-bind /usr /usr --symlink usr/lib /lib --symlink usr/lib64 /lib64 --symlink usr/bin /bin --ro-bind /etc /etc
+      --proc /proc --dev-bind /dev /dev --ro-bind /sys /sys --bind /tmp /tmp --ro-bind /run /run --ro-bind /var /var --ro-bind /home /home
+      --tmpfs /usr/share)
+for d in /usr/share/*; do args+=(--ro-bind "$d" "$d"); done
+args+=(--ro-bind "$R/usr/share/espeak-data" /usr/share/espeak-data --ro-bind "$R/usr/share/emulationstation" /usr/share/emulationstation
+       --bind "$P/userdata" /userdata --ro-bind "$P/themes" /userdata/themes --ro-bind "$ROMS" /userdata/roms)
+exec bwrap "${args[@]}" --setenv HOME /userdata/system --setenv LD_LIBRARY_PATH "$R/usr/lib" ${SHIM_CMD:+--setenv SDL_AUDIODRIVER dummy} \
+     ${SHIM_CMD:+--setenv LD_PRELOAD "$P/shim.so" --setenv SHIM_CMD "$SHIM_CMD"} \
+     "$R/usr/bin/emulationstation" --windowed --resolution "${PREVIEW_W:-1280}" "${PREVIEW_H:-720}" --no-splash

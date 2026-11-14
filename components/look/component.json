@@ -1,0 +1,14 @@
+{
+  "title": "Xbox-style look",
+  "question": "Install the Xbox-style look (green theme, menu colours, fonts and sounds)?",
+  "default": true,
+  "order": 10,
+  "files": [
+    {"from": "files/theme", "to": "themes/retrobox"},
+    {"from": "files/controlcenter/style.css", "to": "system/configs/controlcenter/style.css"},
+    {"from": "files/fonts", "to": "system/.fonts"}
+  ],
+  "es_settings": {"ThemeSet": "retrobox"},
+  "replaces": ["themes/classic-dash"],
+  "after": "The look is selected as the theme. To switch back: Main menu > User interface settings > Theme set."
+}

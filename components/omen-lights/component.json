@@ -1,0 +1,12 @@
+{
+  "title": "OMEN lights",
+  "question": "This PC has HP OMEN case lights. Install OMEN Lights (cooler screen and lights follow the game)?",
+  "default": true,
+  "order": 70,
+  "source": {
+    "sibling": "OmenRGB-Controller",
+    "url": "https://github.com/Konfus-dev/OmenRGB-Controller"
+  },
+  "usb_devices": ["03f0:7397", "103c:84fd"],
+  "services": ["omen_lights"]
+}

@@ -1,0 +1,36 @@
+{
+  "name": "Discord",
+  "question": "Install Discord (voice and text chat, set up for the controller)?",
+  "description": "Voice and text chat, set up for the controller. D-pad moves, A selects, B goes back, click the left stick for the keyboard, Guide opens the menu. Hide it with Select+B and it keeps running while you play. Downloads itself the first time you open it (needs internet).",
+  "flatpak": "com.discordapp.Discord",
+  "args": [
+    "--no-sandbox"
+  ],
+  "window": "discord",
+  "pad": {
+    "up": ["KEY_UP"],
+    "down": ["KEY_DOWN"],
+    "left": ["KEY_LEFT"],
+    "right": ["KEY_RIGHT"],
+    "a": ["KEY_ENTER"],
+    "b": ["KEY_ESC"],
+    "x": ["KEY_LEFTCTRL", "KEY_LEFTSHIFT", "KEY_M"],
+    "y": ["KEY_F6"],
+    "lb": ["KEY_LEFTSHIFT", "KEY_TAB"],
+    "rb": ["KEY_TAB"],
+    "lt": ["KEY_LEFTCTRL", "KEY_LEFTALT", "KEY_UP"],
+    "rt": ["KEY_LEFTCTRL", "KEY_LEFTALT", "KEY_DOWN"],
+    "start": ["KEY_LEFTCTRL", "KEY_K"],
+    "select+up": ["KEY_LEFTALT", "KEY_UP"],
+    "select+down": ["KEY_LEFTALT", "KEY_DOWN"],
+    "select+x": ["KEY_LEFTCTRL", "KEY_LEFTSHIFT", "KEY_D"],
+    "select+a": "menu",
+    "select+b": "back",
+    "select+start": "close",
+    "guide": "menu",
+    "l3": "osk",
+    "r3": "click",
+    "left_stick": "scroll",
+    "right_stick": "pointer"
+  }
+}

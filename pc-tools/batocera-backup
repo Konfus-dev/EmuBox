@@ -1,0 +1,15 @@
+#!/bin/bash
+# Back up saves, screenshots and settings from the Batocera stick to ~/Batocera-Backups/<date>/
+DRIVE="${1:-/run/media/$USER/SHARE}"
+if [ ! -d "$DRIVE/saves" ] && [ -e /dev/disk/by-label/SHARE ]; then
+    udisksctl mount -b /dev/disk/by-label/SHARE >/dev/null 2>&1
+fi
+[ -d "$DRIVE/saves" ] || { echo "Can't find the Batocera stick. Plug it in (or pass the SHARE path)."; exit 1; }
+DEST="$HOME/Batocera-Backups/$(date +%Y-%m-%d_%H%M)"
+mkdir -p "$DEST/system" || exit 1
+# flatpak holds installed launchers/games, not save files worth copying
+rsync -a --exclude='flatpak/' "$DRIVE/saves" "$DRIVE/screenshots" "$DEST/" || exit 1
+rsync -a "$DRIVE/system/batocera.conf" "$DEST/system/" || exit 1
+rsync -a --exclude='tmp/' "$DRIVE/system/configs" "$DEST/system/" || exit 1
+find "$DRIVE/roms" -name gamelist.xml -print0 | rsync -a --from0 --files-from=- / "$DEST/gamelists/" 2>/dev/null
+echo "Backed up to $DEST ($(du -sh "$DEST" | cut -f1))"

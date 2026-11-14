@@ -1,0 +1,40 @@
+{
+  "name": "Apple Music",
+  "question": "Install Apple Music (the web player, set up for the controller)?",
+  "description": "Your Apple Music library, set up for the controller. D-pad moves, A selects, X plays or pauses, LB/RB change song. Hide it with Select+B and the music keeps playing while you play. Downloads itself the first time you open it (needs internet).",
+  "flatpak": "com.google.Chrome",
+  "args": [
+    "--no-sandbox",
+    "--test-type",
+    "--no-first-run",
+    "--no-default-browser-check",
+    "--password-store=basic",
+    "--kiosk",
+    "--enable-spatial-navigation",
+    "--force-dark-mode",
+    "--app=https://music.apple.com/"
+  ],
+  "window": "chrome-music.apple.com",
+  "pad": {
+    "up": ["KEY_UP"],
+    "down": ["KEY_DOWN"],
+    "left": ["KEY_LEFT"],
+    "right": ["KEY_RIGHT"],
+    "a": ["KEY_ENTER"],
+    "b": ["KEY_LEFTALT", "KEY_LEFT"],
+    "x": {"media": "PlayPause"},
+    "y": ["KEY_TAB"],
+    "lb": {"media": "Previous"},
+    "rb": {"media": "Next"},
+    "lt": {"run": "batocera-audio setSystemVolume -5"},
+    "rt": {"run": "batocera-audio setSystemVolume +5"},
+    "select+a": "menu",
+    "select+b": "back",
+    "select+start": "close",
+    "guide": "menu",
+    "l3": "osk",
+    "r3": "click",
+    "left_stick": "scroll",
+    "right_stick": "pointer"
+  }
+}

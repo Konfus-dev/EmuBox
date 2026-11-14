@@ -1,0 +1,4 @@
+#!/bin/bash
+# Applies any ROM-hack patches waiting in /userdata/patches at boot.
+[ "$1" = "start" ] || exit 0
+python3 /userdata/system/retrobox/tools/apply-patches.py /userdata >> /userdata/system/logs/rom_patcher.log 2>&1

@@ -1,0 +1,101 @@
+#!/usr/bin/env python3
+"""Set the ScreenScraper account on the Batocera USB stick, from this PC.
+
+  batocera-scraper                 asks for your ScreenScraper username and password
+  batocera-scraper NAME            asks for the password only
+  batocera-scraper --clear         remove the saved account
+  batocera-scraper --show          show what the stick is set to (password hidden)
+
+Use your ScreenScraper username, not your email address. Both are case-sensitive.
+Batocera must be shut down (stick plugged into this PC) when you run this.
+"""
+import argparse, getpass, os, re, subprocess, sys, tempfile
+from xml.sax.saxutils import quoteattr
+
+KEYS = ("Scraper", "ScreenScraperUser", "ScreenScraperPass")
+
+
+def find_drive(arg):
+    if arg:
+        return arg
+    path = "/run/media/%s/SHARE" % getpass.getuser()
+    if not os.path.isdir(os.path.join(path, "system")) and os.path.exists("/dev/disk/by-label/SHARE"):
+        subprocess.run(["udisksctl", "mount", "-b", "/dev/disk/by-label/SHARE"], capture_output=True)
+    if not os.path.isdir(os.path.join(path, "system")):
+        sys.exit("Can't find the Batocera stick. Plug it in (or pass --drive /path/to/SHARE).")
+    return path
+
+
+def line_for(key):
+    return re.compile(r'^\s*<string\s+name="%s"\s+value="[^"]*"\s*/>\s*$' % re.escape(key))
+
+
+def set_values(text, values):
+    """Set or remove <string name=... value=.../> lines. A value of None removes the line."""
+    if "<config>" not in text:
+        text = '<?xml version="1.0"?>\n<config>\n</config>\n'
+    lines = text.splitlines(keepends=True)
+    for key, val in values.items():
+        lines = [l for l in lines if not line_for(key).match(l)]
+        if val is not None:
+            end = next(i for i, l in enumerate(lines) if "</config>" in l)
+            lines.insert(end, '\t<string name="%s" value=%s />\n' % (key, quoteattr(val)))
+    return "".join(lines)
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("username", nargs="?", help="ScreenScraper username (asked for if left out)")
+    ap.add_argument("--clear", action="store_true", help="remove the saved account")
+    ap.add_argument("--show", action="store_true", help="show the current setting")
+    ap.add_argument("--drive", help="path to the mounted SHARE partition")
+    a = ap.parse_args()
+    conf = os.path.join(find_drive(a.drive), "system", "configs", "emulationstation", "es_settings.cfg")
+    text = open(conf, errors="surrogateescape").read() if os.path.isfile(conf) else ""
+
+    if a.show:
+        found = False
+        for l in text.splitlines():
+            if any(line_for(k).match(l) for k in KEYS):
+                print(re.sub(r'(name="ScreenScraperPass"\s+value=)"[^"]*"', r'\1"<hidden>"', l.strip()))
+                found = True
+        if not found:
+            print("No ScreenScraper account is saved on the stick.")
+        return 0
+    if a.clear:
+        values = {"ScreenScraperUser": None, "ScreenScraperPass": None}
+    else:
+        user = (a.username or input("ScreenScraper username: ")).strip()
+        password = getpass.getpass("ScreenScraper password (not shown as you type): ")
+        if not user or not password:
+            sys.exit("Username and password are both needed. Nothing was changed.")
+        if "@" in user:
+            print("Note: that looks like an email address. ScreenScraper wants the username you log in with.")
+        values = {"Scraper": "ScreenScraper", "ScreenScraperUser": user, "ScreenScraperPass": password}
+    new = set_values(text, values)
+
+    if os.access(conf, os.W_OK) or (not os.path.exists(conf) and os.access(os.path.dirname(conf), os.W_OK)):
+        with open(conf, "w", errors="surrogateescape") as f:
+            f.write(new)
+    else:
+        # The file belongs to root on the stick. Write a private copy, then let root put it in place,
+        # so the password never appears on a command line.
+        fd, tmp = tempfile.mkstemp(prefix="batocera-scraper-", dir=os.environ.get("XDG_RUNTIME_DIR") or None)
+        try:
+            with os.fdopen(fd, "w", errors="surrogateescape") as f:
+                f.write(new)
+            r = subprocess.run(["pkexec", "/usr/bin/install", "-m", "644", "-o", "root", "-g", "root", tmp, conf])
+        finally:
+            os.unlink(tmp)
+        if r.returncode != 0:
+            sys.exit("Could not write the setting (the password prompt was cancelled or failed).")
+    os.sync()
+    if a.clear:
+        print("ScreenScraper account removed from the stick.")
+    else:
+        print('ScreenScraper account "%s" saved on the stick. Scrape in Batocera with Start > Scraper.' % values["ScreenScraperUser"])
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

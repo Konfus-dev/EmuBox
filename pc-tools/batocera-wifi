@@ -1,0 +1,105 @@
+#!/usr/bin/env python3
+"""Set the Wi-Fi network on the Batocera USB stick, from this PC. It connects at the next boot.
+
+  batocera-wifi "Network name" "password"     set the network and turn Wi-Fi on
+  batocera-wifi "Network name"                asks for the password (keeps it out of shell history)
+  batocera-wifi --off                         turn Wi-Fi off again
+  batocera-wifi --show                        show what the stick is set to (password hidden)
+
+Add  --country US  (or FR, GB, ...) if the network is not found.
+"""
+import argparse, getpass, os, re, subprocess, sys, tempfile
+
+
+def find_drive(arg):
+    if arg:
+        return arg
+    path = "/run/media/%s/SHARE" % getpass.getuser()
+    conf = os.path.join(path, "system", "batocera.conf")
+    if not os.path.isfile(conf) and os.path.exists("/dev/disk/by-label/SHARE"):
+        subprocess.run(["udisksctl", "mount", "-b", "/dev/disk/by-label/SHARE"], capture_output=True)
+    if not os.path.isfile(conf):
+        sys.exit("Can't find the Batocera stick. Plug it in (or pass --drive /path/to/SHARE).")
+    return path
+
+
+def set_keys(lines, values):
+    """Set key=value lines, reusing an existing (even commented-out) line for each key."""
+    for key, val in values.items():
+        new = "%s=%s\n" % (key, val)
+        live = [i for i, l in enumerate(lines) if re.match(r"\s*%s\s*=" % re.escape(key), l)]
+        dead = [i for i, l in enumerate(lines) if re.match(r"\s*#\s*%s\s*=" % re.escape(key), l)]
+        if live:
+            lines[live[0]] = new
+            for i in reversed(live[1:]):
+                del lines[i]
+        elif dead:
+            lines[dead[0]] = new
+        else:
+            if lines and not lines[-1].endswith("\n"):
+                lines[-1] += "\n"
+            lines.append(new)
+    return lines
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("ssid", nargs="?", help="the Wi-Fi network name")
+    ap.add_argument("password", nargs="?", help="the Wi-Fi password (asked for if left out)")
+    ap.add_argument("--country", help="two-letter Wi-Fi country code, e.g. US")
+    ap.add_argument("--open", action="store_true", help="the network has no password")
+    ap.add_argument("--off", action="store_true", help="turn Wi-Fi off")
+    ap.add_argument("--show", action="store_true", help="show the current setting")
+    ap.add_argument("--drive", help="path to the mounted SHARE partition")
+    a = ap.parse_args()
+    conf = os.path.join(find_drive(a.drive), "system", "batocera.conf")
+    with open(conf, errors="surrogateescape") as f:
+        lines = f.readlines()
+
+    if a.show:
+        for l in lines:
+            if re.match(r"\s*wifi[^=]*=", l):
+                print(re.sub(r"(key\s*=).+", r"\1<hidden>", l.rstrip()))
+        return 0
+    if a.off:
+        values = {"wifi.enabled": "0"}
+    else:
+        if not a.ssid:
+            ap.print_help()
+            return 1
+        key = "" if a.open else (a.password if a.password is not None else getpass.getpass("Wi-Fi password: "))
+        if not a.open and not key:
+            sys.exit("No password given. For a network without one, add --open.")
+        if "\\" in key or "\n" in key:
+            sys.exit("Batocera can't store a password containing a backslash; set it in Batocera's menu instead.")
+        values = {"wifi.enabled": "1", "wifi.ssid": a.ssid, "wifi.key": key}
+        if a.country:
+            values["wifi.country"] = a.country.upper()
+    text = "".join(set_keys(lines, values))
+
+    if os.access(conf, os.W_OK):
+        with open(conf, "w", errors="surrogateescape") as f:
+            f.write(text)
+    else:
+        # The file belongs to root on the stick. Write a private copy, then let root put it in place,
+        # so the password never appears on a command line.
+        tmpdir = os.environ.get("XDG_RUNTIME_DIR") or None
+        fd, tmp = tempfile.mkstemp(prefix="batocera-wifi-", dir=tmpdir)
+        try:
+            with os.fdopen(fd, "w", errors="surrogateescape") as f:
+                f.write(text)
+            r = subprocess.run(["pkexec", "/usr/bin/install", "-m", "644", "-o", "root", "-g", "root", tmp, conf])
+        finally:
+            os.unlink(tmp)
+        if r.returncode != 0:
+            sys.exit("Could not write the setting (the password prompt was cancelled or failed).")
+    os.sync()
+    if a.off:
+        print("Wi-Fi turned off on the stick.")
+    else:
+        print('Wi-Fi set to "%s" on the stick. Batocera connects when it next boots.' % a.ssid)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

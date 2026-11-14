@@ -1,0 +1,164 @@
+#!/bin/bash
+# Open, hide and control RetroBox apps (Discord, Apple Music...) on Batocera.
+#
+#   retrobox-app open <app> [--wait]   start it, or bring it back if it is running
+#   retrobox-app back [<app>]          hide it and return to the game (it keeps running)
+#   retrobox-app close <app>           quit it
+#   retrobox-app install <app>         download it (needs internet); "open" does this when needed
+#   retrobox-app running <app>         exit status 0 if it is running
+#   retrobox-app media PlayPause|Next|Previous|title
+#   retrobox-app list                  the apps that are set up
+#
+# Each app is one folder, apps/<app>/, whose app.json says what to start, how
+# its window is named, and what the controller's buttons do in it.
+
+ROOT=$(dirname "$(dirname "$(readlink -f "$0")")")
+RUN=/var/run/retrobox
+LOG=/userdata/system/logs/retrobox.log
+mkdir -p "$RUN" "$(dirname "$LOG")"
+
+# Batocera's display, for when we are called from a menu with a bare environment.
+export HOME=/userdata/system XDG_RUNTIME_DIR=/var/run
+export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}" DISPLAY="${DISPLAY:-:0}"
+export XDG_SESSION_TYPE=wayland XDG_CURRENT_DESKTOP=labwc:wlroots
+
+# The apps need a D-Bus session of their own (Batocera has none): flatpak's
+# sandbox helper lives on it, and so do the players' media controls.
+BUS="unix:path=$RUN/bus"
+export DBUS_SESSION_BUS_ADDRESS="$BUS"
+bus_call() { dbus-send --bus="$BUS" --print-reply "$@" 2>/dev/null; }
+start_bus() {
+    bus_call --dest=org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus.GetId >/dev/null && return
+    rm -f "$RUN/bus"
+    dbus-daemon --session --address="$BUS" --fork --nopidfile 2>>"$LOG"
+}
+
+conf() { jq -r "$2" "$ROOT/apps/$1/app.json"; }
+list_apps() { for f in "$ROOT"/apps/*/app.json; do [ -f "$f" ] && basename "$(dirname "$f")"; done; }
+need_app() {
+    [ -f "$ROOT/apps/$1/app.json" ] && return
+    echo "retrobox-app: no such app '$1' (have: $(list_apps | tr '\n' ' '))" >&2
+    exit 2
+}
+
+# The app's window, as the compositor names it (empty when there is none).
+window() {
+    wlrctl toplevel list 2>/dev/null | awk -F': ' -v p="$(conf "$1" .window)" 'index($1, p) == 1 { print $1; exit }'
+}
+focused() { local w; w=$(window "$1"); [ -n "$w" ] && wlrctl toplevel find "app_id:$w" state:focused 2>/dev/null; }
+running() { [ -e "$RUN/$1.started" ] && flatpak ps --columns=application 2>/dev/null | grep -qx "$(conf "$1" .flatpak)"; }
+installed() { flatpak info "$(conf "$1" .flatpak)" >/dev/null 2>&1; }
+
+download() {
+    local name flatpak free_gb
+    name=$(conf "$1" .name) flatpak=$(conf "$1" .flatpak)
+    free_gb=$(df -BG --output=avail /userdata | tail -1 | tr -dc 0-9)
+    if [ "${free_gb:-0}" -lt 3 ]; then echo "Not enough free space for $name (${free_gb} GB free, 3 GB needed)."; return 1; fi
+    echo "Downloading $name. This needs internet and takes a few minutes..."
+    flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo || return 1
+    flatpak install -y --noninteractive flathub "$flatpak" || return 1
+    # Same permission fix Batocera applies after installing a flatpak.
+    chmod -R a+rX /userdata/saves/flatpak/binaries
+    chmod a+rx /userdata /userdata/saves /userdata/saves/flatpak
+    echo "$name is ready."
+}
+# Download with something to look at: a full-screen terminal when there is a display.
+install_app() {
+    installed "$1" && return
+    if command -v xterm >/dev/null; then
+        xterm -fullscreen -fa Monospace -fs 14 -e bash -c "'$0' download '$1' 2>&1 | tee -a '$LOG'; sleep 4"
+    else
+        download "$1" 2>&1 | tee -a "$LOG"
+    fi
+    installed "$1"
+}
+
+start_pad() {
+    local pidfile="$RUN/$1.pad.pid"
+    [ -e "$pidfile" ] && kill -0 "$(cat "$pidfile")" 2>/dev/null && return
+    setsid python3 "$ROOT/lib/pad.py" "$ROOT/apps/$1/app.json" >>"$LOG" 2>&1 &
+    echo $! >"$pidfile"
+}
+
+open_app() {
+    local app=$1 w
+    start_bus
+    w=$(window "$app")
+    if [ -z "$w" ]; then
+        install_app "$app" || { echo "retrobox-app: $(conf "$app" .name) could not be downloaded; see $LOG" >&2; return 1; }
+        # Sound for the sandboxed app (the same fix Batocera applies to its own flatpaks).
+        chown -R root:audio /var/run/pulse 2>/dev/null; chmod -R g+rwX /var/run/pulse 2>/dev/null
+        mapfile -t args < <(conf "$app" '.args[]')
+        echo "$(date '+%F %T') starting $app" >>"$LOG"
+        setsid flatpak run "$(conf "$app" .flatpak)" "${args[@]}" >>"$LOG" 2>&1 &
+        touch "$RUN/$app.started"
+        for _ in $(seq 240); do   # up to a minute: first starts download updates
+            w=$(window "$app"); [ -n "$w" ] && break
+            sleep 0.25
+        done
+        [ -n "$w" ] || { echo "retrobox-app: $app did not open a window; see $LOG" >&2; return 1; }
+        wlrctl toplevel fullscreen "app_id:$w"
+    fi
+    wlrctl toplevel focus "app_id:$w"
+    start_pad "$app"
+}
+
+# Used when the app is started like a game from the menu: come back when the
+# player leaves the app (hides or quits it), so the menu returns.
+wait_until_left() {
+    local away=0
+    sleep 2
+    while [ "$away" -lt 3 ]; do
+        sleep 0.5
+        if focused "$1" >/dev/null; then away=0; else away=$((away + 1)); fi
+    done
+}
+
+back() {
+    local app w
+    for app in ${1:-$(list_apps)}; do
+        w=$(window "$app"); [ -n "$w" ] && wlrctl toplevel minimize "app_id:$w"
+    done
+}
+
+close_app() {
+    flatpak kill "$(conf "$1" .flatpak)" 2>/dev/null
+    rm -f "$RUN/$1.started"
+    [ -e "$RUN/$1.pad.pid" ] && kill "$(cat "$RUN/$1.pad.pid")" 2>/dev/null
+    rm -f "$RUN/$1.pad.pid"
+}
+
+players() {
+    bus_call --dest=org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus.ListNames |
+        grep -o 'org\.mpris\.MediaPlayer2\.[^"]*'
+}
+media() {
+    local p
+    case $1 in
+    PlayPause | Next | Previous | Pause | Play)
+        for p in $(players); do
+            bus_call --dest="$p" /org/mpris/MediaPlayer2 "org.mpris.MediaPlayer2.Player.$1" >/dev/null
+        done ;;
+    title)  # "Song - Artist" of whatever is playing, or nothing
+        for p in $(players); do
+            bus_call --dest="$p" /org/mpris/MediaPlayer2 org.freedesktop.DBus.Properties.Get \
+                string:org.mpris.MediaPlayer2.Player string:Metadata |
+                awk -F'"' '/xesam:title/ { want = "t" } /xesam:artist/ { want = "a" }
+                           /string "/ && !/xesam:|mpris:/ { if (want == "t" && !t) t = $2; if (want == "a" && !a) a = $2; want = "" }
+                           END { if (t) print t (a ? " - " a : "") }'
+        done | head -n 1 ;;
+    *) echo "retrobox-app media PlayPause|Next|Previous|title" >&2; exit 2 ;;
+    esac
+}
+
+case $1 in
+open)     need_app "$2"; open_app "$2" || exit 1; if [ "$3" = --wait ]; then wait_until_left "$2"; fi ;;
+back)     [ -n "$2" ] && need_app "$2"; back "$2" ;;
+close)    need_app "$2"; close_app "$2" ;;
+install)  need_app "$2"; install_app "$2" ;;
+download) need_app "$2"; download "$2" ;;
+running)  need_app "$2"; running "$2" ;;
+media)    media "$2" ;;
+list)     list_apps ;;
+*)        sed -n '2,11s/^# \{0,1\}//p' "$0" >&2; exit 2 ;;
+esac
