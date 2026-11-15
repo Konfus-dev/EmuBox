@@ -672,3 +672,60 @@ class PhoneKeys(unittest.TestCase):
             urllib.request.urlopen(f"http://127.0.0.1:{port}/k/wrong")
         with gone.exception:
             self.assertIn(b"This code has expired", gone.exception.read())
+
+
+class PointerInApps(unittest.TestCase):
+    """Regression: in web apps (Apple Music) the pointer was gone. Batocera's hide shortcut parks
+    it in the bottom-right corner, behind the row of hints, and showing it again left it there;
+    and the strip dropped "R Pointer" first, so nothing said how to bring it back."""
+
+    def test_the_strip_keeps_the_pointer_hint_when_space_runs_out(self):
+        import hints
+        music = json.loads((REPO / "apps/apple-music/app.json").read_text())
+        everything = hints.hints(music)
+        self.assertIn(("right_stick", "Pointer"), everything)
+        droppable = {button for button, _ in everything} & set(hints.DROP_FIRST) - {"right_stick"}
+        for room in range(1, len(everything) + 1):   # however narrow: of the hints that can go, it goes last
+            kept = {button for button, _ in hints.fit(everything, lambda pairs: len(pairs) <= room)}
+            if "right_stick" not in kept:
+                self.assertFalse(droppable & kept, f"room for {room}: {sorted(droppable & kept)} kept instead")
+        self.assertIn("right_stick", {b for b, _ in hints.fit(everything, lambda pairs: len(pairs) <= 8)})   # as on a TV
+
+    def test_taking_the_controller_shows_the_pointer_in_the_middle(self):
+        try:
+            import evdev
+            from evdev import ecodes as e
+        except ImportError:
+            self.skipTest("python-evdev is not on this PC (it is on Batocera)")
+        import pad
+
+        made = []
+
+        class Recorder:   # a virtual device that only remembers what was sent through it
+            def __init__(self, capabilities, name=""):
+                self.name, self.capabilities, self.sent = name, capabilities, []
+                made.append(self)
+
+            def write(self, kind, code, value):
+                self.sent.append((kind, code, value))
+
+            def syn(self):
+                pass
+
+            def close(self):
+                pass
+
+        music = json.loads((REPO / "apps/apple-music/app.json").read_text())
+        with mock.patch.object(pad, "UInput", Recorder), mock.patch.object(evdev, "list_devices", return_value=[]), \
+                mock.patch.object(pad.time, "sleep") as slept:
+            app_pad = pad.Pad({"id": "apple-music", **music})
+            app_pad._show_pointer(True)
+        # A brand-new device is not heard at once: the placer waits for that, then places.
+        self.assertGreater(max(call.args[0] for call in slept.call_args_list), 0.5)
+        out, placer = (next(d for d in made if d.name == name) for name in ("EmuBox app controller", "EmuBox pointer placer"))
+        presses = [code for kind, code, value in out.sent if kind == e.EV_KEY and value == 1]
+        self.assertEqual(presses, [e.KEY_LEFTALT, e.KEY_LEFTMETA, e.KEY_S])          # the window manager's "show pointer"
+        middle = pad.PLACE_MAX // 2 + pad.PLACE_MAX % 2
+        self.assertEqual([(code, value) for kind, code, value in placer.sent if kind == e.EV_ABS],
+                         [(e.ABS_X, middle), (e.ABS_Y, middle)])                    # and in the middle of the screen
+        self.assertIn((e.ABS_X, mock.ANY), placer.capabilities[e.EV_ABS])

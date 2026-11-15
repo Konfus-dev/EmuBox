@@ -35,7 +35,7 @@ import sys
 import time
 
 import evdev
-from evdev import UInput, ecodes as e
+from evdev import AbsInfo, UInput, ecodes as e
 
 HERE = os.path.dirname(os.path.realpath(__file__))
 EMUBOX_APP = os.path.join(os.path.dirname(HERE), "bin", "emubox-app")
@@ -50,6 +50,8 @@ STARTUP_GRACE_S = 90      # ...but allow this long for it to appear in the first
 TICK_S = 1 / 60           # pointer and scroll updates while a stick is pushed
 STICK_DEADZONE = 0.18
 POINTER_SPEED = 1100      # pixels per second with the stick fully over
+PLACE_MAX = 32767         # the range of the pointer placer's axes: the whole screen
+PLACER_SETTLE_S = 1.0     # a new input device is heard by the window manager only after a moment
 SCROLL_SPEED = 14         # wheel notches per second with the stick fully over
 TRIGGER_PULLED = 0.5
 HOLD_B_S = 0.8            # B held this long leaves the app (hides it), wherever you are in it
@@ -128,6 +130,19 @@ class Pad:
             {e.EV_KEY: sorted(keys | set(MOUSE_BUTTONS.values())), e.EV_REL: [e.REL_X, e.REL_Y, e.REL_WHEEL]},
             name="EmuBox app controller",
         )
+        # For apps steered with a pointer: an absolute pointer of our own (as a tablet is), which
+        # puts the pointer in the middle of the screen when the app takes the controller. Hiding the
+        # pointer (Batocera's shortcut) parks it in the bottom-right corner, behind the row of
+        # hints, where showing it again would leave it: as good as gone.
+        self.placer: UInput | None = None
+        if "pointer" in self.map.values():
+            axis = AbsInfo(value=0, min=0, max=PLACE_MAX, fuzz=0, flat=0, resolution=0)
+            try:
+                self.placer = UInput({e.EV_KEY: [e.BTN_LEFT], e.EV_ABS: [(e.ABS_X, axis), (e.ABS_Y, axis)]},
+                                     name="EmuBox pointer placer")
+                self.placer_made = time.monotonic()
+            except (OSError, evdev.UInputError):
+                self.placer = None
 
     # --- taking and releasing the controllers -----------------------------------
 
@@ -366,8 +381,19 @@ class Pad:
             for key in reversed(chord):
                 self.out.write(e.EV_KEY, key, 0)
                 self.out.syn()
+            if show and self.placer:
+                self._place_pointer(0.5, 0.5)
         except OSError:
             pass
+
+    def _place_pointer(self, x: float, y: float) -> None:
+        """Put the pointer at this spot of the screen (0-1 across, 0-1 down). Straight after the
+        placer was made the window manager would not hear it yet (the app can be in front at
+        once): wait for it, once, at most a second."""
+        time.sleep(max(0.0, self.placer_made + PLACER_SETTLE_S - time.monotonic()))
+        self.placer.write(e.EV_ABS, e.ABS_X, round(x * PLACE_MAX))
+        self.placer.write(e.EV_ABS, e.ABS_Y, round(y * PLACE_MAX))
+        self.placer.syn()
 
     def _show_strip(self, show: bool) -> None:
         """The hints stay up while the app is in front (also under the keyboard or the Guide
@@ -419,6 +445,8 @@ class Pad:
             self._show_strip(False)
             self._show_pointer(False)
             self.out.close()
+            if self.placer:
+                self.placer.close()
 
 
 def main() -> int:

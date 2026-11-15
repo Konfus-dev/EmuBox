@@ -35,7 +35,9 @@ KEYS = {   # keys pressed together -> what that usually means
     ("KEY_LEFTSHIFT", "KEY_PAGEUP"): "Scroll up", ("KEY_LEFTSHIFT", "KEY_PAGEDOWN"): "Scroll down", ("KEY_F5",): "Reload",
 }
 LEAVING = ("select+b", "select+start")
-DROP_FIRST = ["r3", "left_stick", "select+a", "select+r3", "right_stick", "l3", "lt", "rt", "select+x", "lb", "rb", "start", "y", "x"]
+# What gives way first when the strip is too long. The pointer stick goes last: in an app steered
+# with a pointer (a web page) it is the one thing nobody would guess.
+DROP_FIRST = ["r3", "left_stick", "select+a", "select+r3", "l3", "lt", "rt", "select+x", "lb", "rb", "start", "y", "x", "right_stick"]
 MEDIA = {"PlayPause": "Play/Pause", "Next": "Next song", "Previous": "Previous song"}
 
 
@@ -72,6 +74,15 @@ def hints(app: dict) -> list[tuple[str, str]]:
             kept.append((button, text))
             seen.add(text)
     return kept
+
+
+def fit(pairs: list[tuple[str, str]], fits) -> list[tuple[str, str]]:
+    """The hints that go on the strip: the least needed give way (DROP_FIRST) until fits(pairs)."""
+    for button in [None] + DROP_FIRST:
+        pairs = [pair for pair in pairs if pair[0] != button]
+        if fits(pairs):
+            break
+    return pairs
 
 
 def glyph(button: str) -> str:
@@ -123,13 +134,8 @@ def screen(app: dict) -> int:
     display = Gdk.Display.get_default()
     monitor = display.get_primary_monitor() or display.get_monitor(0)
     width = monitor.get_geometry().width if monitor else 1280
-    pairs = hints(app)
-    for button in [None] + DROP_FIRST:
-        pairs = [pair for pair in pairs if pair[0] != button]
-        row = strip(pairs)
-        if row.get_preferred_width()[1] <= width:
-            break
-    window.add(row)
+    pairs = fit(hints(app), lambda pairs: strip(pairs).get_preferred_width()[1] <= width)
+    window.add(strip(pairs))
     window.connect("destroy", Gtk.main_quit)
     window.show_all()
     Gtk.main()
