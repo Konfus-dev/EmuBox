@@ -106,7 +106,7 @@ def main() -> None:
     fm(s, 0, 0.11, 640, 300, ratio=1.41, index=2.6, attack=0.002, decay=34, volume=1.0, index_decay=40)
     fm(s, 0, 0.09, 150, 90, ratio=1.0, index=0.6, attack=0.003, decay=40, volume=0.55)
     swept_noise(s, 0, 0.05, 2600, 900, resonance=3, attack=0.001, decay=70, volume=0.35)
-    save(folder, "scroll", s, room=0.22, size=0.6, gain=0.5)
+    save(folder, "scroll", s, room=0.22, size=0.6, gain=0.7)
 
     # select: a low "bwom" that opens upward into a glassy chime.
     s = silence(0.95)
@@ -114,21 +114,21 @@ def main() -> None:
     fm(s, 0.07, 0.55, 520, 780, ratio=3.01, index=1.8, attack=0.02, decay=6.5, volume=0.45, index_decay=5, wobble=(7, 0.006))
     fm(s, 0.07, 0.55, 783, 1170, ratio=2.0, index=0.9, attack=0.03, decay=7.5, volume=0.22, index_decay=6)
     swept_noise(s, 0, 0.32, 300, 2800, resonance=6, attack=0.02, decay=10, volume=0.5, seed=2)
-    save(folder, "select", s, room=0.38, gain=0.72)
+    save(folder, "select", s, room=0.38, gain=0.9)
 
     # back: the same voice falling and closing.
     s = silence(0.80)
     fm(s, 0, 0.28, 300, 100, ratio=2.0, index=2.8, attack=0.008, decay=10, volume=1.0, index_decay=10)
     fm(s, 0.02, 0.40, 660, 390, ratio=3.01, index=1.4, attack=0.012, decay=9, volume=0.35, index_decay=8)
     swept_noise(s, 0, 0.26, 2400, 260, resonance=6, attack=0.01, decay=12, volume=0.45, seed=3)
-    save(folder, "back", s, room=0.34, gain=0.68)
+    save(folder, "back", s, room=0.34, gain=0.88)
 
     # menuopen: a quick breath of air sliding up, with a faint ring on top.
     s = silence(0.75)
     swept_noise(s, 0, 0.36, 240, 3600, resonance=8, attack=0.05, decay=8, volume=1.0, seed=4)
     fm(s, 0.03, 0.34, 200, 520, ratio=1.5, index=2.2, attack=0.03, decay=9, volume=0.55, index_decay=7)
     fm(s, 0.16, 0.40, 1040, 1100, ratio=2.76, index=1.2, attack=0.02, decay=9, volume=0.16, index_decay=6)
-    save(folder, "menuopen", s, room=0.36, gain=0.62)
+    save(folder, "menuopen", s, room=0.36, gain=0.85)
 
     # launch: a deep swell that rises, shimmers and washes out as the game takes over.
     s = silence(2.1)
@@ -137,7 +137,7 @@ def main() -> None:
     fm(s, 0.35, 1.0, 392, 1176, ratio=3.01, index=2.6, attack=0.4, decay=3.4, volume=0.28, index_decay=2.2, wobble=(8, 0.01))
     swept_noise(s, 0, 1.3, 160, 5200, resonance=7, attack=0.6, decay=3.0, volume=0.9, seed=5)
     fm(s, 0.95, 0.5, 1568, 1568, ratio=2.76, index=1.5, attack=0.01, decay=8, volume=0.14, index_decay=7)
-    save(folder, "launch", s, room=0.5, size=1.25, gain=0.85)
+    save(folder, "launch", s, room=0.5, size=1.25, gain=0.95)
 
     print(f"sounds written to {folder}")
 

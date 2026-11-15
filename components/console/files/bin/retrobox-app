@@ -6,7 +6,9 @@
 #   retrobox-app close <app>           quit it
 #   retrobox-app install <app>         download it (needs internet); "open" does this when needed
 #   retrobox-app running <app>         exit status 0 if it is running
-#   retrobox-app media PlayPause|Next|Previous|title
+#   retrobox-app play <app>            play/pause; opens the app first when it is not running
+#   retrobox-app media PlayPause|Next|Previous|title|playing
+#   retrobox-app pads                  note the connected controllers in the log (for troubleshooting)
 #   retrobox-app list                  the apps that are set up
 #
 # Each app is one folder, apps/<app>/, whose app.json says what to start, how
@@ -54,7 +56,7 @@ download() {
     name=$(conf "$1" .name) flatpak=$(conf "$1" .flatpak)
     free_gb=$(df -BG --output=avail /userdata | tail -1 | tr -dc 0-9)
     if [ "${free_gb:-0}" -lt 3 ]; then echo "Not enough free space for $name (${free_gb} GB free, 3 GB needed)."; return 1; fi
-    echo "Downloading $name. This needs internet and takes a few minutes..."
+    echo "Getting ready..."
     flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo || return 1
     flatpak install -y --noninteractive flathub "$flatpak" || return 1
     # Same permission fix Batocera applies after installing a flatpak.
@@ -62,14 +64,19 @@ download() {
     chmod a+rx /userdata /userdata/saves /userdata/saves/flatpak
     echo "$name is ready."
 }
-# Download with something to look at: a full-screen terminal when there is a display.
+# Download behind a full-screen notice (B cancels), so the screen never looks frozen.
 install_app() {
     installed "$1" && return
-    if command -v xterm >/dev/null; then
-        xterm -fullscreen -fa Monospace -fs 14 -e bash -c "'$0' download '$1' 2>&1 | tee -a '$LOG'; sleep 4"
-    else
-        download "$1" 2>&1 | tee -a "$LOG"
-    fi
+    python3 "$ROOT/lib/notice.py" "Downloading $(conf "$1" .name)" -- "$0" download "$1" 2>>"$LOG"
+    case $? in
+    0 | 1 | 130) ;;   # done, failed (the notice said so), or cancelled with B
+    *)                # the notice itself could not be shown: fall back to a plain terminal
+        if command -v xterm >/dev/null; then
+            xterm -fullscreen -fa Monospace -fs 14 -e bash -c "'$0' download '$1' 2>&1 | tee -a '$LOG'; sleep 4"
+        else
+            "$0" download "$1" >>"$LOG" 2>&1
+        fi ;;
+    esac
     installed "$1"
 }
 
@@ -147,8 +154,35 @@ media() {
                            /string "/ && !/xesam:|mpris:/ { if (want == "t" && !t) t = $2; if (want == "a" && !a) a = $2; want = "" }
                            END { if (t) print t (a ? " - " a : "") }'
         done | head -n 1 ;;
-    *) echo "retrobox-app media PlayPause|Next|Previous|title" >&2; exit 2 ;;
+    playing)  # the same, for showing on screen: never empty
+        local title; title=$(media title)
+        echo "${title:-Nothing playing}" ;;
+    *) echo "retrobox-app media PlayPause|Next|Previous|title|playing" >&2; exit 2 ;;
     esac
+}
+
+# Play or pause; with nothing playing yet, open the app so there is something to play.
+play() {
+    if [ -n "$(players)" ]; then media PlayPause; else open_app "$1"; fi
+}
+
+# Which controllers are connected, and what Batocera's menu calls their buttons.
+pads() {
+    {
+        echo "$(date '+%F %T') controllers:"
+        python3 - <<'PY'
+import evdev
+for path in evdev.list_devices():
+    d = evdev.InputDevice(path)
+    keys = d.capabilities().get(evdev.ecodes.EV_KEY, [])
+    if evdev.ecodes.BTN_SOUTH in keys:
+        i = d.info
+        print(f"  {d.name!r} bus={i.bustype:04x} vendor={i.vendor:04x} product={i.product:04x} "
+              f"version={i.version:04x} phys={d.phys} keys={sorted(keys)}")
+PY
+        grep -h -B1 -A3 'inputConfig' /userdata/system/configs/emulationstation/es_input.cfg 2>/dev/null | head -60
+        tail -n 5 /userdata/system/configs/emulationstation/es_last_input.cfg 2>/dev/null
+    } >>"$LOG" 2>&1
 }
 
 case $1 in
@@ -159,6 +193,8 @@ install)  need_app "$2"; install_app "$2" ;;
 download) need_app "$2"; download "$2" ;;
 running)  need_app "$2"; running "$2" ;;
 media)    media "$2" ;;
+play)     need_app "$2"; play "$2" ;;
+pads)     pads ;;
 list)     list_apps ;;
-*)        sed -n '2,11s/^# \{0,1\}//p' "$0" >&2; exit 2 ;;
+*)        sed -n '2,13s/^# \{0,1\}//p' "$0" >&2; exit 2 ;;
 esac

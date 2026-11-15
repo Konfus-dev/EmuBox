@@ -22,39 +22,54 @@ TABS_END = "</feature>"   # the first one after the tab list closes it
 MARK = "<!-- retrobox apps -->"
 
 
-def apps() -> list[tuple[str, str]]:
+def apps() -> list[tuple[str, dict]]:
     found = []
     for path in sorted(glob.glob(os.path.join(ROOT, "apps", "*", "app.json"))):
         with open(path) as f:
-            found.append((os.path.basename(os.path.dirname(path)), json.load(f)["name"]))
+            found.append((os.path.basename(os.path.dirname(path)), json.load(f)))
     return found
 
 
-def apps_tab() -> str:
+def button(label: str, action: str, close: bool = False) -> str:
+    after = ' afterclick="bcc_close"' if close else ""
+    return f'\t\t\t\t<button display={quoteattr(label)} action={quoteattr(action)}{after} />'
+
+
+def app_widget(app_id: str, app: dict) -> list[str]:
+    """One box per app. A music player also shows what is playing and has its buttons right there."""
     c = RETROBOX_APP
-    rows = [
-        f'\t{MARK}',
-        '\t<hgroup name="Apps" display="Apps">',
-        '\t\t<feature>',
-        f'\t\t\t<button display="Back to game" action="{c} back" afterclick="bcc_close" />',
-        '\t\t</feature>',
-    ]
-    for app, name in apps():
+    rows = [f'\t\t<vgroup display={quoteattr(app["name"])}>']
+    if app.get("player"):
+        playing = quoteattr(f"${{{c} media playing}}")
         rows += [
-            f'\t\t<feature display={quoteattr(name)}>',
-            f'\t\t\t<button display="Open" action="{c} open {app}" afterclick="bcc_close" />',
-            f'\t\t\t<button display="Quit" action="{c} close {app}" />',
-            '\t\t</feature>',
+            '\t\t\t<feature>',
+            f'\t\t\t\t<text display={playing} refresh="2" align="left" />',
+            '\t\t\t</feature>',
+            '\t\t\t<feature>',
+            button("Previous", f"{c} media Previous"),
+            button("Play / Pause", f"{c} play {app_id}"),
+            button("Next", f"{c} media Next"),
+            button("Open", f"{c} open {app_id}", close=True),
+            button("Quit", f"{c} close {app_id}"),
+            '\t\t\t</feature>',
         ]
-    title = quoteattr(f"${{{c} media title}}")
+    else:
+        rows += [
+            '\t\t\t<feature>',
+            button("Open", f"{c} open {app_id}", close=True),
+            button("Quit", f"{c} close {app_id}"),
+            '\t\t\t</feature>',
+        ]
+    return rows + ['\t\t</vgroup>']
+
+
+def apps_tab() -> str:
+    rows = [f'\t{MARK}', '\t<hgroup name="Apps" display="Apps">']
+    for app_id, app in apps():
+        rows += app_widget(app_id, app)
     rows += [
-        '\t\t<feature display="Music">',
-        f'\t\t\t<button display="Previous" action="{c} media Previous" />',
-        f'\t\t\t<button display="Play / Pause" action="{c} media PlayPause" />',
-        f'\t\t\t<button display="Next" action="{c} media Next" />',
-        '\t\t</feature>',
         '\t\t<feature>',
-        f'\t\t\t<text display={title} refresh="3" align="left" />',
+        button("Back to game", f"{RETROBOX_APP} back", close=True).replace("\t\t\t\t", "\t\t\t"),
         '\t\t</feature>',
         '\t</hgroup>',
     ]

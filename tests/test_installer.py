@@ -39,7 +39,8 @@ def make_file(path: Path, size: int = 10) -> Path:
 def run(drive: Path, *args: str, answers: str = "") -> tuple[int, str]:
     out = io.StringIO()
     with mock.patch("sys.stdin", io.StringIO(answers)), mock.patch("sys.stdout", out), \
-            mock.patch.object(cli.Host, "usb_devices", return_value=set()):
+            mock.patch.object(cli.Host, "usb_devices", return_value=set()), \
+            mock.patch.object(cli.Host, "paired_bluetooth_devices", return_value=[]):
         code = cli.main(["--target", str(drive), *args])
     return code, out.getvalue()
 
@@ -251,8 +252,53 @@ class SmallThings(unittest.TestCase):
             app = json.loads(path.read_text())
             for key in ("name", "flatpak", "args", "window", "pad", "description"):
                 self.assertIn(key, app, f"{path}: {key}")
+            # The buttons every app shares, so the controller always behaves the same way.
+            for button, action in (("a", ["KEY_ENTER"]), ("guide", "menu"), ("l3", "osk"),
+                                   ("select+b", "back"), ("select+start", "close")):
+                self.assertEqual(app["pad"].get(button), action, f"{path}: {button}")
             self.assertTrue((path.parent / "tile.png").exists())
 
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BluetoothSharing(Drive):
+    def test_pairings_are_merged_into_batoceras_archive(self):
+        import importlib.util
+        import io
+        import tarfile
+        spec = importlib.util.spec_from_file_location("bt", REPO / "components/bluetooth/component.py")
+        bt = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(bt)
+
+        host = Path(self.tmp.name) / "host"
+        pad = host / "AA:AA:AA:AA:AA:AA" / "11:11:11:11:11:11"
+        make_file(pad / "info").write_text(
+            "[General]\nName=Pad\nTrusted=false\nServices=00001812-0000-1000-8000-00805f9b34fb;\n\n[LongTermKey]\nKey=NEWKEY\n")
+        make_file(host / "AA:AA:AA:AA:AA:AA" / "22:22:22:22:22:22" / "info").write_text(
+            "[General]\nName=Speaker\nServices=0000110b-0000-1000-8000-00805f9b34fb;\n\n[LinkKey]\nKey=SPK\n")
+
+        archive = self.root / "system/bluetooth/bluetooth.tar"
+        archive.parent.mkdir(parents=True)
+        with tarfile.open(archive, "w") as old:
+            for name, text in (("bluetooth/AA:AA:AA:AA:AA:AA/11:11:11:11:11:11/info", "Key=OLDKEY\n"),
+                               ("bluetooth/AA:AA:AA:AA:AA:AA/33:33:33:33:33:33/info", "Key=OTHER\n")):
+                entry = tarfile.TarInfo(name)
+                entry.size = len(text)
+                old.addfile(entry, io.BytesIO(text.encode()))
+
+        said = []
+        env = components.Env(target=self.target, repo=REPO, host=None, fetch=None, say=said.append)
+        with mock.patch.object(bt, "HOST_PAIRINGS", host):
+            bt.install(env)
+
+        with tarfile.open(archive) as new:
+            names = new.getnames()
+            info = new.extractfile("bluetooth/AA:AA:AA:AA:AA:AA/11:11:11:11:11:11/info").read().decode()
+        self.assertIn("Key=NEWKEY", info)                       # this PC's pairing replaced the stale one
+        self.assertIn("Trusted=true", info)
+        self.assertIn("bluetooth/AA:AA:AA:AA:AA:AA/33:33:33:33:33:33/info", names)   # Batocera's others are kept
+        self.assertFalse(any("22:22:22" in n for n in names))   # a speaker is not an input device
+        self.assertEqual(names.count("bluetooth/AA:AA:AA:AA:AA:AA/11:11:11:11:11:11/info"), 1)
+        self.assertFalse(any("KEY" in line for line in said))   # keys are never printed

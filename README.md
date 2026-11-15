@@ -62,6 +62,7 @@ things or update; it only copies what is missing.
 | **Discord**, **Apple Music** | Open from Ports, or over a running game from the in-game menu's **Apps** tab. Each downloads itself the first time you open it |
 | **ROM-hack patcher** | Drop a `.ips`/`.bps`/`.ups` file in `patches` and it is applied at boot |
 | **Play settings** | Auto-save, rewind on 8/16-bit systems, a light CRT shader, a tidier network share |
+| **Bluetooth controllers** | Offered when preparing a drive on a PC with paired controllers: copies the pairings so the same controller works in Linux and Batocera without re-pairing |
 | **Wi-Fi** | Asks for the network name and password, so Batocera connects by itself |
 | **ScreenScraper account** | For box art, videos and descriptions; with the picture style and extras already chosen |
 | **RetroAchievements account** | Trophies for older games |
@@ -81,7 +82,12 @@ things or update; it only copies what is missing.
 | Select+B | Hide the app and go back to the game (it keeps running) |
 | Select+Start | Quit the app |
 
-Each app adds its own on top; see its `app.json`.
+Each app adds its own on top (see its `app.json`): in Discord, X mutes, Y searches, LB/RB step
+through items, LT/RT switch servers; in Apple Music, X or Start plays and pauses, LB/RB change
+song, LT/RT change the volume, Y opens the keyboard.
+
+In the in-game menu's **Apps** tab each app has one box: Open and Quit, and for a player what is
+playing with Previous, Play/Pause and Next.
 
 ## Your BIOS files and games
 

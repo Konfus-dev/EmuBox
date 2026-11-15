@@ -1,0 +1,7 @@
+{
+  "title": "Bluetooth controllers from this PC",
+  "question": "Copy this PC's Bluetooth controller pairings to Batocera (so a controller works in both without re-pairing)?",
+  "default": true,
+  "order": 36,
+  "after": "Controllers paired with this PC now connect to Batocera too. Pair a new one here first, then run the installer again."
+}

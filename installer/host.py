@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import os
 import pwd
+import re
+import subprocess
 from pathlib import Path
 
 
@@ -18,6 +20,15 @@ class Host:
                 continue
             found.add(f"{vendor}:{product}")
         return found
+
+
+    def paired_bluetooth_devices(self) -> list[str]:
+        """Addresses of the Bluetooth devices paired with this PC (empty without Bluetooth)."""
+        try:
+            listing = subprocess.run(["bluetoothctl", "devices", "Paired"], capture_output=True, text=True, timeout=10)
+        except (OSError, subprocess.SubprocessError):
+            return []
+        return re.findall(r"(?:[0-9A-F]{2}:){5}[0-9A-F]{2}", listing.stdout)
 
 
 def expand(location: str) -> Path:

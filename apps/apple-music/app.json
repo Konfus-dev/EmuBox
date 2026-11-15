@@ -15,6 +15,7 @@
     "--app=https://music.apple.com/"
   ],
   "window": "chrome-music.apple.com",
+  "player": true,
   "pad": {
     "up": ["KEY_UP"],
     "down": ["KEY_DOWN"],
@@ -23,11 +24,12 @@
     "a": ["KEY_ENTER"],
     "b": ["KEY_LEFTALT", "KEY_LEFT"],
     "x": {"media": "PlayPause"},
-    "y": ["KEY_TAB"],
+    "y": "osk",
     "lb": {"media": "Previous"},
     "rb": {"media": "Next"},
     "lt": {"run": "batocera-audio setSystemVolume -5"},
     "rt": {"run": "batocera-audio setSystemVolume +5"},
+    "start": {"media": "PlayPause"},
     "select+a": "menu",
     "select+b": "back",
     "select+start": "close",

@@ -11,6 +11,9 @@ case "$1" in
     start)
         # Rebuilt at every boot from Batocera's own menu, so it follows updates.
         python3 "$root/lib/menu.py" >>/userdata/system/logs/retrobox.log 2>&1
+        # A note of the connected controllers, a little after start-up when
+        # wireless ones have had time to connect. Helps explain odd buttons.
+        (sleep 60; "$root/bin/retrobox-app" pads) >/dev/null 2>&1 &
         ;;
     stop)
         for app in $("$root/bin/retrobox-app" list); do "$root/bin/retrobox-app" close "$app"; done

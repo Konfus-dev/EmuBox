@@ -34,6 +34,8 @@ Make a folder `apps/<id>/` with two files.
 
 - `flatpak`: the app's id on [Flathub](https://flathub.org). It is downloaded the first time the app is opened.
 - `args`: extra arguments. Browser-based apps need `--no-sandbox` on Batocera.
+- `player`: `true` for a music or video player. Its box in the in-game menu's Apps tab then shows
+  what is playing, with Previous, Play/Pause and Next beside Open and Quit.
 - `window`: how the app's window id starts. Find it on Batocera with `wlrctl toplevel list` while the app is open.
 - `pad`: what each button does. Buttons: `a b x y lb rb lt rt start select guide l3 r3 up down left right`,
   and `select+<button>` for a second layer. Actions:

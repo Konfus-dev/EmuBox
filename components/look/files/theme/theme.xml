@@ -31,21 +31,6 @@ System logos are borrowed at run time from Batocera's built-in Carbon theme.
       <size>1 0.1</size>
       <zIndex>60</zIndex>
     </image>
-    <sound name="scroll">
-      <path>${themePath}/art/sounds/scroll.wav</path>
-    </sound>
-    <sound name="select">
-      <path>${themePath}/art/sounds/select.wav</path>
-    </sound>
-    <sound name="back">
-      <path>${themePath}/art/sounds/back.wav</path>
-    </sound>
-    <sound name="menuOpen">
-      <path>${themePath}/art/sounds/menuopen.wav</path>
-    </sound>
-    <sound name="launch">
-      <path>${themePath}/art/sounds/launch.wav</path>
-    </sound>
     <image name="holoScanlines" extra="static">
       <path>${themePath}/art/scanlines.png</path>
       <tile>true</tile>
@@ -108,6 +93,36 @@ System logos are borrowed at run time from Batocera's built-in Carbon theme.
       <iconLeftRight>${themePath}/art/help/xk_leftright.png</iconLeftRight>
       <iconUpDownLeftRight>${themePath}/art/help/xk_all.png</iconUpDownLeftRight>
     </helpsystem>
+  </view>
+
+  <!-- ===================== menu sounds =====================
+       Declared for every screen, under every name the menu program asks for,
+       so none is silently missing. Made by components/look/tools/sounds.py. -->
+  <view name="system, basic, detailed, video, grid, gamecarousel, menu, screen">
+    <sound name="scroll">
+      <path>${themePath}/art/sounds/scroll.wav</path>
+    </sound>
+    <sound name="systembrowse">
+      <path>${themePath}/art/sounds/scroll.wav</path>
+    </sound>
+    <sound name="quicksysselect">
+      <path>${themePath}/art/sounds/scroll.wav</path>
+    </sound>
+    <sound name="select">
+      <path>${themePath}/art/sounds/select.wav</path>
+    </sound>
+    <sound name="favorite">
+      <path>${themePath}/art/sounds/select.wav</path>
+    </sound>
+    <sound name="back">
+      <path>${themePath}/art/sounds/back.wav</path>
+    </sound>
+    <sound name="menuOpen">
+      <path>${themePath}/art/sounds/menuopen.wav</path>
+    </sound>
+    <sound name="launch">
+      <path>${themePath}/art/sounds/launch.wav</path>
+    </sound>
   </view>
 
   <!-- ===================== system list (main screen) ===================== -->
