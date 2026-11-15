@@ -69,7 +69,7 @@ def swirl(name, size, radius, arms, alpha):
     im.alpha_composite(with_alpha(Image.new("RGB", (n, n), (240, 250, 190)), ImageChops.multiply(light.filter(ImageFilter.GaussianBlur(3 * s)), disc), alpha))
     im.resize((size, size), Image.LANCZOS).save(f"{OUT}/{name}")
 
-sphere("plasma_outer.png", 900, 0.372, [(0.0, (150, 200, 40)), (0.70, (110, 175, 25)), (0.92, (60, 140, 18)), (1.0, (40, 110, 14))], 255, 9)
+sphere("plasma_outer.png", 900, 0.372, [(0.0, (150, 200, 40)), (0.70, (110, 175, 25)), (0.92, (60, 140, 18)), (1.0, (40, 110, 14))], 200, 9)   # a little see-through
 swirl("plasma_mid.png", 900, 0.372, 3, 115)
 sphere("plasma_core.png", 900, 0.32, [(0.0, (236, 236, 160)), (0.45, (214, 218, 90)), (1.0, (170, 196, 34))], 235, 55)
 sphere("plasma_spot.png", 900, 0.12, [(0.0, (250, 252, 215)), (1.0, (225, 232, 140))], 120, 40)
@@ -156,8 +156,6 @@ def row(name, bright, w=806, h=119):
     path = [(80, y - 26), (98, y - 26), (110, y - 14), (128, y - 14), (136, y0 + 10)]
     for a, b in zip(path, path[1:]):
         d.line((a[0] * s, a[1] * s, b[0] * s, b[1] * s), fill=line, width=2 * s)
-    for nx, ny in (path[0], path[-1]):
-        d.ellipse(((nx - 3.5) * s, (ny - 3.5) * s, (nx + 3.5) * s, (ny + 3.5) * s), fill=line)
     d.line((136 * s, (y0 + 10) * s, x0 * s, (y0 + 12) * s), fill=line, width=2 * s)
     if bright:
         glass((w, h), pts, (226, 250, 84), (150, 214, 28), 250, (245, 255, 185), (200, 255, 80), s, 3, 9, 1.9, im)

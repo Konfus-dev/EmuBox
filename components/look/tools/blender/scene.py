@@ -168,74 +168,67 @@ def glow_glass(name, colour=(0.06, 0.50, 0.05)):
     l.new(glow.outputs[0], add.inputs[1])
     see = n.new("ShaderNodeBsdfTransparent")
     mix = n.new("ShaderNodeMixShader")
-    mix.inputs["Fac"].default_value = 0.62                     # partly see-through, as the dashboard draws it
+    mix.inputs["Fac"].default_value = 0.42                     # mostly see-through, as the dashboard draws it
     l.new(see.outputs[0], mix.inputs[1])
     l.new(add.outputs[0], mix.inputs[2])
     l.new(mix.outputs[0], out.inputs["Surface"])
     return m
 
 
-def arm_path(u):
-    """How far out (r) and how far forward (z) an arm is, from its clip on the ring (u=0) to its
-    tip over the orb's edge (u=1)."""
-    r = 1.86 - 0.95 * (1 - (1 - u) ** 1.7)
-    z = 0.10 + 0.20 * math.sin(math.pi * u * 0.9)
-    return r, z
+def shell_arm(name, angle, holes=0):
+    """One arm of the holder: a curved shell that leaves its clip on the ring, reaches in, and
+    curls over the front of the orb lying on its curve, cupping it like a finger. Built as a
+    surface of rows across the arm, each row bent round the ball, then given some thickness."""
+    rows, cols = 56, 14
+    verts, faces = [], []
 
+    def point(u, v):
+        """u: from the clip (0) to the tip (1); v: across the arm, -1 to 1."""
+        a = math.radians(angle + 70 * u)
+        reach = max(0.0, (u - 0.42) / 0.58)                   # 0 until it meets the ball, then curling over it
+        r_flat = 1.86 - 0.78 * min(1.0, u / 0.42) ** 0.8 - 0.40 * reach ** 1.2   # tips stop short of the middle (the name)
+        z = 0.06 - 0.10 * math.sin(math.pi * min(1.0, u / 0.42)) + 1.05 * reach ** 1.1
+        p = Vector((r_flat * math.cos(a), r_flat * math.sin(a), z))
+        width = 0.66 * math.sin(math.pi * (0.16 + 0.84 * u)) ** 0.6
+        p = p + Vector((-math.sin(a), math.cos(a), 0)) * width * v * 0.5
+        bend = 1.07 + 0.25 * (1 - u) ** 3                     # never inside the ball: the arm lies on it
+        if p.length < bend:
+            p = p.normalized() * bend
+        return p
 
-def bracket(name, start, sweep, holes=2):
-    """One arm of the claw: a flat curved bracket that leaves the ring, sweeps in over the edge of
-    the orb and on behind it, lying on the orb's curve like a band, with round holes through it."""
-    rows, verts, faces = 48, [], []
     for i in range(rows + 1):
-        u = i / rows
-        a = math.radians(start + sweep * u)
-        r, z = arm_path(u)
-        p = Vector((r * math.cos(a), r * math.sin(a), z))
-        ahead = (Vector((r * math.cos(a + 0.02), r * math.sin(a + 0.02), z)) - p).normalized()
-        flat = ahead.cross(Vector((0, 0, 1))).normalized()    # across the arm, in the ring's plane
-        tilt = 0.9 * u                                        # turning in towards the orb as it goes: reads as 3D
-        side = (flat * math.cos(tilt) + Vector((0, 0, 1)) * math.sin(tilt)).normalized()
-        face = ahead.cross(side).normalized()
-        width = (0.50 - 0.14 * u) * min(1.0, 0.55 + u * 4)   # narrow where it leaves the clip
-        thick = 0.07
-        for sx in (-1, 1):
-            for sz in (-1, 1):
-                verts.append(p + side * sx * width / 2 + face * sz * thick / 2)
+        for j in range(cols + 1):
+            verts.append(point(i / rows, -1 + 2 * j / cols))
     for i in range(rows):
-        a, b = 4 * i, 4 * (i + 1)
-        # four corners per section: (-side,-out) (-side,+out) (+side,-out) (+side,+out)
-        for c0, c1 in ((0, 1), (1, 3), (3, 2), (2, 0)):
-            faces.append((a + c0, a + c1, b + c1, b + c0))
-    faces.append((0, 1, 3, 2))
-    last = 4 * rows
-    faces.append((last, last + 2, last + 3, last + 1))
+        for j in range(cols):
+            a, b = i * (cols + 1) + j, (i + 1) * (cols + 1) + j
+            faces.append((a, a + 1, b + 1, b))
     mesh = bpy.data.meshes.new(name)
     mesh.from_pydata([tuple(v) for v in verts], [], faces)
     mesh.update()
     arm = bpy.data.objects.new(name, mesh)
     bpy.context.collection.objects.link(arm)
-    for k in range(holes):                                    # the round holes, punched straight through
-        u = (k + 1) / (holes + 1) * 0.8 + 0.08
-        a = math.radians(start + sweep * u)
-        r, z = arm_path(u)
-        p = Vector((r * math.cos(a), r * math.sin(a), z))
-        bpy.ops.mesh.primitive_cylinder_add(radius=0.10 - 0.025 * u, depth=0.6, location=p)
+    thick = arm.modifiers.new("thickness", "SOLIDIFY")
+    thick.thickness, thick.offset = 0.06, 0
+    bpy.context.view_layer.objects.active = arm
+    bpy.ops.object.modifier_apply(modifier=thick.name)
+    for k in range(holes):                                    # the round holes, through the shell
+        p = point(0.16 + 0.17 * k, 0)                     # on the part between the ring and the ball
+        bpy.ops.mesh.primitive_cylinder_add(radius=0.09, depth=0.5, location=p)
         cutter = bpy.context.active_object
-        cutter.rotation_euler = Vector((0, 0, 1)).lerp(p.normalized(), 0.9 * u * 0.6).normalized().to_track_quat("Z", "Y").to_euler()
+        cutter.rotation_euler = p.normalized().to_track_quat("Z", "Y").to_euler()
         cut = arm.modifiers.new("hole", "BOOLEAN")
         cut.operation, cut.object = "DIFFERENCE", cutter
+        cut.solver = "FLOAT"                                  # the exact solver loses whole arms at some angles
         bpy.context.view_layer.objects.active = arm
         bpy.ops.object.modifier_apply(modifier=cut.name)
         bpy.data.objects.remove(cutter)
-    bevel = arm.modifiers.new("soft edges", "BEVEL")
-    bevel.width, bevel.segments = 0.012, 2
     return arm
 
 
 def claw(scene):
     """The orb's holder, after the classic dashboard's: a thick flat ring with four loop clips, and
-    four bracket arms reaching in from it over the orb's edge and round behind it. Everything a
+    four shell arms reaching in from it and curling over the front of the orb. Everything a
     quarter turn apart (the theme turns it 90 degrees per move) and lit only by its own glow, so
     each quarter turn looks the same."""
     orb_camera(scene)
@@ -253,7 +246,7 @@ def claw(scene):
         clip = bpy.context.active_object
         clip.rotation_euler = Vector((-math.sin(a), math.cos(a), 0)).to_track_quat("Z", "Y").to_euler()   # loops round the band
         clip.data.materials.append(look)
-        arm = bracket(f"arm{k}", 45 + 90 * k, 70)
+        arm = shell_arm(f"arm{k}", 45 + 90 * k)
         arm.data.materials.append(look)
     for obj in bpy.context.scene.objects:
         if obj.type == "MESH" and not obj.is_holdout:
