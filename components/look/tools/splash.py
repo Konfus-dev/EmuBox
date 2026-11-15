@@ -1,40 +1,36 @@
 #!/usr/bin/env python3
-"""Draws the start-up film: the theme's plasma orb waking, then the EmuBox name in front of it.
+"""Draws the start-up film: a dark chamber lit by a waking plasma, which flares into the EmuBox name.
 
     python3 splash.py [output.mp4]      (default: ../files/splash/emubox.mp4)
     python3 splash.py --sound my.wav output.mp4      the same film with a sound of your own
                                         (16-bit WAV; cut or padded to the film's length)
 
 Batocera plays an .mp4 found in /userdata/splash while it starts. Everything in the film is
-made here: the pictures are the theme's own orb artwork (from art.py) and the sound is
+made here: the pictures are drawn below (the chamber and the plasma are original shapes) and the sound is
 synthesised with the recipes' building blocks in sounds.py. Nothing is taken from any console.
 Needs Pillow and GStreamer (gst-launch-1.0 with x264enc, mp4mux and an AAC encoder).
 """
 import math
+import random
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
-from PIL import Image, ImageChops
+from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
 import brand
 import sounds
 
 HERE = Path(__file__).resolve().parent
-ART = HERE.parent / "files" / "theme" / "art"
 W, H, FPS, SECONDS = 1280, 720, 30, 5.4
-ORB = 430          # the orb's size on screen once it is awake
-WAKE, LAND, FADE = 0.35, 2.3, 4.7   # seconds: the orb starts to grow, the name lands, everything fades
+WAKE, FLARE, FADE = 0.25, 2.6, 4.8  # seconds: the plasma starts to glow, flares into the name, everything fades
+LAND = FLARE + 0.3                  # the name is there (the sound's chord lands with it)
 
 
 def ease(x: float) -> float:
     x = max(0.0, min(1.0, x))
     return 1 - (1 - x) ** 3
-
-
-def layer(name: str, size: int) -> Image.Image:
-    return Image.open(ART / name).convert("RGBA").resize((size, size), Image.LANCZOS)
 
 
 def faded(image: Image.Image, alpha: float) -> Image.Image:
@@ -45,65 +41,124 @@ def faded(image: Image.Image, alpha: float) -> Image.Image:
     return out
 
 
-def put(frame: Image.Image, image: Image.Image, scale: float = 1.0, turn: float = 0.0, alpha: float = 1.0) -> None:
-    if alpha <= 0.003 or scale <= 0.01:
-        return
-    if turn:
-        image = image.rotate(turn, resample=Image.BICUBIC)
-    if abs(scale - 1) > 0.002:
-        side = max(2, int(image.width * scale))
-        image = image.resize((side, side), Image.BILINEAR)
-    frame.alpha_composite(faded(image, alpha), ((W - image.width) // 2, (H - image.height) // 2))
-
-
 def name_picture() -> tuple[Image.Image, Image.Image]:
     """The name, and a soft glow of it to sit behind."""
     return brand.wordmark(W, H, 96, 14)
 
 
+def chamber() -> tuple[Image.Image, Image.Image]:
+    """The room the plasma wakes in, as if lit only by it: dark machinery around a central space.
+    Gives the room and a mask of where its surfaces face the light (for their bright rims).
+    Original shapes: ribbed pillars, a ring overhead, a cradle below, tubes in front."""
+    s = 2; w, h = W * s, H * s; cx = w // 2
+    body = Image.new("L", (w, h), 0); d = ImageDraw.Draw(body)
+    rim = Image.new("L", (w, h), 0); r = ImageDraw.Draw(rim)
+    for side in (-1, 1):                                             # two ribbed pillars each side, bowing in
+        for k, (x0, bend, thick) in enumerate(((0.30, 0.09, 54), (0.42, 0.05, 34))):
+            pts = []
+            for i in range(41):
+                v = i / 40
+                x = cx + side * w * (x0 - bend * math.sin(v * math.pi))
+                pts.append((x, h * (-0.05 + 1.1 * v)))
+            d.line(pts, fill=150 - 40 * k, width=thick * s)
+            inner = [(x - side * thick * s * 0.42, y) for x, y in pts]
+            r.line(inner, fill=255 - 60 * k, width=3 * s)
+            for i in range(3, 38, 5):                                # bands round the pillar
+                x, y = pts[i]
+                d.ellipse((x - thick * s * 0.62, y - 9 * s, x + thick * s * 0.62, y + 9 * s), fill=175 - 40 * k)
+                r.arc((x - thick * s * 0.62, y - 9 * s, x + thick * s * 0.62, y + 9 * s), 200, 340, fill=220, width=2 * s)
+    for k, (rx, ry, y) in enumerate(((0.20, 0.07, 0.06), (0.15, 0.05, 0.10), (0.10, 0.034, 0.135))):   # the ring overhead
+        box = (cx - w * rx, h * y - h * ry, cx + w * rx, h * y + h * ry)
+        d.ellipse(box, outline=170 - 30 * k, width=(16 - 4 * k) * s)
+        r.arc(box, 20, 160, fill=255, width=3 * s)
+    for i in range(12):                                              # small lamps round it
+        a = i / 12 * 2 * math.pi
+        x, y = cx + math.cos(a) * w * 0.15, h * 0.10 + math.sin(a) * h * 0.05
+        d.ellipse((x - 7 * s, y - 7 * s, x + 7 * s, y + 7 * s), fill=210)
+    for k, (rx, ry, y) in enumerate(((0.17, 0.05, 0.86), (0.23, 0.07, 0.90))):   # the cradle below
+        box = (cx - w * rx, h * y - h * ry, cx + w * rx, h * y + h * ry)
+        d.ellipse(box, outline=160, width=(14 + 6 * k) * s)
+        r.arc(box, 190, 350, fill=255, width=3 * s)
+    for x in (-0.13, 0.0, 0.13):                                     # posts on the cradle
+        d.rectangle((cx + w * x - 6 * s, h * 0.76, cx + w * x + 6 * s, h * 0.86), fill=150)
+    for k, (x, y, rr) in enumerate(((0.14, 1.02, 0.17), (0.86, 1.04, 0.19), (0.30, 1.10, 0.14), (0.70, 1.12, 0.15))):
+        box = (w * x - w * rr, h * y - h * rr * 1.2, w * x + w * rr, h * y + h * rr * 1.2)   # tubes in the foreground
+        d.ellipse(box, outline=60, width=int(w * 0.035))
+        r.arc(box, 220, 320, fill=140, width=3 * s)
+    body = body.resize((W, H), Image.LANCZOS).filter(ImageFilter.GaussianBlur(1.2))
+    rim = rim.resize((W, H), Image.LANCZOS).filter(ImageFilter.GaussianBlur(1))
+    return body, rim
+
+
+def blob_mask(t: float, size: float, seed: int, wobble: float) -> Image.Image:
+    """The plasma's outline at time t: a disc whose edge heaves in slow, overlapping waves."""
+    rnd = random.Random(seed)
+    waves = [(k, rnd.uniform(0.4, 1.0) * wobble / k ** 0.8, rnd.uniform(0.6, 1.9) * rnd.choice((-1, 1)), rnd.uniform(0, 6.3))
+             for k in range(2, 7)]
+    n = 720
+    pts = []
+    for i in range(n):
+        a = i / n * 2 * math.pi
+        r = size * (1 + sum(amp * math.sin(k * a + speed * t + phase) for k, amp, speed, phase in waves))
+        pts.append((W / 2 + r * math.cos(a), H * 0.48 + r * math.sin(a) * 0.92))
+    mask = Image.new("L", (W, H), 0)
+    ImageDraw.Draw(mask).polygon(pts, fill=255)
+    return mask
+
+
 def frames(folder: Path) -> int:
-    big = int(ORB * 1.11)
-    art = {name: layer(f"{name}.png", ORB) for name in ("plasma_outer", "plasma_mid", "plasma_core", "plasma_spot", "shell", "plasma_flash")}
-    art["plasma_glow"] = layer("plasma_glow.png", int(ORB * 1.75))
-    for ring in ("rings_a", "rings_b", "rings_c"):
-        art[ring] = layer(f"{ring}.png", int(big * 1.5))
+    room, rims = chamber()
     text, behind = name_picture()
-    vignette = Image.radial_gradient("L").resize((W * 2, H * 2)).crop((W // 2, H // 2, W // 2 + W, H // 2 + H))
+    fog = Image.effect_noise((W // 16, H // 16), 60).resize((W, H), Image.BICUBIC).filter(ImageFilter.GaussianBlur(30))
     count = int(SECONDS * FPS)
     for n in range(count):
         t = n / FPS
-        frame = Image.new("RGBA", (W, H), (0, 0, 0, 255))
-        awake = ease((t - WAKE) / 1.7)                         # 0: dark, 1: the orb at full size
-        breathe = 1 + 0.02 * math.sin(t * 2.2)
-        size = (0.04 + 0.96 * awake) * breathe
-        if awake > 0:
-            wash = Image.new("RGBA", (W, H), (10, 70, 8, 255))  # the room lights up a little, darker at the edges
-            wash.putalpha(ImageChops.invert(vignette).point(lambda v: int(v * 0.55 * awake)))
-            frame.alpha_composite(wash)
-            put(frame, art["plasma_glow"], size, 0, 0.9 * awake)
-            rings = ease((t - 1.3) / 1.2)
-            put(frame, art["rings_c"], 0.8 + 0.2 * rings, t * 9, 0.75 * rings)
-            put(frame, art["rings_b"], 0.85 + 0.15 * rings, -t * 14, 0.85 * rings)
-            put(frame, art["rings_a"], 0.9 + 0.1 * rings, t * 22, 0.9 * rings)
-            put(frame, art["plasma_outer"], size, t * 16, awake)
-            put(frame, art["plasma_mid"], size, -t * 27, awake)
-            put(frame, art["plasma_core"], size * (1 + 0.04 * math.sin(t * 5)), t * 41, awake)
-            put(frame, art["plasma_spot"], size, t * 60, 0.8 * awake)
-            put(frame, art["shell"], size, 0, awake)
-        landed = t - LAND
-        if landed > -0.05:
-            put(frame, art["plasma_flash"], 1.0 + 0.9 * ease(landed / 0.5), 0, max(0.0, 1 - landed / 0.55))
-            shown = ease(landed / 0.45)
-            grow = 1.12 - 0.12 * shown
-            for picture, alpha in ((behind, 0.95 * shown), (text, shown)):
-                if grow > 1.002:
-                    w, h = int(W * grow), int(H * grow)
-                    picture = picture.resize((w, h), Image.BILINEAR).crop(((w - W) // 2, (h - H) // 2, (w - W) // 2 + W, (h - H) // 2 + H))
-                frame.alpha_composite(faded(picture, alpha))
-        out = frame.convert("RGB")
+        light = ease((t - 0.25) / (FLARE - 0.25)) * (0.92 + 0.08 * math.sin(t * 23) * math.sin(t * 7))   # with a flicker
+        size = 14 + 90 * ease((t - 0.2) / (FLARE - 0.2))
+        frame = Image.new("RGB", (W, H), (0, 0, 0))
+        if light > 0:
+            # The room: its surfaces lit by the plasma, brighter near it, with a haze in the air.
+            near = Image.radial_gradient("L").resize((int(W * 1.6), int(W * 1.6))).crop(
+                (int(W * 0.3), int(W * 0.8 - H * 0.48), int(W * 0.3) + W, int(W * 0.8 - H * 0.48) + H))
+            # Light falls off fast away from the plasma: the far corners stay in shadow.
+            reach = ImageChops.invert(near).point(lambda v, l=light: int(255 * min(1.0, (v / 255) ** 2.2 * (0.15 + 1.1 * l))))
+            lit = ImageChops.multiply(room, reach).point(lambda v: int(v * 0.8))
+            frame.paste(Image.new("RGB", (W, H), (40, 170, 30)), mask=lit)
+            frame.paste(Image.new("RGB", (W, H), (160, 255, 110)), mask=ImageChops.multiply(rims, reach.point(lambda v, l=light: int(v * l))))
+            haze = ImageChops.multiply(fog, reach).point(lambda v, l=light: int(v * 0.9 * l))
+            frame.paste(Image.new("RGB", (W, H), (40, 150, 25)), mask=haze)
+            # The plasma: a wide green glow, a heaving body, and a white-hot heart.
+            glow = blob_mask(t, size * 2.4, 3, 0.10).filter(ImageFilter.GaussianBlur(size * 0.9 + 10))
+            frame.paste(Image.new("RGB", (W, H), (90, 230, 40)), mask=glow.point(lambda v, l=light: int(v * 0.85 * l)))
+            body = blob_mask(t, size, 5, 0.16)
+            drops = ImageDraw.Draw(body)
+            for k in range(3):                                       # droplets thrown off, drifting round it
+                a = t * (0.9 + 0.4 * k) + k * 2.1
+                x = W / 2 + math.cos(a) * size * (1.45 + 0.3 * k)
+                y = H * 0.48 + math.sin(a * 1.3) * size * (1.15 + 0.2 * k)
+                rr = max(2, size * (0.13 - 0.025 * k))
+                drops.ellipse((x - rr, y - rr, x + rr, y + rr), fill=255)
+            bloom = body.filter(ImageFilter.GaussianBlur(size * 0.35 + 6))
+            frame.paste(Image.new("RGB", (W, H), (150, 255, 70)), mask=bloom.point(lambda v, l=light: int(v * 0.9 * l)))
+            body = body.filter(ImageFilter.GaussianBlur(max(1.5, size * 0.04)))
+            frame.paste(Image.new("RGB", (W, H), (200, 255, 130)), mask=body.point(lambda v, l=light: int(v * min(1, 0.6 + l))))
+            heart = blob_mask(t * 1.3, size * 0.7, 9, 0.2).filter(ImageFilter.GaussianBlur(max(3, size * 0.16)))
+            frame.paste(Image.new("RGB", (W, H), (250, 255, 230)), mask=heart.point(lambda v, l=light: int(v * l)))
+        # The flare: the plasma floods the room with light, and the name is there as it clears.
+        flare = t - FLARE
+        if flare > 0:
+            white = max(0.0, 1 - abs(flare - 0.28) / 0.28) if flare < 0.56 else 0.0
+            frame = Image.blend(frame, Image.new("RGB", (W, H), (225, 255, 200)), min(1.0, white))
+            if flare > 0.3:
+                clear = ease((flare - 0.3) / 0.6)
+                dark = Image.blend(frame, Image.new("RGB", (W, H), (0, 0, 0)), clear * 0.85).convert("RGBA")
+                shown = ease((flare - 0.3) / 0.5)
+                for picture, alpha in ((behind, 0.95 * shown), (text, shown)):
+                    dark.alpha_composite(faded(picture, alpha))
+                frame = dark.convert("RGB")
         if t > FADE:
-            out = Image.blend(out, Image.new("RGB", (W, H)), ease((t - FADE) / (SECONDS - FADE - 0.1)))
-        out.save(folder / f"f{n:04d}.png", compress_level=1)
+            frame = Image.blend(frame, Image.new("RGB", (W, H)), ease((t - FADE) / (SECONDS - FADE - 0.1)))
+        frame.save(folder / f"f{n:04d}.png", compress_level=1)
     return count
 
 

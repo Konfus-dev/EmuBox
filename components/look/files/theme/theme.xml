@@ -170,7 +170,7 @@ art/logos and art/badges hold EmuBox's own for systems that theme does not know 
       <maxSize>0.490 0.820</maxSize>
       <zIndex>4</zIndex>
       <storyboard>
-        <animation property="rotation" from="0" to="30" duration="900" mode="easeoutcubic"/>
+        <animation property="rotation" from="0" to="180" duration="1600" mode="easeoutcubic"/>
       </storyboard>
     </image>
     <image name="ringsB" extra="static">
@@ -180,7 +180,7 @@ art/logos and art/badges hold EmuBox's own for systems that theme does not know 
       <maxSize>0.490 0.820</maxSize>
       <zIndex>4</zIndex>
       <storyboard>
-        <animation property="rotation" from="0" to="-45" duration="750" mode="easeoutcubic"/>
+        <animation property="rotation" from="0" to="-180" duration="1300" mode="easeoutcubic"/>
       </storyboard>
     </image>
     <image name="ringsA" extra="static">
@@ -190,7 +190,7 @@ art/logos and art/badges hold EmuBox's own for systems that theme does not know 
       <maxSize>0.490 0.820</maxSize>
       <zIndex>4</zIndex>
       <storyboard>
-        <animation property="rotation" from="0" to="60" duration="600" mode="easeoutcubic"/>
+        <animation property="rotation" from="0" to="120" duration="800" mode="easeoutcubic"/>
       </storyboard>
     </image>
     <image name="plasmaOuter" extra="static">
@@ -482,7 +482,7 @@ art/logos and art/badges hold EmuBox's own for systems that theme does not know 
       <maxSize>0.421 0.705</maxSize>
       <zIndex>4</zIndex>
       <storyboard>
-        <animation property="rotation" from="0" to="30" duration="900" mode="easeoutcubic"/>
+        <animation property="rotation" from="0" to="180" duration="1600" mode="easeoutcubic"/>
       </storyboard>
     </image>
     <image name="ringsB" extra="static">
@@ -492,7 +492,7 @@ art/logos and art/badges hold EmuBox's own for systems that theme does not know 
       <maxSize>0.421 0.705</maxSize>
       <zIndex>4</zIndex>
       <storyboard>
-        <animation property="rotation" from="0" to="-45" duration="750" mode="easeoutcubic"/>
+        <animation property="rotation" from="0" to="-180" duration="1300" mode="easeoutcubic"/>
       </storyboard>
     </image>
     <image name="ringsA" extra="static">
@@ -502,7 +502,7 @@ art/logos and art/badges hold EmuBox's own for systems that theme does not know 
       <maxSize>0.421 0.705</maxSize>
       <zIndex>4</zIndex>
       <storyboard>
-        <animation property="rotation" from="0" to="60" duration="600" mode="easeoutcubic"/>
+        <animation property="rotation" from="0" to="120" duration="800" mode="easeoutcubic"/>
       </storyboard>
     </image>
     <image name="plasmaOuter" extra="static">

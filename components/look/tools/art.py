@@ -24,36 +24,78 @@ def glow_of(mask, color, blur, strength=1.0):
     g.putalpha(mask.filter(ImageFilter.GaussianBlur(blur)).point(lambda v: min(255, int(v * strength)))); return g
 
 # ------------------------------------------------------------------ backgrounds
-def globe_grid(size, center, R, alpha):
-    """Thin curved lines like the inside of a huge wireframe sphere."""
-    s = 2; layer = Image.new("RGBA", (size[0] * s, size[1] * s), (0, 0, 0, 0)); d = ImageDraw.Draw(layer)
-    cx, cy = center[0] * s, center[1] * s; R *= s; col = (150, 255, 110, alpha)
-    for a in range(6, 90, 7):                                   # meridians
-        rx = R * math.sin(math.radians(a))
-        d.ellipse((cx - rx, cy - R, cx + rx, cy + R), outline=col, width=2 * s)
-    for b in range(-84, 85, 7):                                 # parallels (tilted towards the viewer)
-        y = cy + R * math.sin(math.radians(b)) * 0.92; rx = R * math.cos(math.radians(b)); ry = rx * 0.16
-        d.ellipse((cx - rx, y - ry, cx + rx, y + ry), outline=col, width=2 * s)
-    return layer.resize(size, Image.LANCZOS).rotate(-9, resample=Image.BICUBIC).filter(ImageFilter.GaussianBlur(0.5))
+def voronoi_cells(sites, box):
+    """The cell around each site (the area closer to it than to any other), as polygons: each
+    starts as the whole box and is cut by the line halfway to every nearby site."""
+    cells = []
+    for i, (x, y) in enumerate(sites):
+        poly = [(box[0], box[1]), (box[2], box[1]), (box[2], box[3]), (box[0], box[3])]
+        near = sorted((j for j in range(len(sites)) if j != i),
+                      key=lambda j: (sites[j][0] - x) ** 2 + (sites[j][1] - y) ** 2)
+        for j in near[:40]:
+            ox, oy = sites[j]; nx, ny = ox - x, oy - y; mx, my = (x + ox) / 2, (y + oy) / 2
+            keep = lambda p: (p[0] - mx) * nx + (p[1] - my) * ny <= 0      # noqa: E731  our side of the line
+            out = []
+            for k in range(len(poly)):
+                p, q = poly[k], poly[(k + 1) % len(poly)]
+                if keep(p):
+                    out.append(p)
+                if keep(p) != keep(q):
+                    dp = (p[0] - mx) * nx + (p[1] - my) * ny; dq = (q[0] - mx) * nx + (q[1] - my) * ny
+                    t = dp / (dp - dq); out.append((p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t))
+            poly = out
+            if len(poly) < 3:
+                break
+        cells.append(poly)
+    return cells
 
-def background(name, glow_center, inner, outer, radius, grid_center, grid_alpha):
+def mesh_tunnel(size, center, alpha, seed=7):
+    """The inside of a huge wireframe sphere seen from its middle: irregular cells, small and dim
+    straight ahead, large and bright towards the edges of the screen."""
+    s = 2; w, h = size[0] * s, size[1] * s; cx, cy = center[0] * s, center[1] * s
+    rnd = random.Random(seed); focal = 0.34 * w; step = math.radians(7.5); sites = []
+    phi = math.radians(3)
+    while phi < math.radians(80):
+        count = max(5, round(2 * math.pi * math.sin(phi) / step))
+        turn = rnd.uniform(0, 6.283)
+        for k in range(count):
+            a = turn + k * 6.283185 / count + rnd.uniform(-0.35, 0.35) / count * 6.283
+            f = phi + rnd.uniform(-0.3, 0.3) * step
+            r = focal * math.tan(f)
+            sites.append((cx + r * math.cos(a), cy + r * math.sin(a) * 0.92))
+        phi += step
+    reach = math.hypot(max(cx, w - cx), max(cy, h - cy))
+    lines = Image.new("L", (w, h), 0); d = ImageDraw.Draw(lines)
+    dots = Image.new("L", (w, h), 0); dd = ImageDraw.Draw(dots)
+    for (x, y), poly in zip(sites, voronoi_cells(sites, (-200, -200, w + 200, h + 200))):
+        if len(poly) < 3:
+            continue
+        near = min(1.0, math.hypot(x - cx, y - cy) / reach)                    # 0 straight ahead, 1 at the edge
+        level = int(255 * (0.18 + 0.82 * near ** 1.3))
+        d.line(poly + [poly[0]], fill=level, width=max(2, int((1.2 + 3.2 * near) * s)), joint="curve")
+        for px, py in poly:                                                     # a bead where cells meet
+            rr = (1.6 + 3.0 * near) * s
+            dd.ellipse((px - rr, py - rr, px + rr, py + rr), fill=level)
+    lines = ImageChops.lighter(lines, dots)
+    small = lines.resize(size, Image.LANCZOS)
+    layer = Image.new("RGBA", size, (0, 0, 0, 0))
+    layer.alpha_composite(glow_of(small, (70, 230, 40), 6, 1.4 * alpha / 255))
+    layer.alpha_composite(with_alpha(Image.new("RGB", size, (150, 255, 90)), small, alpha))
+    return layer
+
+def background(name, glow_center, inner, outer, radius, mesh_center, mesh_alpha):
     bg = radial((W, H), glow_center, radius, inner, outer).convert("RGBA")
-    bg.alpha_composite(globe_grid((W, H), grid_center, 1500, grid_alpha))
-    # big soft "tube" arcs in the distance
-    tubes = Image.new("RGBA", (W, H), (0, 0, 0, 0)); td = ImageDraw.Draw(tubes)
-    td.arc((-700, 250, 900, 1850), 250, 340, fill=(90, 220, 50, 26), width=90)
-    td.arc((1100, -900, 2700, 700), 60, 160, fill=(90, 220, 50, 22), width=120)
-    bg.alpha_composite(tubes.filter(ImageFilter.GaussianBlur(14)))
+    bg.alpha_composite(mesh_tunnel((W, H), mesh_center, mesh_alpha))
     # the sweeping line that carries the button hints, bottom left
     sweep = Image.new("RGBA", (W * 2, H * 2), (0, 0, 0, 0)); sd = ImageDraw.Draw(sweep)
     sd.arc((-1500, 1150, 2300, 3400), 200, 318, fill=(150, 255, 90, 120), width=5)
     sd.arc((-1500, 1186, 2300, 3436), 200, 300, fill=(150, 255, 90, 50), width=3)
     bg.alpha_composite(sweep.resize((W, H), Image.LANCZOS))
-    v = radial((W, H), (W / 2, H / 2), W * 0.74, (0, 0, 0), (165, 165, 165)).convert("L")
-    Image.composite(Image.new("RGB", (W, H), (0, 6, 0)), bg.convert("RGB"), v).save(f"{OUT}/{name}", quality=92)
+    bg.convert("RGB").save(f"{OUT}/{name}", quality=92)
 
-background("bg_system.jpg", (520, 470), (44, 150, 18), (2, 26, 2), 1150, (520, 470), 34)
-background("bg_list.jpg", (960, 560), (40, 140, 16), (5, 50, 5), 1300, (960, 520), 38)
+# Near-black, lit only by the orb and the mesh (behind the lists a little lighter, for reading).
+background("bg_system.jpg", (520, 470), (18, 70, 8), (1, 7, 1), 900, (960, 540), 205)
+background("bg_list.jpg", (960, 560), (14, 58, 8), (2, 14, 2), 1300, (960, 540), 120)
 
 # ------------------------------------------------------------------ plasma orb layers
 def blob(name, size, base, lumps, seed, inner, outer, alpha, blur):
@@ -92,23 +134,31 @@ def shell(size=900, rr=0.372):
     im.resize((size, size), Image.LANCZOS).save(f"{OUT}/shell.png")
 shell()
 
-def sym_ring(name, parts, size=1000):
-    """Glass shards in evenly repeated segments, so turning one step looks identical to the start."""
-    s = 2; n = size * s; c = n / 2; im = Image.new("RGBA", (n, n), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
-    for (count, radius, width, span, offset, alpha) in parts:
-        r = radius * n; box = (c - r, c - r, c + r, c + r); step = 360 / count
-        mid = (box[0] + width * s * 0.45, box[1] + width * s * 0.45, box[2] - width * s * 0.45, box[3] - width * s * 0.45)
-        inner = (box[0] + width * s, box[1] + width * s, box[2] - width * s, box[3] - width * s)
-        for k in range(count):
-            a0 = offset + k * step; a1 = a0 + span
-            d.arc(box, a0, a1, fill=(40, 180, 30, alpha), width=width * s)                    # glass body
-            d.arc(mid, a0 + 1, a1 - 1, fill=(110, 235, 60, alpha), width=int(width * s * 0.3))  # lighter band inside
-            d.arc(box, a0, a1, fill=(205, 255, 140, min(255, alpha + 90)), width=4 * s)       # bright outer edge
-            d.arc(inner, a0, a1, fill=(14, 96, 14, min(255, alpha + 40)), width=4 * s)        # dark inner edge
+def ribbons(name, count, radius, thickness, sweep, tilt, alpha, size=1000, wire=False):
+    """Glassy ribbons swirling around the orb, `count` copies of one, evenly turned, so that turning
+    by one step (360 / count degrees, as the theme does on each move) looks just like the start.
+    The ribbon is a crescent: a flattened disc with a slightly shifted, smaller one taken out of it,
+    thickest on one side and tapering to points; `wire` draws only its edge."""
+    s = 2; n = size * s; c = n / 2; r = radius * n
+    outer = Image.new("L", (n, n), 0); ImageDraw.Draw(outer).ellipse((c - r, c - r * sweep, c + r, c + r * sweep), fill=255)
+    shift = thickness * n; ri = r * 0.985
+    inner = Image.new("L", (n, n), 0)
+    ImageDraw.Draw(inner).ellipse((c - ri, c - ri * sweep - shift, c + ri, c + ri * sweep - shift), fill=255)
+    body = ImageChops.subtract(outer, inner).rotate(tilt, resample=Image.BICUBIC, center=(c, c))
+    edge = body.filter(ImageFilter.FIND_EDGES).point(lambda v: 255 if v > 40 else 0).filter(ImageFilter.MaxFilter(3))
+    one = Image.new("RGBA", (n, n), (0, 0, 0, 0))
+    if not wire:
+        fill = radial((n, n), (c, c + r * 0.4), r * 1.3, (210, 255, 120), (20, 120, 14))
+        one.alpha_composite(with_alpha(fill, body.filter(ImageFilter.GaussianBlur(2 * s)), alpha))
+    one.alpha_composite(glow_of(edge, (140, 255, 80), 6 * s, 1.0))
+    one.alpha_composite(with_alpha(Image.new("RGB", (n, n), (215, 255, 160)), edge, min(255, alpha + 110)))
+    im = Image.new("RGBA", (n, n), (0, 0, 0, 0))
+    for k in range(count):
+        im.alpha_composite(one.rotate(k * 360 / count, resample=Image.BICUBIC, center=(c, c)))
     im.resize((size, size), Image.LANCZOS).save(f"{OUT}/{name}")
-sym_ring("rings_a.png", [(6, 0.425, 54, 41, 8, 120)])                              # turns 60 degrees per move
-sym_ring("rings_b.png", [(8, 0.468, 18, 30, 0, 95)])                               # turns 45
-sym_ring("rings_c.png", [(12, 0.497, 8, 17, 3, 85)])                               # turns 30
+ribbons("rings_a.png", 3, 0.45, 0.075, 0.42, 20, 120)                          # turns 120 degrees per move
+ribbons("rings_b.png", 2, 0.49, 0.012, 0.26, 62, 55, wire=True)              # turns 180: two thin orbits
+ribbons("rings_c.png", 2, 0.47, 0.010, 0.20, -28, 40, wire=True)             # turns 180
 
 # ------------------------------------------------------------------ angular glass shapes
 def cut_poly(x0, y0, x1, y1, cut):

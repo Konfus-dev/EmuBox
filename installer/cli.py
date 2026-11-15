@@ -393,7 +393,8 @@ def copy_sound_sets(target: Target, folder: Path | None, say=lambda text: None, 
                 target.copy_file(sound, f"{there}/{sound.name}")
         jingle, film = one / "boot.wav", target.path(f"{there}/boot.mp4")
         if jingle.is_file() and not (one / "boot.mp4").is_file():
-            if not film.is_file() or film.stat().st_mtime < jingle.stat().st_mtime:   # not made yet, or the sound changed
+            newest = max(jingle.stat().st_mtime, FILM_TOOL.stat().st_mtime if FILM_TOOL.is_file() else 0)
+            if not film.is_file() or film.stat().st_mtime < newest:   # not made yet, or the sound or the film's pictures changed
                 say(f"  Making the start-up film for {one.name}...")
                 with tempfile.TemporaryDirectory() as temp:
                     made = Path(temp) / "boot.mp4"
