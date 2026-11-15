@@ -29,6 +29,7 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -132,14 +133,78 @@ def apps(folder: Path | None = None) -> list[tuple[str, dict]]:
     return found
 
 
+# Values asked of EmuBox's own code are read here, in this program. Starting a program for each
+# (python, bash, jq: read off a USB drive every time) made every opening of the menu a burst of
+# forty of them, which is felt as lag in everything else: the menus, the sounds, the buttons.
+
+def running_game() -> str:
+    """The name of what Batocera's menu started (a game, or an app from its tile); '' for nothing."""
+    try:
+        with urllib.request.urlopen("http://127.0.0.1:1234/runningGame", timeout=1) as reply:
+            game = json.loads(reply.read().decode(errors="replace") or "{}")
+    except (OSError, ValueError):
+        return ""
+    return str(game.get("name") or "") if isinstance(game, dict) else ""
+
+
+def open_apps(found: list[tuple[str, dict]], run: Path = Path("/var/run/emubox"), proc: Path = Path("/proc")) -> list[str]:
+    """The names of the apps that are open now, told from what the system already keeps:
+    the processes, the note the opener leaves, and flatpak's list of what it is running."""
+    web, flatpaks = set(), set()
+    for folder in proc.iterdir():
+        if folder.name.isdigit():
+            try:
+                words = (folder / "cmdline").read_bytes().split(b"\0")
+            except OSError:
+                continue
+            if any(word.endswith(b"webview.py") for word in words) and b"--id" in words:
+                web.add(words[words.index(b"--id") + 1].decode(errors="replace"))
+    for info in run.parent.glob(".flatpak/*/info"):
+        try:
+            flatpaks |= {line[5:].strip() for line in info.read_text().splitlines() if line.startswith("name=")}
+        except OSError:
+            continue
+    names = []
+    for app_id, app in found:
+        if app.get("web"):
+            is_open = app_id in web
+        elif not (run / f"{app_id}.started").exists():
+            is_open = False
+        elif app.get("flatpak"):
+            is_open = app["flatpak"] in flatpaks
+        else:
+            try:
+                is_open = (proc / (run / f"{app_id}.pid").read_text().strip()).is_dir()
+            except OSError:
+                is_open = False
+        if is_open:
+            names.append(app["name"])
+    return names
+
+
+def own(module: str, call: Callable[[object], object]) -> Callable[[], str]:
+    """A value from one of EmuBox's own modules beside this file, asked without starting python again."""
+    def ask() -> str:
+        loaded = sys.modules.get(module) or __import__(module)
+        answer = call(loaded)
+        return "" if answer is None else str(answer)
+    return ask
+
+
 def layout(found: list[tuple[str, dict]] | None = None, lights: bool | None = None) -> tuple[list[Tab], list[Row]]:
     """The tabs and the bars along the bottom."""
     found = apps() if found is None else found
     lights = (HERE / "startmenu_omen.py").is_file() if lights is None else lights
     a, lib = str(APP), str(HERE)
     sounds, omen = f"python3 {lib}/menusounds.py", f"python3 {lib}/startmenu_omen.py"
-    in_game = f"{RUNNING_GAME} | jq -r '.name // empty' 2>/dev/null"
-    in_menus = f"[ -z \"$({in_game})\" ] && echo yes"
+    in_game = running_game
+    in_menus = lambda: "" if running_game() else "yes"   # noqa: E731
+    memo: dict[str, tuple[float, list[str]]] = {}
+
+    def open_now_names() -> list[str]:   # asked by several rows in one reading: looked up once
+        if "apps" not in memo or time.monotonic() - memo["apps"][0] > 0.5:
+            memo["apps"] = (time.monotonic(), open_apps(found))
+        return memo["apps"][1]
 
     settings = [
         heading("Sound"),
@@ -147,22 +212,23 @@ def layout(found: list[tuple[str, dict]] | None = None, lights: bool | None = No
                                "batocera-audio setSystemVolume +5")]),
         Row("Mute", [switch("batocera-audio getSystemMute", "batocera-audio setSystemVolume mute",
                             "batocera-audio setSystemVolume unmute")]),
-        Row("Menu sounds", [chooser(f"{sounds} set-now", f"{sounds} previous", f"{sounds} next")]),
-        Row("Menu sound volume", [stepper(f"python3 {lib}/settings.py get ui.sound_volume",
+        Row("Menu sounds", [chooser(own("menusounds", lambda m: m.chosen_set(m.settings.get("ui.sound_set"), m.sets(m.es_text()))),
+                                    f"{sounds} previous", f"{sounds} next")]),
+        Row("Menu sound volume", [stepper(own("settings", lambda m: m.get("ui.sound_volume")),
                                           f"{sounds} volume -10", f"{sounds} volume +10")]),
     ]
     if lights:
         settings += [
             heading("OMEN Lighting"),
-            Row("Lights", [switch(f"{omen} is lights-enabled", f"{omen} set lights-enabled on", f"{omen} set lights-enabled off")]),
-            Row("Brightness", [stepper(f"{omen} get lights-brightness", f"{omen} step lights-brightness -10",
+            Row("Lights", [switch(own("startmenu_omen", lambda m: m.run(["is", "lights-enabled"])), f"{omen} set lights-enabled on", f"{omen} set lights-enabled off")]),
+            Row("Brightness", [stepper(own("startmenu_omen", lambda m: m.run(["get", "lights-brightness"])), f"{omen} step lights-brightness -10",
                                        f"{omen} step lights-brightness +10")]),
-            Row("Follow the game", [switch(f"{omen} is auto-enabled", f"{omen} set auto-enabled on",
+            Row("Follow the game", [switch(own("startmenu_omen", lambda m: m.run(["is", "auto-enabled"])), f"{omen} set auto-enabled on",
                                            f"{omen} set auto-enabled off")]),
         ]
     settings += [
         heading("System"),
-        Row("Power", [chooser("cat /sys/devices/system/cpu/cpufreq/policy0/scaling_governor 2>/dev/null",
+        Row("Power", [chooser(lambda: Path("/sys/devices/system/cpu/cpufreq/policy0/scaling_governor").read_text().strip(),
                               f"{a} power previous", f"{a} power next")]),
         Row("Plane mode", [switch("batocera-planemode status", "batocera-planemode enable", "batocera-planemode disable")]),
         Row("Stuck emulator?", [button("Stop it", "curl -s http://127.0.0.1:1234/emukill", confirm=True)]),
@@ -188,8 +254,11 @@ def layout(found: list[tuple[str, dict]] | None = None, lights: bool | None = No
 
     # The Running tab: whatever is running now, an emulator Batocera started or an app of ours,
     # each with what you would want to reach for (go back to it, its settings, close it).
-    names = "|".join(f'"{app["name"]}"' for _id, app in found) or '""'
-    in_emulator = f'n=$({in_game}); case "$n" in {names}) ;; *) echo "$n" ;; esac'   # not an app opened from its tile
+    app_names = {app["name"] for _id, app in found}
+    def in_emulator() -> str:   # what Batocera started, unless that is one of our apps opened from its tile
+        name = running_game()
+        return "" if name in app_names else name
+
     game = [
         Row("Now running", [text(in_emulator)], when=in_emulator),
         Row("", [button("Resume", "true", close=True),
@@ -198,14 +267,13 @@ def layout(found: list[tuple[str, dict]] | None = None, lights: bool | None = No
                  button("Force close", "curl -s http://127.0.0.1:1234/emukill", close=True, confirm=True)],
             when=in_emulator),
     ]
-    open_apps = f"{a} status running"   # their names, one a line: asked once for all of them
     for app_id, app in found:
-        open_now = f"{open_apps} | grep -qxF '{app['name']}' && echo yes"
+        open_now = lambda name=app["name"]: "yes" if name in open_now_names() else ""   # noqa: E731
         game.append(Row(app["name"], [open_button("Resume", app_id, app),
                                       button("Hide", f"{a} back {app_id}", close=True),
                                       button("Force close", f"{a} close {app_id}", confirm=True)],
                         when=open_now))
-    something_running = f"{in_game}; {open_apps}"
+    something_running = lambda: running_game() or " ".join(open_now_names())   # noqa: E731
     record = [Row("Recording", [switch("batocera-record is_running | grep true", "batocera-record start", "batocera-record stop")])]
     tabs = [Tab("Running", game, when=something_running), Tab("Settings", settings), Tab("Apps", app_rows), Tab("Record", record)]
 
@@ -223,8 +291,9 @@ def layout(found: list[tuple[str, dict]] | None = None, lights: bool | None = No
                             when=f"{a} status music"))
     # The menus' own music, while it is what you hear (music.py goes quiet for a game or your music app).
     music = f"python3 {lib}/music.py"
-    bars.append(Row("Menu music", [text(f"{music} line"), button("<", f"{music} previous"), button("||", f"{music} toggle"),
-                                   button(">", f"{music} next")], when=f"{music} line"))
+    music_line = own("music", lambda m: m.line())
+    bars.append(Row("Menu music", [text(music_line), button("<", f"{music} previous"), button("||", f"{music} toggle"),
+                                   button(">", f"{music} next")], when=music_line))
     return tabs, bars
 
 
@@ -317,6 +386,11 @@ class Model:
 
 # --- reading values -----------------------------------------------------------------------
 
+def note(words: str) -> None:
+    """A line for the log (logs/emubox.log), with the time: how long things took, for finding lag."""
+    print(f"{time.strftime('%F %T')} guide: {words}", file=sys.stderr, flush=True)
+
+
 def read(get: object) -> str:
     if callable(get):
         try:
@@ -331,16 +405,18 @@ def read(get: object) -> str:
         return ""
 
 
-def refresh(model: Model, reader=read) -> None:
-    """Read every value the menu shows, on every tab, so changing tab never waits. The commands
-    are run side by side (call this off the screen's thread: it still takes a moment)."""
+def refresh(model: Model, reader=read, everything: bool = False) -> None:
+    """Read the values the menu is showing: which tabs and rows exist, and what is on the open
+    tab (every tab with `everything`, for the first reading: changing tab then shows last time's
+    values at once and reads its own). What still needs a program is run a few at a time, side
+    by side (call this off the screen's thread)."""
     seen: dict[object, str] = {}
 
     def fetch(getters) -> None:
         wanted = [get for get in dict.fromkeys(getters) if get and get not in seen]
         if not wanted:
             return
-        with ThreadPoolExecutor(max_workers=8) as pool:
+        with ThreadPoolExecutor(max_workers=4) as pool:
             for get, result in zip(wanted, pool.map(reader, wanted)):
                 seen[get] = result
 
@@ -350,8 +426,9 @@ def refresh(model: Model, reader=read) -> None:
         tab.shown = truthy(seen[tab.when]) if tab.when else True
     for row in rows:
         row.shown = truthy(seen[row.when]) if row.when else True
-    fetch(control.get for row in rows if row.shown for control in row.controls)   # only what can be seen
-    for row in rows:
+    looked_at = rows if everything else model.page().rows + model.bars
+    fetch(control.get for row in looked_at if row.shown for control in row.controls)   # only what can be seen
+    for row in looked_at:
         if row.shown:
             for control in row.controls:
                 if control.get:
@@ -513,7 +590,9 @@ def screen(show_now: bool) -> int:
             self.watched: dict[str, object] = {}
             self._watch_pads()
             GLib.timeout_add_seconds(3, self._watch_pads)
-            GLib.timeout_add(1500, self._read_soon, True)   # read once while hidden: the first opening is ready
+            # Read everything once while hidden, so the first opening is ready; not straight away,
+            # while the system is still starting and has better things to do.
+            GLib.timeout_add_seconds(20, self._read_soon, True)
             if show_now:
                 self._show()
 
@@ -584,6 +663,8 @@ def screen(show_now: bool) -> int:
             return False
 
         def _show(self) -> None:
+            asked = time.monotonic()
+            GLib.idle_add(lambda: note(f"opened in {(time.monotonic() - asked) * 1000:.0f} ms") and False)
             self.showing = True
             self.changed_at = time.monotonic()
             # Drawn at once with what was last read (reading runs a dozen commands); fresh values follow.
@@ -741,7 +822,11 @@ def screen(show_now: bool) -> int:
             GLib.timeout_add(90, self._pulse)
 
             def work() -> None:
-                refresh(self.model)
+                began = time.monotonic()
+                refresh(self.model, everything=not self.read_once)
+                took = time.monotonic() - began
+                if took > 0.4:   # worth knowing about: this is what makes the values arrive late
+                    note(f"values read in {took * 1000:.0f} ms")
                 address = read("ip -4 -o addr show scope global 2>/dev/null | awk '{print $2 \": \" $4}' | cut -d/ -f1 | head -1")
                 GLib.idle_add(done, address)
 
@@ -825,6 +910,8 @@ def screen(show_now: bool) -> int:
                 self._hide()
                 return
             self._draw()
+            if key in ("lb", "rb"):
+                self._read_soon()                         # the tab turned to: its own values, now
             if result == "ran":
                 GLib.timeout_add(350, self._read_soon)   # show the new value as soon as it can be read
 

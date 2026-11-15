@@ -156,6 +156,44 @@ class AppStoreTests(unittest.TestCase):
         self.assertEqual(running["YouTube"], ["Resume", "Hide", "Force close"])
 
 
+class GuideReadingTests(unittest.TestCase):
+    def test_which_apps_are_open_is_told_without_starting_a_program(self):
+        with tempfile.TemporaryDirectory() as folder:
+            folder = Path(folder)
+            run, proc = folder / "run/emubox", folder / "proc"
+            run.mkdir(parents=True)
+            for pid, words in (("10", ["python3", "/x/lib/webview.py", "https://y", "--id", "youtube"]), ("11", ["xterm"]), ("self", ["x"])):
+                (proc / pid).mkdir(parents=True)
+                (proc / pid / "cmdline").write_bytes(b"\0".join(w.encode() for w in words))
+            (run.parent / ".flatpak/123").mkdir(parents=True)
+            (run.parent / ".flatpak/123/info").write_text("[Application]\nname=com.discordapp.Discord\n")
+            for app in ("discord", "terminal", "apple-music", "files"):
+                (run / f"{app}.started").write_text("")
+            (run / "terminal.pid").write_text("11\n")
+            (run / "files.pid").write_text("999\n")                    # closed since: no such process
+            found = [("youtube", {"name": "YouTube", "web": "https://y"}), ("twitch", {"name": "Twitch", "web": "https://t"}),
+                     ("discord", {"name": "Discord", "flatpak": "com.discordapp.Discord"}),
+                     ("apple-music", {"name": "Apple Music", "flatpak": "com.google.Chrome"}),   # started once, not running now
+                     ("terminal", {"name": "Terminal", "command": ["xterm"]}), ("files", {"name": "Files", "command": ["pcmanfm"]})]
+            self.assertEqual(guide.open_apps(found, run, proc), ["YouTube", "Discord", "Terminal"])
+
+    def test_only_the_open_tab_is_read_unless_everything_is_asked_for(self):
+        asked = []
+
+        def reader(get):
+            asked.append(get)
+            return "yes"
+
+        tabs = [guide.Tab("One", [guide.Row("a", [guide.text("get-a")])]), guide.Tab("Two", [guide.Row("b", [guide.text("get-b")], when="when-b")])]
+        model = guide.Model(tabs, [])
+        guide.refresh(model, reader)
+        self.assertEqual(sorted(asked), ["get-a", "when-b"])                 # the other tab: only whether its row exists
+        asked.clear()
+        guide.refresh(model, reader, everything=True)
+        self.assertEqual(sorted(asked), ["get-a", "get-b", "when-b"])
+        self.assertEqual(tabs[1].rows[0].controls[0].value, "yes")
+
+
 class HintsAndIconsTests(unittest.TestCase):
     def test_every_app_gets_its_hints_from_its_own_buttons(self):
         import hints

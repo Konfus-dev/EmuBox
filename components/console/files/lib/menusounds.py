@@ -328,7 +328,11 @@ def listen() -> int:
         if kind not in files or not should_play(kind, switches, in_menus):
             return
         level = volume(switches)
+        began = time.monotonic()
         if loaded.ready(kind, files[kind], level) and loaded.play(kind):
+            took = time.monotonic() - began
+            if took > 0.08:   # a sound that came late: say so in the log, for finding out why
+                print(f"{time.strftime('%F %T')} menusounds: {kind} took {took * 1000:.0f} ms to start", file=sys.stderr, flush=True)
             return
         voice = "scroll" if kind == "scroll" else "button"   # the slower way, should the server refuse
         before = playing.get(voice)
