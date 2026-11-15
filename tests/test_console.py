@@ -103,7 +103,8 @@ class GuideTests(unittest.TestCase):
     def test_the_game_tab_comes_first_while_a_game_runs(self):
         self.tabs[0].shown = True
         self.model.open_on("Running")
-        self.assertEqual([c.label for c in self.model.controls()], ["Resume", "Quit"])
+        self.assertEqual([c.label for c in self.model.controls()], ["Resume", "Settings", "Quit", "Force close"])
+        self.assertEqual(self.model.controls()[1].do, "hotkeygen --send menu")       # the emulator's own quick settings
         self.model.press("right"); self.model.press("right")
         self.assertEqual(self.model.press("a"), "moved")                        # quitting asks first
         self.assertEqual((self.model.press("a"), self.model.ran), ("close", ["hotkeygen --send exit"]))
@@ -150,7 +151,9 @@ class AppStoreTests(unittest.TestCase):
             self.assertEqual([g.findtext("name") for g in ET.parse(folder / "tiles/gamelist.xml").getroot()], ["Netflix"])
             self.assertFalse((folder / "tiles/YouTube.sh").exists())
         tabs, _ = guide.layout([("youtube", {"name": "YouTube", "web": "https://www.youtube.com"})], lights=False)
-        self.assertIn("webview.py 'https://www.youtube.com' --id youtube", tabs[2].rows[1].controls[0].do)
+        self.assertTrue(tabs[2].rows[1].controls[0].do.endswith(" detach open youtube"))
+        running = {row.label: [c.label for c in row.controls] for row in tabs[0].rows if row.label}   # and, once open, in Running
+        self.assertEqual(running["YouTube"], ["Resume", "Hide", "Force close"])
 
 
 class HintsAndIconsTests(unittest.TestCase):
@@ -392,6 +395,26 @@ class AudioTests(unittest.TestCase):
         self.assertFalse(menusounds.should_play("select", {}, in_menus=False))                 # a game is running
         self.assertFalse(menusounds.should_play("back", {"ui.sound.back": "off"}, True))
         self.assertTrue(menusounds.should_play("select", {"ui.sound.back": "off"}, True))      # each has its own switch
+
+    def test_a_held_direction_is_only_believed_while_the_controller_says_so(self):
+        class Info:
+            def __init__(self, value, low, high):
+                self.value, self.min, self.max = value, low, high
+
+        class Device:   # a controller another program has taken: no events reach us, but it can still be asked
+            def __init__(self, keys=(), axes=None):
+                self.keys, self.axes = list(keys), axes or {}
+            def active_keys(self):
+                return self.keys
+            def absinfo(self, code):
+                return self.axes[code]
+
+        down = menusounds.still_down
+        self.assertTrue(down(Device(keys=[545]), "key545"))
+        self.assertFalse(down(Device(), "key545"))                                   # let go while we could not hear it
+        self.assertEqual((down(Device(axes={17: Info(1, -1, 1)}), "hat17"), down(Device(axes={17: Info(0, -1, 1)}), "hat17")), (True, False))
+        self.assertEqual((down(Device(axes={1: Info(30000, -32768, 32767)}), "stick1"), down(Device(axes={1: Info(900, -32768, 32767)}), "stick1")), (True, False))
+        self.assertFalse(down(Device(), "hat16"))                                    # unplugged, or cannot be asked: stop
 
     def test_moving_is_heard_from_the_dpad_the_stick_and_the_arrow_keys(self):
         move = menusounds.direction

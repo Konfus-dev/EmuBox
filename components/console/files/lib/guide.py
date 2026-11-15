@@ -167,8 +167,6 @@ def layout(found: list[tuple[str, dict]] | None = None, lights: bool | None = No
 
     listed = [(app_id, app) for app_id, app in found if app.get("menu", True)]
     def opening(app_id: str, app: dict) -> str:
-        if app.get("web"):   # a site in EmuBox's own web view
-            return f"setsid python3 {lib}/webview.py '{app['web']}' --id {app_id} >/dev/null 2>&1 &"
         return f"{a} detach open {app_id}"
 
     def opens(which: list[tuple[str, dict]]) -> list[Row]:
@@ -181,16 +179,27 @@ def layout(found: list[tuple[str, dict]] | None = None, lights: bool | None = No
         app_rows += [heading("Tools")] + opens(tools)
     app_rows += [heading("Return"), Row("Hide apps", [button("Go back", f"{a} back", close=True)])]
 
-    # Whatever Batocera started: a game in an emulator, or an app opened from its tile.
+    # The Running tab: whatever is running now, an emulator Batocera started or an app of ours,
+    # each with what you would want to reach for (go back to it, its settings, close it).
+    names = "|".join(f'"{app["name"]}"' for _id, app in found) or '""'
+    in_emulator = f'n=$({in_game}); case "$n" in {names}) ;; *) echo "$n" ;; esac'   # not an app opened from its tile
     game = [
-        Row("Now running", [text(in_game)]),
+        Row("Now running", [text(in_emulator)], when=in_emulator),
         Row("", [button("Resume", "true", close=True),
-                 button("Quit", "hotkeygen --send exit", close=True, confirm=True)]),
-        heading("Emulator"),
-        Row("Quick settings", [button("Open the emulator's menu", "hotkeygen --send menu", close=True)]),
+                 button("Settings", "hotkeygen --send menu", close=True),
+                 button("Quit", "hotkeygen --send exit", close=True, confirm=True),
+                 button("Force close", "curl -s http://127.0.0.1:1234/emukill", close=True, confirm=True)],
+            when=in_emulator),
     ]
+    for app_id, app in found:
+        open_now = f"{a} running {app_id} && echo yes"
+        game.append(Row(app["name"], [button("Resume", opening(app_id, app), close=True),
+                                      button("Hide", f"{a} back {app_id}", close=True),
+                                      button("Force close", f"{a} close {app_id}", confirm=True)],
+                        when=open_now))
+    something_running = f"{in_game}; {a} status running"
     record = [Row("Recording", [switch("batocera-record is_running | grep true", "batocera-record start", "batocera-record stop")])]
-    tabs = [Tab("Running", game, when=in_game), Tab("Settings", settings), Tab("Apps", app_rows), Tab("Record", record)]
+    tabs = [Tab("Running", game, when=something_running), Tab("Settings", settings), Tab("Apps", app_rows), Tab("Record", record)]
 
     # One bar for each app that is doing something, with what you would want to reach for.
     bars = []

@@ -349,7 +349,8 @@ class Browser(Gtk.Box):
 def start_pad(app_id: str) -> subprocess.Popen | None:
     """The controller, as keys and a pointer, for as long as the window named app_id is in front."""
     try:
-        config = {"id": app_id, "window": app_id, "pad": json.loads((HERE / "web-pad.json").read_text())}
+        config = {"id": app_id, "window": app_id, "pad": json.loads((HERE / "web-pad.json").read_text()),
+                  "strip": False}   # the web view draws the row of hints itself
         with tempfile.NamedTemporaryFile("w", prefix=f"{app_id}-", suffix=".json", delete=False) as file:
             json.dump(config, file)
         pad = subprocess.Popen([sys.executable, str(HERE / "pad.py"), file.name],

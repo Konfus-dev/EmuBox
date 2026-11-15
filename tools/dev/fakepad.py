@@ -7,6 +7,7 @@ Creates a virtual pad and plays commands written to /tmp/fakepad.fifo:
     dpad right       tap a d-pad direction (up down left right)
     dpadhold down 900
     combo guide a    press two buttons together
+    stick rx 20000 800   push a stick axis (x y rx ry) that far for 800 ms
     wait 300
 """
 import os, time
@@ -42,5 +43,8 @@ while True:
                 for b in p[1:]: key(BUTTONS[b], 1); time.sleep(0.03)
                 time.sleep(0.08)
                 for b in reversed(p[1:]): key(BUTTONS[b], 0)
+            elif p[0] == "stick":   # stick rx 20000 800: push an axis (x y rx ry) that far for that long
+                c = {"x": e.ABS_X, "y": e.ABS_Y, "rx": e.ABS_RX, "ry": e.ABS_RY}[p[1]]
+                axis(c, int(p[2])); time.sleep(int(p[3]) / 1000); axis(c, 0)
             elif p[0] == "wait": time.sleep(int(p[1]) / 1000)
             time.sleep(0.09)

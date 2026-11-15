@@ -100,8 +100,8 @@ song, LT/RT change the volume, Y opens the keyboard.
 - **Settings**: the system volume and mute, the menu sound set and its volume, the lights' basics,
   power mode, plane mode, stopping a stuck emulator, and **Open full settings** (Batocera's main menu).
 - **Apps**: open an app or a tool, or hide the apps and go back. **Record**: start and stop a recording.
-- **Running**, while a game or an app from its tile runs: resume, quit, and the emulator's own
-  quick settings.
+- **Running**, while anything is: the emulator Batocera started (resume, its own settings menu,
+  quit, force close) and each app that is open (resume, hide, force close).
 - Each tab's rows sit under headings (Sound, OMEN Lighting, System; Apps, Tools).
 - Along the bottom, a bar for each thing that is live, with its controls: a call (microphone
   switch), your music app (previous, pause, next), or the menus' own music (the same three).

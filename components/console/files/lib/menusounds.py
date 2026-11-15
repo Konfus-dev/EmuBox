@@ -246,6 +246,24 @@ def direction(kind: int, code: int, value: int, centre: float = 0.0, span: float
     return None
 
 
+def still_down(device, what: str) -> bool:
+    """Is this direction really still held? Asked of the controller itself, because the moment
+    it is let go can be missed: another program takes the controller for itself (an app, the
+    Guide menu, the keyboard) and the release never reaches us. Without this a direction held
+    at that moment would tick for ever."""
+    try:
+        if what.startswith("key"):
+            return int(what[3:]) in device.active_keys()
+        code = int(what[3:] if what.startswith("hat") else what[5:])
+        info = device.absinfo(code)
+        if what.startswith("hat"):
+            return info.value != 0
+        centre, span = (info.max + info.min) / 2, (info.max - info.min) / 2
+        return abs((info.value - centre) / (span or 1)) > 0.6
+    except Exception:   # noqa: BLE001  (unplugged, or it cannot be asked: then it is not held)
+        return False
+
+
 def listen() -> int:
     import evdev   # Batocera has it; kept out of the top so the rest can be tried anywhere
 
@@ -306,6 +324,10 @@ def listen() -> int:
             in_menus = game_running() is False
         for name, due in list(held.items()):   # a held direction keeps ticking, as the menus keep moving
             if now >= due:
+                path, _, what = name.rpartition(":")
+                if path not in pads or not still_down(pads[path], what):
+                    del held[name]
+                    continue
                 play("scroll")
                 held[name] = now + REPEAT_S
         wait = min([LOOK_S] + [max(0.0, due - time.monotonic()) for due in held.values()])

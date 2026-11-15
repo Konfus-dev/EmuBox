@@ -29,6 +29,7 @@ from __future__ import annotations
 import json
 import os
 import selectors
+import signal
 import subprocess
 import sys
 import time
@@ -112,9 +113,10 @@ class Pad:
         self.sticks = {"left_stick": [0.0, 0.0], "right_stick": [0.0, 0.0]}
         self.stick_dirs: dict[str, str | None] = {}
         self.carry = {"x": 0.0, "y": 0.0, "wheel": 0.0}
-        self.config_file = config.get("file", "")
+        self.config_file = config.get("file", "") if config.get("strip", True) else ""
         self.strip: subprocess.Popen | None = None        # the row of button hints under the app
         self.in_front = False
+        self.pointer_shown = False
         self.home: str | None = None                      # the window's title on the page the app opened on
         self.b_since: float | None = None                 # when B went down, until it has been acted on
         self.hold_b = config.get("hold_b", True)          # false where B is held on purpose (Backspace in a terminal)
@@ -324,6 +326,18 @@ class Pad:
             return False
         return self.in_front
 
+    def _show_pointer(self, show: bool) -> None:
+        """Batocera hides the mouse pointer in its menus (batocera-mouse); an app steered with
+        a stick needs to see it. Shown while the app is in front, hidden again after."""
+        if show == self.pointer_shown or "pointer" not in self.map.values():
+            return
+        self.pointer_shown = show
+        try:
+            subprocess.run(["batocera-mouse", "show" if show else "hide"], timeout=3, check=False,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+
     def _show_strip(self, show: bool) -> None:
         """The hints stay up while the app is in front (also under the keyboard or the Guide
         menu, so the app's window is not resized each time one of them opens)."""
@@ -345,6 +359,7 @@ class Pad:
                     if wanted is None:
                         return
                     self._show_strip(self.in_front)
+                    self._show_pointer(self.in_front)
                     if self.grabbed and self.b_since is not None and now - self.b_since >= HOLD_B_S:
                         self.b_since = None
                         self._act("back", True)
@@ -371,6 +386,7 @@ class Pad:
         finally:
             self.release()
             self._show_strip(False)
+            self._show_pointer(False)
             self.out.close()
 
 
@@ -382,6 +398,9 @@ def main() -> int:
         config = json.load(f)
     config.setdefault("id", os.path.basename(os.path.dirname(os.path.realpath(sys.argv[1]))))
     config["file"] = os.path.realpath(sys.argv[1])
+    # Being stopped (the app was closed) still tidies up: the controllers are let go, the row
+    # of hints is taken down and the pointer is hidden again.
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
     Pad(config).run()
     return 0
 
