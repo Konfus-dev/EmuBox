@@ -241,6 +241,17 @@ class ComponentTests(Drive):
             code, out = run(self.root, "--setup", str(setup))   # a folder that is not on this PC is no reason to stop
             self.assertEqual(code, 0, out)
             self.assertIn("moved-away is not here; left out", out)
+            # A library the file does not mention is asked for, and the answer kept in the file.
+            make_file(Path(folder) / "bios/psx/scph5501.bin")
+            setup.write_text(json.dumps({"with": ["discord"], "download_later": True}))
+            code, out = run(self.root, "--setup", str(setup), answers=f"/no/such/place\n{folder}/bios\n\n")
+            self.assertEqual(code, 0, out)
+            self.assertIn("/no/such/place is not a folder", out)
+            self.assertTrue((self.root / "bios/scph5501.bin").is_file())
+            self.assertEqual((json.loads(setup.read_text())["bios"], json.loads(setup.read_text())["games"]), (f"{folder}/bios", ""))
+            code, out = run(self.root, "--setup", str(setup))            # nothing left to ask
+            self.assertEqual(code, 0, out)
+            self.assertNotIn("Where are they?", out)
             setup.write_text('{"wiht": []}')
             code, out = run(self.root, "--setup", str(setup))
             self.assertEqual(code, 1)

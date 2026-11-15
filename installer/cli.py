@@ -79,6 +79,9 @@ def read_setup(args, say=lambda text: None) -> dict:
         return where if is_url(where) else str((file.parent / Path(os.path.expandvars(where)).expanduser()).resolve())
 
     args.yes = True
+    # A library the file says nothing about is asked for ("" in the file means: none, do not ask).
+    args.ask_for = [kind for kind in ("bios", "games") if kind not in setup and getattr(args, kind) is None]
+    args.setup_file = file
     if args.include is None and "with" in setup:
         args.include = ",".join(setup["with"])
     for kind in ("sounds", "bios", "games"):
@@ -254,8 +257,37 @@ def choose_from_library(library_: Library, only: str | None, ask: Prompts) -> Se
     return selection
 
 
+LIBRARY_HINT = {
+    "bios": "one sub-folder per system, the files inside as they sit in Batocera's bios folder: psx/scph5501.bin, dreamcast/dc/dc_boot.bin",
+    "games": "one sub-folder per system, named as Batocera names it: psx/Some Game.chd, snes/Another Game.sfc",
+}
+
+
+def ask_for_setup(kind: str, title: str, args, ask: Prompts) -> str:
+    """With a setup file that does not mention this library: ask where it is, and write the
+    answer into the file so it is not asked again. Empty when skipped or nobody is there to ask."""
+    ask.say(f"Your {title}: a folder or a repository address ({LIBRARY_HINT[kind]}).")
+    while True:
+        try:
+            where = ask._read("  Where are they? (Enter for none): ")
+        except NoAnswer:
+            return ""
+        if not where or is_url(where) or expand(where).is_dir():
+            break
+        ask.say(f"  {expand(where)} is not a folder.")
+    setup = json.loads(args.setup_file.read_text())
+    setup[kind] = where if not where or is_url(where) else str(expand(where))
+    args.setup_file.write_text(json.dumps(setup, indent=2) + "\n")
+    ask.say(f"  Written to {args.setup_file.name}, so it is not asked again (\"\" there means none).")
+    return setup[kind]
+
+
 def ask_library(kind: str, title: str, args, target: Target, downloads: Downloads, ask: Prompts) -> tuple[Library, Selection] | None:
     where = getattr(args, kind)
+    if not where and kind in args.ask_for:
+        where = ask_for_setup(kind, title, args, ask)
+        if not where:
+            return None
     if not where:
         if args.yes or not ask.yes_no(f"Install {title}?", False):
             return None
@@ -484,7 +516,7 @@ def run_backup(folder: str, args, target: Target, ask: Prompts) -> None:
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     args = parser().parse_args(argv)
-    args.pages = []
+    args.pages, args.ask_for, args.setup_file = [], [], None
     ask = Prompts(assume_defaults=args.yes or bool(args.setup))
     try:
         ask.say("EmuBox")

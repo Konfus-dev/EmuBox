@@ -44,7 +44,7 @@ things or update; it only copies what is missing.
 | `./install --list` | show what can be installed, and what is |
 | `./install --remove discord` | take something off again |
 | `./install --yes --with look,discord --games /mnt/games` | no questions (for scripts) |
-| `./install --setup setups/example.json` | your own answers kept in a file: what to install, where your sounds, BIOS files and games are (folders relative to the file), the graphics driver to fetch for the apps, pages for Vault. One command then rebuilds a drive the same way |
+| `./install --setup setups/example.json` | your own answers kept in a file: what to install, where your sounds, BIOS files and games are (folders relative to the file), the graphics driver to fetch for the apps, pages for Vault. One command then rebuilds a drive the same way. If the file has no `bios` or `games` line you are asked for each folder ([laid out like this](#your-bios-files-and-games)) and the answer is written into the file; `""` means none |
 | `./backup-games ~/my-games` | copy the games on a drive into a library folder |
 
 ## What you can install
@@ -132,6 +132,11 @@ my-games/                      my-bios/
   psx/images/...                 ps2/ps2/SCPH-70012.bin     (as it sits in Batocera's bios folder)
   snes/Another Game.sfc          segacd/bios_CD_U.bin
 ```
+
+Inside a system's folder the files sit exactly as they go into Batocera: a game straight in the
+folder (with `images/` and a `gamelist.xml` beside it if you have them), a BIOS file at the path
+Batocera's "Missing BIOS" screen names, minus the leading `bios/` (so `bios/dc/dc_boot.bin` is
+`dreamcast/dc/dc_boot.bin` in the library, and `bios/GC/USA/IPL.bin` is `gamecube/GC/USA/IPL.bin`).
 
 A library can be a folder on a drive or NAS, or a private git repository; the installer takes
 either. Multi-disc games count as one game. For games, another Batocera drive works as a library
