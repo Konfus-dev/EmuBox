@@ -66,7 +66,7 @@ things or update; it only copies what is missing.
 | **Wi-Fi** | Asks for the network name and password, so Batocera connects by itself |
 | **ScreenScraper account** | For box art, videos and descriptions; with the picture style and extras already chosen |
 | **RetroAchievements account** | Trophies for older games |
-| **Game stores** | Adds the Steam and Heroic (Epic, GOG) installer to Ports |
+| **Store** | A Store on the home screen: Batocera's catalogue of free games (browse and install with the controller), Steam, and Heroic for Epic and GOG. Each downloads itself the first time you open it |
 | **OMEN lights** | Only offered on an HP OMEN PC that has the lights; fetched from [its own repository](https://github.com/Konfus-dev/OmenRGB-Controller) |
 
 ### Controller buttons in the apps

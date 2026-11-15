@@ -5,6 +5,7 @@
 #   retrobox-app back [<app>]          hide it and return to the game (it keeps running)
 #   retrobox-app close <app>           quit it
 #   retrobox-app install <app>         download it (needs internet); "open" does this when needed
+#   retrobox-app fetch <name> <flatpak id>   download any Flathub program behind the same notice
 #   retrobox-app running <app>         exit status 0 if it is running
 #   retrobox-app play <app>            play/pause; opens the app first when it is not running
 #   retrobox-app media PlayPause|Next|Previous|title|playing
@@ -51,9 +52,9 @@ focused() { local w; w=$(window "$1"); [ -n "$w" ] && wlrctl toplevel find "app_
 running() { [ -e "$RUN/$1.started" ] && flatpak ps --columns=application 2>/dev/null | grep -qx "$(conf "$1" .flatpak)"; }
 installed() { flatpak info "$(conf "$1" .flatpak)" >/dev/null 2>&1; }
 
+# download <name> <flatpak id>
 download() {
-    local name flatpak free_gb
-    name=$(conf "$1" .name) flatpak=$(conf "$1" .flatpak)
+    local name=$1 flatpak=$2 free_gb
     free_gb=$(df -BG --output=avail /userdata | tail -1 | tr -dc 0-9)
     if [ "${free_gb:-0}" -lt 3 ]; then echo "Not enough free space for $name (${free_gb} GB free, 3 GB needed)."; return 1; fi
     echo "Getting ready..."
@@ -65,22 +66,26 @@ download() {
     echo "$name is ready."
 }
 # Download behind a full-screen notice (B cancels), so the screen never looks frozen.
-install_app() {
-    installed "$1" && return
-    python3 "$ROOT/lib/notice.py" "Downloading $(conf "$1" .name)" -- "$0" download "$1" 2>>"$LOG"
+fetch() {
+    local name=$1 flatpak=$2
+    flatpak info "$flatpak" >/dev/null 2>&1 && return
+    python3 "$ROOT/lib/notice.py" "Downloading $name" -- "$0" download "$name" "$flatpak" 2>>"$LOG"
     case $? in
     0 | 1 | 130) ;;   # done, failed (the notice said so), or cancelled with B
     *)                # the notice itself could not be shown: fall back to a plain terminal
         if command -v xterm >/dev/null; then
-            xterm -fullscreen -fa Monospace -fs 14 -e bash -c "'$0' download '$1' 2>&1 | tee -a '$LOG'; sleep 4"
+            xterm -fullscreen -fa Monospace -fs 14 -e bash -c "'$0' download '$name' '$flatpak' 2>&1 | tee -a '$LOG'; sleep 4"
         else
-            "$0" download "$1" >>"$LOG" 2>&1
+            "$0" download "$name" "$flatpak" >>"$LOG" 2>&1
         fi ;;
     esac
-    installed "$1"
+    flatpak info "$flatpak" >/dev/null 2>&1
 }
+install_app() { fetch "$(conf "$1" .name)" "$(conf "$1" .flatpak)"; }
 
 start_pad() {
+    # An app that understands controllers itself (a game launcher) gets them untouched.
+    [ "$(conf "$1" '.pad // empty')" ] || return 0
     local pidfile="$RUN/$1.pad.pid"
     [ -e "$pidfile" ] && kill -0 "$(cat "$pidfile")" 2>/dev/null && return
     setsid python3 "$ROOT/lib/pad.py" "$ROOT/apps/$1/app.json" >>"$LOG" 2>&1 &
@@ -190,11 +195,12 @@ open)     need_app "$2"; open_app "$2" || exit 1; if [ "$3" = --wait ]; then wai
 back)     [ -n "$2" ] && need_app "$2"; back "$2" ;;
 close)    need_app "$2"; close_app "$2" ;;
 install)  need_app "$2"; install_app "$2" ;;
-download) need_app "$2"; download "$2" ;;
+fetch)    fetch "$2" "$3" ;;
+download) download "$2" "$3" ;;
 running)  need_app "$2"; running "$2" ;;
 media)    media "$2" ;;
 play)     need_app "$2"; play "$2" ;;
 pads)     pads ;;
 list)     list_apps ;;
-*)        sed -n '2,13s/^# \{0,1\}//p' "$0" >&2; exit 2 ;;
+*)        sed -n '2,14s/^# \{0,1\}//p' "$0" >&2; exit 2 ;;
 esac

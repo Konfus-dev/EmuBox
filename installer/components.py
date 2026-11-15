@@ -19,12 +19,15 @@ component.json:
                    Use an answer as {user} in batocera_conf and es_settings values.
                    Answers are used once and never stored by the installer.
     files          [{"from": path here, "to": path on the drive, "mode": "755"}]
-    ports          entries for the Ports menu: name, description, image,
-                   and either "script" (a file here) or "command" (one line to run)
+    ports          menu entries: name, description, image, and either "script" (a file here)
+                   or "command" (one line to run). They go in Ports unless "system" names
+                   another system folder (for example "store").
     services       Batocera services to switch on
     batocera_conf  {"key": "value"} settings for batocera.conf
     es_settings    {"name": "value"} settings of the menu program
     renamed_from   ids this component had in older versions
+    generated      files the component creates on Batocera while running, to remove with it:
+                   [{"path": "...", "contains": "text that proves the file is ours"}]
     replaces       paths from older versions to delete
     retired_services  services from older versions to switch off
     after          a note printed when the installation is done
@@ -33,6 +36,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+from datetime import date
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import ModuleType
@@ -159,26 +163,27 @@ def with_requirements(chosen: list[str], everything: dict[str, Component]) -> li
     return ordered
 
 
-def _remove_port(target: Target, name: str) -> None:
-    target.remove(f"{PORTS}/{name}.sh")
-    target.remove(f"{PORTS}/images/{name}.png")
-    gamelist.remove_entry(target.path(f"{PORTS}/gamelist.xml"), f"{name}.sh")
+def _remove_port(target: Target, name: str, folder: str = PORTS) -> None:
+    target.remove(f"{folder}/{name}.sh")
+    target.remove(f"{folder}/images/{name}.png")
+    gamelist.remove_entry(target.path(f"{folder}/gamelist.xml"), f"{name}.sh")
 
 
 def _add_port(component: Component, port: dict, target: Target, record: Record) -> None:
-    name = port["name"]
+    name, folder = port["name"], f"roms/{port.get('system', 'ports')}"
     if "script" in port:
-        record.files.append(target.copy_file(component.folder / port["script"], f"{PORTS}/{name}.sh", 0o755))
+        record.files.append(target.copy_file(component.folder / port["script"], f"{folder}/{name}.sh", 0o755))
     else:
         text = f"#!/bin/bash\n# {name}, installed by RetroBox.\n{port['command']}\n"
-        record.files.append(target.write_text(f"{PORTS}/{name}.sh", text, 0o755))
-    fields = {"name": name, "desc": port.get("description", ""), "genre": port.get("genre", "")}
+        record.files.append(target.write_text(f"{folder}/{name}.sh", text, 0o755))
+    fields = {"name": name, "desc": port.get("description", ""), "genre": port.get("genre", ""),
+              "developer": "RetroBox", "players": "1", "releasedate": f"{date.today().year}0101T000000"}
     if port.get("image"):
-        record.files.append(target.copy_file(component.folder / port["image"], f"{PORTS}/images/{name}.png"))
+        record.files.append(target.copy_file(component.folder / port["image"], f"{folder}/images/{name}.png"))
         fields["image"] = f"./images/{name}.png"
-    target.make_dir(target.path(PORTS))
-    gamelist.set_entry(target.path(f"{PORTS}/gamelist.xml"), f"{name}.sh", {k: v for k, v in fields.items() if v})
-    record.ports.append(name)
+    target.make_dir(target.path(folder))
+    gamelist.set_entry(target.path(f"{folder}/gamelist.xml"), f"{name}.sh", {k: v for k, v in fields.items() if v})
+    record.ports.append(name if folder == PORTS else f"{folder}/{name}")
 
 
 def _fill(value, typed: dict[str, str]):
@@ -224,11 +229,12 @@ def install(component: Component, env: Env) -> Record:
 
 def remember(target: Target, component: Component, record: Record) -> None:
     manifest = target.manifest()
+    generated = component.spec.get("generated", [])
     for old_id in component.spec.get("renamed_from", []):
         manifest["components"].pop(old_id, None)
     manifest["components"][component.id] = {
         "title": component.title, "files": sorted(set(record.files)),
-        "services": record.services, "ports": record.ports,
+        "services": record.services, "ports": record.ports, "generated": generated,
     }
     target.save_manifest(manifest)
 
@@ -242,7 +248,12 @@ def uninstall(component_id: str, target: Target) -> bool:
     for service in entry.get("services", []):
         target.disable_service(service)
     for name in entry.get("ports", []):
-        _remove_port(target, name)
+        folder, _, short = name.rpartition("/")   # "roms/store/Steam", or just "Discord" for Ports
+        _remove_port(target, short, folder or PORTS)
+    for made in entry.get("generated", []):
+        path = target.path(made["path"])
+        if path.is_file() and made["contains"] in path.read_text(errors="replace"):
+            path.unlink()   # only when it is recognisably ours
     for relative in entry.get("files", []):
         target.remove(relative)
         folder = target.path(relative).parent   # tidy folders we emptied, but never a top-level one

@@ -1,0 +1,31 @@
+{
+  "title": "Store",
+  "question": "Add a Store to the home screen (free games, Steam, and Heroic for Epic and GOG)?",
+  "default": true,
+  "order": 25,
+  "requires": ["console"],
+  "renamed_from": ["pc-launchers"],
+  "files": [
+    {"from": "files/es_systems_store.cfg", "to": "system/configs/emulationstation/es_systems_store.cfg"},
+    {"from": "files/heroic", "to": "system/retrobox/apps/heroic"}
+  ],
+  "ports": [
+    {
+      "system": "store", "name": "Free Games", "script": "files/Free Games.sh", "image": "files/free-games.png",
+      "genre": "Store",
+      "description": "Batocera's catalogue of homebrew and freely distributable games, for many systems. Pick one and it downloads straight into your library."
+    },
+    {
+      "system": "store", "name": "Steam", "script": "files/Steam.sh", "image": "files/steam.png",
+      "genre": "Store",
+      "description": "Your Steam library and the Steam store. Downloads itself the first time you open it (needs internet, about 3 GB)."
+    },
+    {
+      "system": "store", "name": "Heroic", "command": "exec /userdata/system/retrobox/bin/retrobox-app open heroic --wait",
+      "image": "files/heroic.png", "genre": "Store",
+      "description": "Your Epic Games, GOG and Amazon libraries, through the Heroic launcher. Downloads itself the first time you open it (needs internet)."
+    }
+  ],
+  "replaces": ["roms/ports/Install Steam and Heroic.sh"],
+  "after": "Store is a new entry on the home screen."
+}

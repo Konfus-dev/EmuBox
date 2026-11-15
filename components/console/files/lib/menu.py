@@ -20,6 +20,7 @@ SYSTEM_MENU = "/usr/share/batocera/controlcenter/controlcenter.xml"
 OUR_MENU = "/userdata/system/configs/controlcenter/controlcenter.xml"
 TABS_END = "</feature>"   # the first one after the tab list closes it
 MARK = "<!-- retrobox apps -->"
+CHANGED = 10   # exit status when the menu file was (re)written: a running menu must be restarted to show it
 
 
 def apps() -> list[tuple[str, dict]]:
@@ -32,44 +33,42 @@ def apps() -> list[tuple[str, dict]]:
 
 def button(label: str, action: str, close: bool = False) -> str:
     after = ' afterclick="bcc_close"' if close else ""
-    return f'\t\t\t\t<button display={quoteattr(label)} action={quoteattr(action)}{after} />'
+    return f'\t\t\t<button display={quoteattr(label)} action={quoteattr(action)}{after} />'
 
 
-def app_widget(app_id: str, app: dict) -> list[str]:
-    """One box per app. A music player also shows what is playing and has its buttons right there."""
+def app_rows(app_id: str, app: dict) -> list[str]:
+    """One row per app, named after it. A music player gets its buttons on that
+    row and, under it, what is playing."""
     c = RETROBOX_APP
-    rows = [f'\t\t<vgroup display={quoteattr(app["name"])}>']
+    rows = [f'\t\t<feature display={quoteattr(app["name"])}>']
     if app.get("player"):
-        playing = quoteattr(f"${{{c} media playing}}")
         rows += [
-            '\t\t\t<feature>',
-            f'\t\t\t\t<text display={playing} refresh="2" align="left" />',
-            '\t\t\t</feature>',
-            '\t\t\t<feature>',
             button("Previous", f"{c} media Previous"),
             button("Play / Pause", f"{c} play {app_id}"),
             button("Next", f"{c} media Next"),
-            button("Open", f"{c} open {app_id}", close=True),
-            button("Quit", f"{c} close {app_id}"),
-            '\t\t\t</feature>',
         ]
-    else:
+    rows += [
+        button("Open", f"{c} open {app_id}", close=True),
+        button("Quit", f"{c} close {app_id}"),
+        '\t\t</feature>',
+    ]
+    if app.get("player"):
+        playing = quoteattr(f"${{{c} media playing}}")
         rows += [
-            '\t\t\t<feature>',
-            button("Open", f"{c} open {app_id}", close=True),
-            button("Quit", f"{c} close {app_id}"),
-            '\t\t\t</feature>',
+            '\t\t<feature display="Now playing">',
+            f'\t\t\t<text display={playing} refresh="2" align="left" />',
+            '\t\t</feature>',
         ]
-    return rows + ['\t\t</vgroup>']
+    return rows
 
 
 def apps_tab() -> str:
     rows = [f'\t{MARK}', '\t<hgroup name="Apps" display="Apps">']
     for app_id, app in apps():
-        rows += app_widget(app_id, app)
+        rows += app_rows(app_id, app)
     rows += [
-        '\t\t<feature>',
-        button("Back to game", f"{RETROBOX_APP} back", close=True).replace("\t\t\t\t", "\t\t\t"),
+        '\t\t<feature display="Game">',
+        button("Back to game", f"{RETROBOX_APP} back", close=True),
         '\t\t</feature>',
         '\t</hgroup>',
     ]
@@ -95,11 +94,13 @@ def main() -> int:
         return 1
     with open(SYSTEM_MENU) as f:
         menu = build(f.read())
+    if os.path.exists(OUR_MENU) and open(OUR_MENU).read() == menu:
+        return 0
     os.makedirs(os.path.dirname(OUR_MENU), exist_ok=True)
     with open(OUR_MENU + ".new", "w") as f:
         f.write(menu)
     os.replace(OUR_MENU + ".new", OUR_MENU)
-    return 0
+    return CHANGED
 
 
 if __name__ == "__main__":

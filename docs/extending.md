@@ -37,7 +37,9 @@ Make a folder `apps/<id>/` with two files.
 - `player`: `true` for a music or video player. Its box in the in-game menu's Apps tab then shows
   what is playing, with Previous, Play/Pause and Next beside Open and Quit.
 - `window`: how the app's window id starts. Find it on Batocera with `wlrctl toplevel list` while the app is open.
-- `pad`: what each button does. Buttons: `a b x y lb rb lt rt start select guide l3 r3 up down left right`,
+- `pad`: what each button does. Leave `pad` out for a program that understands controllers
+  itself (a game launcher); it then receives the controller untouched.
+  Otherwise: Buttons: `a b x y lb rb lt rt start select guide l3 r3 up down left right`,
   and `select+<button>` for a second layer. Actions:
 
   | Action | Meaning |
@@ -71,7 +73,8 @@ Make a folder `components/<id>/` with a `component.json`:
   "services": ["my_service"],
   "batocera_conf": {"global.shaderset": "zfast"},
   "es_settings": {"ThemeSet": "retrobox"},
-  "ports": [{"name": "My Port", "script": "files/My Port.sh", "image": "files/tile.png", "description": "..."}],
+  "ports": [{"name": "My Port", "script": "files/My Port.sh", "image": "files/tile.png", "description": "...",
+             "system": "store"}],
   "after": "A note printed when the installation is done."
 }
 ```
@@ -89,6 +92,9 @@ settings as `{id}`:
 
 Answers are used once and never recorded by the installer. For scripts they can be given ahead:
 `--set <component>.user=me`, or the environment variable `RETROBOX_<COMPONENT>_PASSWORD`.
+
+A menu entry goes in Ports unless `"system"` names another system folder; `"store"` puts it in the
+Store on the home screen (`components/store` is the example).
 
 Every key but `title` is optional. Paths under `to` are relative to Batocera's data folder
 (`/userdata`). The full list of keys is at the top of `installer/components.py`.

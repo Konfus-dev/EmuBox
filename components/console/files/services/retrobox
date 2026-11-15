@@ -10,13 +10,24 @@ root=/userdata/system/retrobox
 case "$1" in
     start)
         # Rebuilt at every boot from Batocera's own menu, so it follows updates.
+        # The menu program reads its layout once, when it starts; if it is
+        # already running and the layout changed, start it afresh (hidden).
         python3 "$root/lib/menu.py" >>/userdata/system/logs/retrobox.log 2>&1
+        if [ $? -eq 10 ] && [ -f /var/run/batocera-controlcenter.pid ]; then
+            menu=$(cat /var/run/batocera-controlcenter.pid)
+            if [ -r "/proc/$menu/cmdline" ]; then
+                mapfile -d '' -t how </proc/$menu/cmdline   # start it again exactly as it was started
+                kill "$menu" 2>/dev/null
+                (sleep 1; "${how[@]}" & echo $! >/var/run/batocera-controlcenter.pid) >/dev/null 2>&1 &
+            fi
+        fi
         # A note of the connected controllers, a little after start-up when
         # wireless ones have had time to connect. Helps explain odd buttons.
         (sleep 60; "$root/bin/retrobox-app" pads) >/dev/null 2>&1 &
         ;;
     stop)
+        # The Apps tab stays in place: Batocera also calls "stop" at shutdown,
+        # and its menu may start before we do at the next boot.
         for app in $("$root/bin/retrobox-app" list); do "$root/bin/retrobox-app" close "$app"; done
-        python3 "$root/lib/menu.py" --remove
         ;;
 esac

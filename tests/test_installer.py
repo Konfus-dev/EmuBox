@@ -94,25 +94,31 @@ class ComponentTests(Drive):
         self.assertEqual(components.with_requirements(["discord"], everything), ["console", "discord"])
 
     def test_install_everything_then_remove_an_app(self):
-        code, out = run(self.root, "--yes", "--with", "look,discord,apple-music,rom-patcher,tweaks,pc-launchers")
+        code, out = run(self.root, "--yes", "--with", "look,discord,apple-music,rom-patcher,tweaks,store")
         self.assertEqual(code, 0, out)
         for path in ("themes/retrobox/theme.xml", "system/retrobox/bin/retrobox-app", "system/retrobox/lib/pad.py",
                      "system/retrobox/apps/discord/app.json", "roms/ports/Discord.sh", "roms/ports/images/Apple Music.png",
                      "system/services/retrobox", "system/retrobox/tools/apply-patches.py",
-                     "roms/ports/Install Steam and Heroic.sh"):
+                     "roms/store/Steam.sh", "roms/store/images/Free Games.png", "system/retrobox/apps/heroic/app.json",
+                     "system/configs/emulationstation/es_systems_store.cfg"):
             self.assertTrue((self.root / path).is_file(), path)
         self.assertIn("retrobox-app open discord --wait", (self.root / "roms/ports/Discord.sh").read_text())
         self.assertEqual(self.target.services(), ["old_one", "retrobox", "rom_patcher", "tidy_folders"])
         self.assertEqual(self.target.conf_get("global.shaderset"), "zfast")
-        self.assertEqual((self.root / "roms/ports/gamelist.xml").read_text().count("<game>"), 3)
+        self.assertEqual((self.root / "roms/ports/gamelist.xml").read_text().count("<game>"), 2)
+        self.assertEqual((self.root / "roms/store/gamelist.xml").read_text().count("<game>"), 3)
 
         code, out = run(self.root, "--remove", "discord")
         self.assertEqual(code, 0, out)
         self.assertFalse((self.root / "roms/ports/Discord.sh").exists())
         self.assertFalse((self.root / "system/retrobox/apps/discord").exists())
         self.assertTrue((self.root / "system/retrobox/bin/retrobox-app").exists())   # Apple Music still needs it
-        code, out = run(self.root, "--remove", "apple-music")
+        menu = self.root / "system/configs/controlcenter/controlcenter.xml"   # as built on Batocera at boot
+        make_file(menu).write_text("<features><!-- retrobox apps --></features>")
+        code, out = run(self.root, "--remove", "apple-music", "store")
+        self.assertFalse((self.root / "roms/store/Steam.sh").exists())
         self.assertFalse((self.root / "system/retrobox/bin").exists())
+        self.assertFalse(menu.exists())
         self.assertNotIn("retrobox", self.target.services())
 
     def test_installing_twice_changes_nothing_more(self):
@@ -139,8 +145,8 @@ class ComponentTests(Drive):
 
 class TypedAnswerTests(Drive):
     def test_wifi_is_asked_for_and_written(self):
-        # look n, apple-music n, discord n, wifi y + name + password, five more n, bios n, games n, go ahead y
-        code, out = run(self.root, answers="n\nn\nn\ny\nHome Net\np@ss {word}\n" + "n\n" * 5 + "n\nn\ny\n")
+        # look, apple-music, discord, store n; wifi y + name + password; four more n; bios n, games n; go ahead y
+        code, out = run(self.root, answers="n\nn\nn\nn\ny\nHome Net\np@ss {word}\n" + "n\n" * 4 + "n\nn\ny\n")
         self.assertEqual(code, 0, out)
         self.assertEqual(self.target.conf_get("wifi.ssid"), "Home Net")
         self.assertEqual(self.target.conf_get("wifi.key"), "p@ss {word}")

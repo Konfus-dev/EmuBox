@@ -15,18 +15,20 @@ import signal
 import subprocess
 import sys
 
-import evdev
 import gi
 
 # Batocera's display, for when we are started from a menu with a bare
 # environment. GTK connects while it is being imported, so this comes first.
 os.environ.setdefault("XDG_RUNTIME_DIR", "/run")
 os.environ.setdefault("WAYLAND_DISPLAY", "wayland-0")
+ARGV = list(sys.argv)  # as given: loading GTK below takes the "--" out of sys.argv
 
 gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gdk, GLib, Gtk, GtkLayerShell  # noqa: E402
+
+from padinput import Pads  # noqa: E402
 
 CANCELLED = 130
 LINGER_MS = 2500  # how long the final message stays up
@@ -84,7 +86,7 @@ class Notice(Gtk.Window):
             errors="replace", start_new_session=True)
         GLib.io_add_watch(self.process.stdout, GLib.IO_IN | GLib.IO_HUP, self._on_output)
         GLib.timeout_add(120, self._pulse)
-        self.pads = self._watch_pads()
+        self.pads = Pads(self._on_pad)
 
     @staticmethod
     def _label(text: str, style: str) -> Gtk.Label:
@@ -126,55 +128,22 @@ class Notice(Gtk.Window):
                 pass
             self._finish(CANCELLED)
 
-    # --- the controller: B cancels -------------------------------------------------
-
-    def _watch_pads(self) -> list:
-        pads = []
-        for path in evdev.list_devices():
-            try:
-                device = evdev.InputDevice(path)
-                if evdev.ecodes.BTN_SOUTH not in device.capabilities().get(evdev.ecodes.EV_KEY, []):
-                    device.close()
-                    continue
-                device.grab()   # so the press does not also reach whatever is underneath
-            except OSError:
-                continue
-            pads.append(device)
-            GLib.io_add_watch(device.fd, GLib.IO_IN, self._on_pad, device)
-        return pads
-
-    def _on_pad(self, _fd, _condition, device) -> bool:
-        try:
-            events = list(device.read())
-        except BlockingIOError:
-            return True
-        except OSError:
-            return False
-        for event in events:
-            if event.type == evdev.ecodes.EV_KEY and event.code == evdev.ecodes.BTN_EAST and event.value == 1:
-                self.cancel()
-        return True
-
-    def release_pads(self) -> None:
-        for device in self.pads:
-            try:
-                device.ungrab()
-                device.close()
-            except OSError:
-                pass
+    def _on_pad(self, button: str) -> None:
+        if button == "b":
+            self.cancel()
 
 
 def main() -> int:
-    if "--" not in sys.argv or len(sys.argv) < 4:
+    if "--" not in ARGV or len(ARGV) < 4:
         print(__doc__, file=sys.stderr)
         return 2
-    split = sys.argv.index("--")
-    notice = Notice(" ".join(sys.argv[1:split]), sys.argv[split + 1:])
+    split = ARGV.index("--")
+    notice = Notice(" ".join(ARGV[1:split]), ARGV[split + 1:])
     GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, notice.cancel)
     try:
         Gtk.main()
     finally:
-        notice.release_pads()
+        notice.pads.release()
     return notice.result if notice.result is not None else CANCELLED
 
 

@@ -30,5 +30,11 @@
   ],
   "renamed_from": [
     "runtime"
+  ],
+  "generated": [
+    {
+      "path": "system/configs/controlcenter/controlcenter.xml",
+      "contains": "<!-- retrobox apps -->"
+    }
   ]
 }

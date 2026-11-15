@@ -260,4 +260,14 @@ def gamepad():
     im.resize((96, 64), Image.LANCZOS).save(f"{OUT}/gamepad.png")
 gamepad()
 
+# ------------------------------------------------------------------ emblems for systems Batocera's theme has none for
+def system_logo(system, text):
+    """White lettering on clear; the theme tints it like the borrowed logos."""
+    os.makedirs(f"{OUT}/logos", exist_ok=True)
+    font = ImageFont.truetype(f"{OUT}/fonts/Michroma-Regular.ttf", 150)
+    width = int(ImageDraw.Draw(Image.new("L", (1, 1))).textlength(text, font=font))
+    image = Image.new("RGBA", (width + 60, 240), (0, 0, 0, 0))
+    ImageDraw.Draw(image).text((30, 30), text, font=font, fill=(255, 255, 255, 255))
+    image.save(f"{OUT}/logos/{system}.png")
+system_logo("store", "STORE")
 print("art written (sounds: see sounds.py)")
