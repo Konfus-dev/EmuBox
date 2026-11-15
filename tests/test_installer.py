@@ -233,6 +233,20 @@ class ComponentTests(Drive):
             code, out = run(self.root, "--yes", "--with", "discord")      # next time it is used without asking
             self.assertIn("Arcade", out)
 
+    def test_the_plain_form_of_the_xbox_pad_is_added_to_the_controllers_list(self):
+        run(self.root, "--yes", "--with", "discord")
+        file = self.root / "system/configs/emulationstation/es_input.cfg"
+        self.assertEqual(file.read_text().count("050000005e040000220b000023050000"), 1)
+        file.write_text('<?xml version="1.0"?>\n<inputList>\n\t<inputConfig deviceName="Mine" deviceGUID="abc" />\n</inputList>\n')
+        run(self.root, "--yes", "--with", "discord")
+        text = file.read_text()
+        self.assertIn('deviceName="Mine"', text)                 # yours stay
+        self.assertEqual(text.count("220b000023050000"), 1)
+        import xml.etree.ElementTree as ET
+        self.assertEqual(len(ET.fromstring(text)), 2)
+        run(self.root, "--yes", "--with", "discord")
+        self.assertEqual(file.read_text(), text)                 # and it is added once
+
     def test_installing_twice_changes_nothing_more(self):
         run(self.root, "--yes", "--with", "discord")
         before = sorted(p.relative_to(self.root).as_posix() for p in self.root.rglob("*"))

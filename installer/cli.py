@@ -324,9 +324,14 @@ def write_start_menu(target: Target) -> bool:
         return False
     sys.path.insert(0, str(lib))
     try:
-        for name in ("settings", "menusounds", "startmenu"):
+        for name in ("settings", "menusounds", "startmenu", "space"):
             sys.modules.pop(name, None)
         import startmenu
+        try:   # and the "how full is the drive" indicator, so it is right at the first start too
+            import space
+            space.draw_indicator(target.path("themes"), target.root)
+        except Exception:   # noqa: BLE001
+            pass
         return startmenu.write(target.root) or True
     except Exception:   # noqa: BLE001  the service will write them at the next start
         return False

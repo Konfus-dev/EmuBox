@@ -60,7 +60,9 @@ RUNNING_GAME = "http://127.0.0.1:1234/runningGame"
 SOUTH, EAST, START = 304, 305, 315                 # BTN_SOUTH, BTN_EAST, BTN_START
 ENTER, ESCAPE, SPACE = 28, 1, 57                   # a keyboard's keys for the same three things
 DIRECTION_KEYS = (544, 545, 546, 547, 103, 108, 105, 106)   # d-pad buttons, then the arrow keys
-HOLD_S, REPEAT_S = 0.45, 0.11                      # a held direction: the wait, then the pace
+# A held direction: the wait, then the pace. These are the menu program's own figures for its
+# pop-up menus (half a second, then one row every fifth of a second), so a tick is a row moved.
+HOLD_S, REPEAT_S = 0.5, 0.2
 KINDS = ("scroll", "select", "back", "menuopen")
 BUILT_IN = "EmuBox"
 RESCAN_S, LOOK_S = 5.0, 1.0
