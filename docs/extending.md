@@ -47,6 +47,8 @@ Make a folder `apps/<id>/` with two files.
   no `window` or `pad` needed).
 - `hints`: the row of button hints along the bottom is made from `pad`; say a button's words
   yourself with `"hints": {"x": "Mute"}`, or hide one with `""`.
+- `tip`: a sentence shown along the top for a few seconds the first three times the app is
+  opened (how to sign in, say).
 - `hold_b`: `false` where B is held on purpose (Backspace in a terminal); elsewhere holding B
   hides the app.
 - The program is fetched onto the drive when the installer runs (needs `flatpak` on the PC), so it

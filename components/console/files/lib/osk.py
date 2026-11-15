@@ -11,12 +11,11 @@ app underneath as ordinary key presses.
     osk.py --toggle   open it, or close it if it is already open
 
 Needs a Wayland compositor with layer-shell and virtual-keyboard support
-(Batocera's labwc has both), GTK 3, python-evdev and the `wtype` tool.
+(Batocera's labwc has both), GTK 3 and python-evdev; typing is done by typer.py.
 """
 
 import os
 import signal
-import subprocess
 import sys
 import time
 
@@ -50,7 +49,7 @@ SYMBOLS = [
     list("…•°©®™¿¡§¶"),
 ]
 # The bottom row: (what the key shows, what it does, how many columns wide)
-BOTTOM = [("ABC ⇧", "shift", 2), ("#+=", "symbols", 1), ("space", "space", 4),
+BOTTOM = [("ABC ⇧", "shift", 2), ("#+=", "symbols", 1), ("space", "space", 2), ("phone", "phone", 2),
           ("⌫", "backspace", 1), ("⏎ enter", "enter", 2)]
 
 # --- the buttons (shown along the bottom, so nobody has to remember them) ---------
@@ -77,9 +76,7 @@ window { background-color: rgba(2, 18, 2, 0.94); border-top: 2px solid #82e846; 
 """
 
 
-def send(*args: str) -> None:
-    """Type into the app underneath (wtype speaks the virtual-keyboard protocol)."""
-    subprocess.Popen(["wtype", *args], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+TYPER = None   # our keyboard for typing into the app underneath (typer.py), made when the screen opens
 
 
 class Keyboard(Gtk.Window):
@@ -96,6 +93,7 @@ class Keyboard(Gtk.Window):
         Gtk.StyleContext.add_provider_for_screen(
             Gdk.Screen.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
+        self.phone = False  # set when the PHONE key ends the keyboard: the phone keyboard follows
         self.shift = 0  # 0 off, 1 next letter only, 2 locked
         self.symbols = False
         self.row, self.col = 1, 0
@@ -188,18 +186,13 @@ class Keyboard(Gtk.Window):
         elif action == "symbols":
             self.symbols = not self.symbols
             self._build()
-        elif action == "space":
-            send("-k", "space")
-        elif action == "backspace":
-            send("-k", "BackSpace")
-        elif action == "enter":
-            send("-k", "Return")
-        elif action == "tab":
-            send("-k", "Tab")
-        elif action in ("left", "right"):
-            send("-k", action.capitalize())
+        elif action == "phone":   # type on a phone instead: a QR code to scan (phonekeys.py)
+            self.phone = True
+            Gtk.main_quit()
+        elif action in ("space", "backspace", "enter", "tab", "left", "right"):
+            TYPER.key(action)
         else:  # an ordinary character
-            send("--", action)
+            TYPER.text(action)
             if self.shift == 1:  # shift was for one letter only
                 self.shift = 0
                 self._build()
@@ -350,17 +343,29 @@ def main() -> int:
         return 0
     with open(PIDFILE, "w") as f:
         f.write(str(os.getpid()))
+    global TYPER
+    from typer import Typer
+    TYPER = Typer()
     keyboard = Keyboard()
     GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, Gtk.main_quit)
     try:
         Gtk.main()
     finally:
         keyboard.release_pads()
+        TYPER.close()
         time.sleep(0.05)
         try:
             os.unlink(PIDFILE)
         except OSError:
             pass
+    if keyboard.phone:
+        # In our place, as the same process: whoever opened the keyboard (an app's pad
+        # mapper, the web view) is waiting for it to end, and now waits for this instead.
+        keyboard.destroy()
+        while Gtk.events_pending():
+            Gtk.main_iteration()
+        here = os.path.dirname(os.path.realpath(__file__))
+        os.execv(sys.executable, [sys.executable, os.path.join(here, "phonekeys.py")])
     return 0
 
 

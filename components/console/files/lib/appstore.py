@@ -47,6 +47,8 @@ def app_json(app: dict, pads: dict) -> dict:
     made = {"name": app["name"], "description": app.get("about", ""), "added": True}
     if app.get("icon"):
         made["icon"] = app["icon"]
+    if app.get("tip"):
+        made["tip"] = app["tip"]
     if app.get("web"):
         made["web"] = app["web"]
         return made
@@ -59,10 +61,7 @@ def app_json(app: dict, pads: dict) -> dict:
 
 
 def tile_script(app: dict, root: Path = ROOT) -> str:
-    if app.get("web"):
-        run = f"exec python3 {root}/lib/webview.py '{app['web']}' --id {app['id']}"
-    else:
-        run = f"exec {root}/bin/emubox-app open {app['id']} --wait"
+    run = f"exec {root}/bin/emubox-app open {app['id']} --wait"   # web apps too: the opener knows both kinds
     return f"#!/bin/bash\n# {app['name']}, added from EmuBox's app list.\n{run}\n"
 
 

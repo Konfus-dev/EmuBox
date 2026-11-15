@@ -115,6 +115,9 @@ open_app() {
     local app=$1 w
     if web_app "$app"; then   # a site in EmuBox's own web view
         running "$app" || setsid python3 "$ROOT/lib/webview.py" "$(conf "$app" .web)" --id "$app" >>"$LOG" 2>&1 &
+        await "$app"
+        w=$(window "$app"); [ -n "$w" ] && wlrctl toplevel focus "app_id:$w"
+        tip "$app"
         return 0
     fi
     start_bus
@@ -152,8 +155,20 @@ open_app() {
     fi
     wlrctl toplevel focus "app_id:$w"
     start_pad "$app"
+    tip "$app"
     # Its tile gets the app's own icon, once (now that the program is here and the network is up).
     [ -e "$ROOT/apps/$app/.icon" ] || setsid python3 "$ROOT/lib/tileicon.py" app "$app" >/dev/null 2>&1 &
+}
+
+# An app's tip (app.json "tip": how to sign in without a keyboard, say), along the top of the
+# screen for a few seconds, the first three times the app is opened.
+tip() {
+    local words seen
+    words=$(conf "$1" '.tip // empty'); [ -n "$words" ] || return 0
+    seen=$(cat "$ROOT/apps/$1/.tips" 2>/dev/null); seen=${seen:-0}
+    [ "$seen" -lt 3 ] || return 0
+    echo $((seen + 1)) >"$ROOT/apps/$1/.tips"
+    setsid python3 "$ROOT/lib/toast.py" "$words" 12 >/dev/null 2>&1 &
 }
 
 await() {
@@ -164,7 +179,7 @@ await() {
     return 1
 }
 
-has_hints() { [ -n "$(python3 "$ROOT/lib/hints.py" "$ROOT/apps/$1/app.json" --list 2>/dev/null)" ]; }
+has_hints() { [ -n "$(conf "$1" '.pad // empty | keys[0] // empty')" ]; }   # a button map: there is a row of hints (lib/hints.py)
 
 # Used when the app is started like a game from the menu: come back when the
 # player leaves the app (hides or quits it), so the menu returns.

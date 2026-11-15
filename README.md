@@ -44,6 +44,8 @@ there is; `./install --remove <name>` takes something off.
 - **Store**: games (free games, Steam, Heroic, itch.io and **Vault**, your own list of store
   pages whose downloads go straight into your games, [more](docs/vault.md)) and apps (add
   YouTube, Twitch, Netflix and others, or anything from Flathub).
+- **Sign in from your phone**: the on-screen keyboard's PHONE key shows a QR code; scan it and
+  type on your phone.
 - **The Guide menu**: quick settings, your apps, and bars along the bottom for a call or the
   music that is playing, each with its controls.
 - **Settings** in Batocera's own menu: Start > Game Settings > EmuBox (menu sounds, apps, and the

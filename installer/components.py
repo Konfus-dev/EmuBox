@@ -59,7 +59,6 @@ from .target import OLD_MANIFESTS, Target
 PORTS = "roms/ports"
 APPS_ON_DRIVE = "system/emubox/apps"
 OPEN_APP = "exec /userdata/system/emubox/bin/emubox-app open {id} --wait"
-OPEN_WEB = "exec python3 /userdata/system/emubox/lib/webview.py '{web}' --id {id}"   # a site in EmuBox's own web view
 
 
 @dataclass
@@ -127,7 +126,7 @@ def _app_spec(app_id: str, app: dict) -> dict:
         "ports": [{
             "system": "apps",
             "name": app["name"],
-            "command": OPEN_WEB.format(id=app_id, web=app["web"]) if app.get("web") else OPEN_APP.format(id=app_id),
+            "command": OPEN_APP.format(id=app_id),
             "image": "tile.png",
             "genre": "Apps",
             "description": app.get("description", ""),

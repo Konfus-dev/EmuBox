@@ -16,7 +16,7 @@ from unittest import mock
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 
-from installer import cli, components, gamelist, library  # noqa: E402
+from installer import cli, components  # noqa: E402
 from installer.fetch import without_secrets  # noqa: E402
 from installer.library import Library  # noqa: E402
 from installer.prompts import parse_numbers  # noqa: E402

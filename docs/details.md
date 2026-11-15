@@ -81,6 +81,13 @@ Each app adds its own on top (see its `app.json`): in Discord, X mutes, Y search
 through items, LT/RT switch servers; in Apple Music, X or Start plays and pauses, LB/RB change
 song, LT/RT change the volume, Y opens the keyboard.
 
+**Signing in without a keyboard.** The on-screen keyboard has a **PHONE** key: it shows a QR code,
+and scanning it opens a small page on your phone; what you type there and send is typed into the
+app on the TV. It works on your own network, only while the code is on screen, at an address made
+for that one time; what you send is not encrypted on its way across your network, so use it at
+home, not on a network you do not trust. Apps that need a sign-in say so along the top the first
+few times they open (Discord's own sign-in page also has a QR code for its phone app).
+
 ### Two menus, two jobs
 
 **Start** opens Batocera's main menu, where every setting lives. EmuBox's own are under

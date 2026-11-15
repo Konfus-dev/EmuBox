@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generates every image used by the EmuBox theme.  Usage: python3 art.py <theme folder>
 All artwork and audio is original and procedural (no console maker's assets are used)."""
-import sys, math, random, struct, wave, os
+import sys, math, random, os
 from PIL import Image, ImageDraw, ImageFilter, ImageOps, ImageChops, ImageFont
 ROOT = sys.argv[1]; OUT = f"{ROOT}/art"; W, H = 1920, 1080
 os.makedirs(f"{OUT}/help", exist_ok=True); 

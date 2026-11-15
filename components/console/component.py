@@ -7,7 +7,6 @@ every button. This adds that form to the drive's own list of controllers, leavin
 already there alone.
 """
 import re
-from pathlib import Path
 
 FILE = "system/configs/emulationstation/es_input.cfg"
 GUID = "050000005e040000220b000023050000"

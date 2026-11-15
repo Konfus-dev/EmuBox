@@ -54,14 +54,16 @@
       "name": "YouTube",
       "about": "Videos, in EmuBox's built-in web view. D-pad moves between things on the page, A selects.",
       "web": "https://www.youtube.com",
-      "icon": "play"
+      "icon": "play",
+      "tip": "Signing in? Press X for the keyboard and choose PHONE: scan the code and type on your phone."
     },
     {
       "id": "twitch",
       "name": "Twitch",
       "about": "Live streams, in EmuBox's built-in web view.",
       "web": "https://www.twitch.tv",
-      "icon": "broadcast"
+      "icon": "broadcast",
+      "tip": "Signing in? Press X for the keyboard and choose PHONE: scan the code and type on your phone."
     },
     {
       "id": "netflix",
@@ -81,7 +83,8 @@
       ],
       "window": "chrome-www.netflix.com",
       "pad": "desktop",
-      "icon": "film"
+      "icon": "film",
+      "tip": "Signing in? Press Y for the keyboard and choose PHONE: scan the code and type on your phone."
     },
     {
       "id": "xbox-cloud",

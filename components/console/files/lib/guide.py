@@ -41,7 +41,6 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 APP = ROOT / "bin" / "emubox-app"
 PID = Path("/var/run/emubox/guide.pid")
-RUNNING_GAME = "curl -s -m 1 http://127.0.0.1:1234/runningGame"
 REFRESH_S = 1.5
 TWICE_S = 0.6    # the Guide button heard again this soon after the menu changed is the same press
 LET_GO_S = 2.0   # after a press changed the menu, a toggle within this long is that press being let go
@@ -197,7 +196,6 @@ def layout(found: list[tuple[str, dict]] | None = None, lights: bool | None = No
     lights = (HERE / "startmenu_omen.py").is_file() if lights is None else lights
     a, lib = str(APP), str(HERE)
     sounds, omen = f"python3 {lib}/menusounds.py", f"python3 {lib}/startmenu_omen.py"
-    in_game = running_game
     in_menus = lambda: "" if running_game() else "yes"   # noqa: E731
     memo: dict[str, tuple[float, list[str]]] = {}
 

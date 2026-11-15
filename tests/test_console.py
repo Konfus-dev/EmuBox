@@ -139,7 +139,7 @@ class AppStoreTests(unittest.TestCase):
             self.assertTrue(appstore.is_added(by_id["youtube"], folder / "apps"))
             made = json.loads((folder / "apps/netflix/app.json").read_text())
             self.assertEqual((made["flatpak"], made["pad"]["a"], made["added"]), ("com.google.Chrome", ["KEY_ENTER"], True))
-            self.assertIn("webview.py 'https://www.youtube.com' --id youtube", (folder / "tiles/YouTube.sh").read_text())
+            self.assertIn("bin/emubox-app open youtube --wait", (folder / "tiles/YouTube.sh").read_text())
             self.assertIn("emubox-app open netflix --wait", (folder / "tiles/Netflix.sh").read_text())
             self.assertTrue((folder / "tiles/images/YouTube.png").is_file())
             games = ET.parse(folder / "tiles/gamelist.xml").getroot()
@@ -246,6 +246,94 @@ class HintsAndIconsTests(unittest.TestCase):
             self.assertTrue(tileicon.upgrade({"name": "Example", "flatpak": "com.example.App"}, out, font, [Path(folder)], fetch))
             self.assertEqual(Image.open(out).size, (512, 512))
             self.assertFalse(tileicon.upgrade({"name": "Plain", "command": ["xterm"]}, Path(folder) / "none.png", font, [Path(folder)], fetch))
+
+
+class PhoneKeyboardTests(unittest.TestCase):
+    def test_qr_codes_have_the_right_shape(self):
+        import qr
+        small = qr.matrix("hi")
+        self.assertEqual((len(small), len(small[0])), (21, 21))
+        corner = [[small[r][c] for c in range(7)] for r in range(7)]
+        ring = lambda r, c: max(abs(r - 3), abs(c - 3)) != 2          # noqa: E731  a finder pattern: dark, light ring, dark
+        self.assertEqual(corner, [[ring(r, c) for c in range(7)] for r in range(7)])
+        self.assertEqual(len(qr.matrix("http://192.168.1.20:8377/k/abcdefghijkl")), 29)
+        self.assertEqual(qr.correction([32, 91, 11, 120, 209, 114, 220, 77, 67, 64, 236, 17, 236, 17, 236, 17], 10),
+                         [196, 35, 39, 119, 235, 215, 231, 226, 93, 23])     # the worked example in the QR tutorials
+        with self.assertRaises(ValueError):
+            qr.matrix("x" * 200)
+
+    def test_the_phone_page_is_only_at_its_one_time_address(self):
+        import phonekeys
+        import urllib.error
+        import urllib.request
+        typed, done = [], []
+        server = phonekeys.serve("one-time", on_type=lambda text, key: typed.append((text, key)),
+                                 on_done=lambda: done.append(True), ports=range(18390, 18399), host="127.0.0.1")
+        try:
+            base = f"http://127.0.0.1:{server.server_address[1]}"
+            self.assertIn(b"EmuBox keyboard", urllib.request.urlopen(base + "/k/one-time").read())
+            for path, data in (("/", None), ("/k/other", None), ("/k/other/do", b"{}")):
+                with self.assertRaises(urllib.error.HTTPError):
+                    urllib.request.urlopen(urllib.request.Request(base + path, data=data))
+            for sent in ({"text": "p\u00e4ss word", "key": "enter"}, {"key": "tab"}, {"done": True}):
+                urllib.request.urlopen(urllib.request.Request(base + "/k/one-time/do", data=json.dumps(sent).encode()))
+            for _ in range(50):
+                if done:
+                    break
+                __import__("time").sleep(0.02)
+            self.assertEqual((typed, done), ([("p\u00e4ss word", "enter"), ("", "tab")], [True]))
+        finally:
+            server.shutdown()
+        class Fake:   # what was typed, in order
+            def __init__(self):
+                self.did = []
+            def text(self, words):
+                self.did.append(("text", words))
+            def key(self, name):
+                self.did.append(("key", name))
+
+        fake = Fake()
+        phonekeys.typing(fake)("abc", "enter")
+        phonekeys.typing(fake)("", "escape")                                       # not one of the page's buttons
+        self.assertEqual(fake.did, [("text", "abc"), ("key", "enter")])
+
+    def test_typing_presses_real_keys_and_lets_them_go(self):
+        import typer
+
+        class Device:
+            def __init__(self):
+                self.events = []
+            def write(self, kind, code, value):
+                self.events.append((code, value))
+            def syn(self):
+                pass
+
+        try:
+            from evdev import ecodes
+        except ImportError:
+            self.skipTest("python-evdev is not on this PC (it is on Batocera)")
+        device = Device()
+        typing = typer.Typer(device=device, pause=0)
+        typing.text("aB!")
+        typing.key("enter")
+        a, b, one, shift, enter = ecodes.KEY_A, ecodes.KEY_B, ecodes.KEY_1, ecodes.KEY_LEFTSHIFT, ecodes.KEY_ENTER
+        self.assertEqual(device.events, [(a, 1), (a, 0), (shift, 1), (b, 1), (b, 0), (shift, 0),
+                                         (shift, 1), (one, 1), (one, 0), (shift, 0), (enter, 1), (enter, 0)])
+
+    def test_what_our_keyboard_has_no_key_for_goes_the_old_way(self):
+        import typer
+        ran = []
+        typing = typer.Typer(own_keyboard=False, run=lambda command, **_: ran.append(command))
+        typing.text("é")
+        typing.key("tab")
+        self.assertEqual(ran, [["wtype", "--", "é"], ["wtype", "-k", "Tab"]])
+        with tempfile.TemporaryDirectory() as folder:
+            conf = Path(folder) / "batocera.conf"
+            conf.write_text("system.kblayout=fr\n")
+            self.assertFalse(typer.us_layout(conf))
+            conf.write_text("#system.kblayout=fr\nsystem.kblayout=us\n")
+            self.assertTrue(typer.us_layout(conf))
+            self.assertTrue(typer.us_layout(Path(folder) / "none"))
 
 
 class StartMenuTests(unittest.TestCase):

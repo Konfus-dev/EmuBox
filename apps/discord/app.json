@@ -94,5 +94,6 @@
     "left_stick": "",
     "b": "Back (hold: leave)"
   },
-  "icon": "chat"
+  "icon": "chat",
+  "tip": "Signing in? Discord's sign-in page shows a QR code: scan it with the Discord app on your phone. Or click the left stick for the keyboard and choose PHONE to type on your phone."
 }
