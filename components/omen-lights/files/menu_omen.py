@@ -217,7 +217,7 @@ def rows() -> list[str]:
     def palette(where: str) -> list[str]:
         return [choice(name, f"colour '{where}' '{name}'") for name in COLOURS]
 
-    out: list[str] = [f'\t\t<feature display="—  OMEN LIGHTS  —">\n\t\t\t<text display="·" />\n\t\t</feature>']
+    out: list[str] = [f'\t\t<feature display="--  OMEN LIGHTS  --">\n\t\t\t<text display="-" />\n\t\t</feature>']
     out += row("Lights", switch("lights-enabled"))
     out += row("Light brightness", *percent("lights-brightness"))
     out += row("Follow the game", switch("auto-enabled"))

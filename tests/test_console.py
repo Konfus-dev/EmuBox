@@ -36,7 +36,7 @@ class MenuTests(unittest.TestCase):
         root = ET.fromstring(menu.build(BATOCERA_MENU, APPS))
         apps = next(group for group in root.iter("hgroup") if group.get("name") == "Apps")
         rows = [(row.get("display"), [b.get("display") for b in row.iter("button")])
-                for row in apps.iter("feature") if not list(row.iter("switch")) and "—" not in row.get("display")]
+                for row in apps.iter("feature") if not list(row.iter("switch")) and "--" not in row.get("display")]
         self.assertEqual(rows[5:], [("Sound set", []), ("Volume", ["-", "+"])])
         self.assertEqual(rows[:5], [("Apple Music", ["Open", "Play", "Close"]), ("Apple Music", ["Open", "Close"]),
                                 ("Now Playing:", ["<", "||", ">"]),   # right under its app
@@ -75,6 +75,8 @@ class MenuTests(unittest.TestCase):
                 for name in ("display", "action", "value"):
                     if name in element.attrib:
                         self.assertTrue(element.get(name).strip(), ET.tostring(element, encoding="unicode")[:120])
+                        # ...and crashes on a label that is not plain ASCII when no language is set
+                        self.assertTrue(element.get(name).isascii(), element.get(name))
 
     def test_the_apps_tab_ends_with_the_settings_switches(self):
         root = ET.fromstring(menu.build(BATOCERA_MENU, APPS))
@@ -145,7 +147,7 @@ class OmenTests(unittest.TestCase):
             rows = menu.extra_rows(lib)
         root = ET.fromstring("<x>" + "\n".join(rows) + "</x>")
         labels = [row.get("display") for row in root.iter("feature")]
-        self.assertEqual(labels[:4], ["—  OMEN LIGHTS  —", "Lights", "Light brightness", "Follow the game"])
+        self.assertEqual(labels[:4], ["--  OMEN LIGHTS  --", "Lights", "Light brightness", "Follow the game"])
         self.assertIn("Left memory stick", labels)
         stick = next(row for row in root.iter("feature") if row.get("display") == "Left memory stick")
         self.assertIn("colour 'RAM/Stick 1' 'Purple'", [c.get("action").split("menu_omen.py ")[1] for c in stick.iter("choice")])

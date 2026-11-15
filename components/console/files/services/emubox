@@ -34,7 +34,7 @@ case "$1" in
         if [ "$changed" -eq 10 ] || [ "$alive" -eq 0 ]; then
             [ "$alive" -eq 1 ] && kill "$menu" 2>/dev/null
             # In a session of its own: started as our child, it would be stopped along with us.
-            setsid sh -c 'sleep 1; rm -f /var/run/batocera-controlcenter.pid; batocera-controlcenter hidden' >/dev/null 2>&1 </dev/null &
+            setsid sh -c '. /etc/profile.d/xdg.sh 2>/dev/null; sleep 1; rm -f /var/run/batocera-controlcenter.pid; batocera-controlcenter hidden' >/dev/null 2>&1 </dev/null &
         fi
         # A note of the connected controllers, a little after start-up when
         # wireless ones have had time to connect. Helps explain odd buttons.

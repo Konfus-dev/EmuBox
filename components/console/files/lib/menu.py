@@ -43,8 +43,10 @@ def button(label: str, action: str, close: bool = False) -> str:
 
 
 def heading(text: str) -> str:
-    """A row that only names the rows under it (the menu has no section titles of its own)."""
-    return f'\t\t<feature display={quoteattr("—  " + text.upper() + "  —")}>\n\t\t\t<text display="·" />\n\t\t</feature>'
+    """A row that only names the rows under it (the menu has no section titles of its own).
+    Plain ASCII only, here and in every label: the menu program crashes on anything else when
+    it is started without a language set, as it is from a boot service."""
+    return f'\t\t<feature display={quoteattr("--  " + text.upper() + "  --")}>\n\t\t\t<text display="-" />\n\t\t</feature>'
 
 
 def app_rows(app_id: str, app: dict) -> list[str]:
