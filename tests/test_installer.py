@@ -171,6 +171,21 @@ class ComponentTests(Drive):
         manifest = self.target.manifest()
         self.assertEqual((list(manifest["components"]), manifest["sources"]), (["look"], {"games": "/somewhere/games"}))
 
+    def test_a_program_an_app_no_longer_uses_is_taken_off_the_drive(self):
+        from installer import flatpak
+        make_file(self.root / "saves/flatpak/binaries/app/com.example.Old/current/active/metadata")
+        calls = []
+
+        def run(command, env=None, check=False):
+            calls.append((command[1:], env.get("FLATPAK_USER_DIR")))
+            return mock.Mock(returncode=0)
+
+        with mock.patch.object(flatpak.shutil, "which", return_value="/usr/bin/flatpak"):
+            gone = flatpak.retire(self.target, ["com.example.Old", "com.example.NeverThere"], lambda _words: None, run)
+        self.assertEqual(gone, ["com.example.Old"])
+        self.assertEqual(calls, [(["uninstall", "--user", "-y", "--noninteractive", "com.example.Old"],
+                                  str(self.root / "saves/flatpak/binaries"))])     # on the drive, not on this PC
+
     def test_an_apps_program_is_fetched_onto_the_drive_with_batoceras_driver(self):
         from installer import flatpak
         refs = self.root / "saves/flatpak/binaries/repo/refs/remotes/flathub/runtime"

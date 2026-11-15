@@ -26,6 +26,7 @@
 
 ROOT=$(dirname "$(dirname "$(readlink -f "$0")")")
 RUN=/var/run/emubox
+FLATPAK_HOME=/userdata/saves/flatpak/data   # where Batocera has Flatpak programs keep their files
 LOG=/userdata/system/logs/emubox.log
 mkdir -p "$RUN" "$(dirname "$LOG")"
 
@@ -151,6 +152,7 @@ open_app() {
         chown -R root:audio /var/run/pulse 2>/dev/null; chmod -R g+rwX /var/run/pulse 2>/dev/null
         mapfile -t args < <(conf "$app" '.args // [] | .[]')
         echo "$(date '+%F %T') starting $app" >>"$LOG"
+        seed "$app"
         if local_app "$app"; then
             mapfile -t command < <(conf "$app" '.command[]')
             (cd /userdata && HOME=/userdata/system exec setsid "${command[@]}" "${args[@]}") >>"$LOG" 2>&1 &
@@ -189,6 +191,18 @@ tip() {
     [ "$seen" -lt 3 ] || return 0
     echo $((seen + 1)) >"$ROOT/apps/$1/.tips"
     setsid python3 "$ROOT/lib/toast.py" "$words" 12 >/dev/null 2>&1 &
+}
+
+# Files a program finds already there the first time it starts (app.json "seed": a path under
+# the Flatpak programs' home -> its JSON content): Vesktop's own first-start questions, already
+# answered. A file that exists is never touched, so the program's own changes stay.
+seed() {
+    local path
+    while read -r path; do
+        [ -n "$path" ] && [ ! -e "$FLATPAK_HOME/$path" ] || continue
+        mkdir -p "$(dirname "$FLATPAK_HOME/$path")"
+        jq --arg p "$path" '.seed[$p]' "$ROOT/apps/$1/app.json" >"$FLATPAK_HOME/$path"
+    done < <(conf "$1" '.seed // {} | keys[]')
 }
 
 await() {

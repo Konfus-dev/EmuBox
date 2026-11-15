@@ -1,12 +1,15 @@
 {
   "name": "Discord",
-  "question": "Install Discord (voice and text chat, set up for the controller)?",
-  "description": "Voice and text chat, set up for the controller. D-pad moves, A selects, B goes back, click the left stick for the keyboard, Guide opens the menu. Hide it with Select+B and it keeps running while you play. Downloads itself the first time you open it (needs internet).",
-  "flatpak": "com.discordapp.Discord",
+  "question": "Install Discord (Vesktop: voice and text chat, set up for the controller)?",
+  "description": "Discord, through Vesktop (a lighter Discord app that does screen sharing on Linux properly). Voice and text chat, set up for the controller. D-pad moves, A selects, B goes back, click the left stick for the keyboard, Guide opens the menu. Hide it with Select+B and it keeps running while you play. Downloads itself the first time you open it (needs internet).",
+  "flatpak": "dev.vencord.Vesktop",
+  "replaces_flatpaks": [
+    "com.discordapp.Discord"
+  ],
   "args": [
     "--no-sandbox"
   ],
-  "window": "discord",
+  "window": "vesktop",
   "voice": true,
   "pad": {
     "up": [
@@ -94,5 +97,17 @@
     "left_stick": "",
     "b": "Back (hold: leave)"
   },
-  "icon": "chat"
+  "icon": "chat",
+  "seed": {
+    ".var/app/dev.vencord.Vesktop/config/vesktop/state.json": {
+      "firstLaunch": false
+    },
+    ".var/app/dev.vencord.Vesktop/config/vesktop/settings.json": {
+      "discordBranch": "stable",
+      "minimizeToTray": false,
+      "tray": false,
+      "arRPC": true,
+      "hardwareAcceleration": true
+    }
+  }
 }

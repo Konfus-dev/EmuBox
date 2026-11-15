@@ -38,6 +38,8 @@ component.json:
                    [{"path": "...", "contains": "text that proves the file is ours"}]
     replaces       paths from older versions to delete
     retired_services  services from older versions to switch off
+    retired_flatpaks  Flathub programs an older version put on the drive, taken off again
+                   (app.json "replaces_flatpaks")
     after          a note printed when the installation is done
 """
 from __future__ import annotations
@@ -122,6 +124,7 @@ def _app_spec(app_id: str, app: dict) -> dict:
         "comes_with": app.get("comes_with"),
         "files": [{"from": ".", "to": f"{APPS_ON_DRIVE}/{app_id}"}],
         "flatpaks": [app["flatpak"]] if app.get("flatpak") else [],
+        "retired_flatpaks": app.get("replaces_flatpaks", []),
         "replaces": [f"{PORTS}/{app['name']}.sh"],   # apps used to sit among the ports
         "ports": [{
             "system": "apps",
@@ -264,6 +267,8 @@ def install(component: Component, env: Env) -> Record:
         run(env)
     if spec.get("flatpaks") and env.downloads:
         flatpak.preinstall(target, spec["flatpaks"], env.say)
+    if spec.get("retired_flatpaks") and env.downloads:
+        flatpak.retire(target, spec["retired_flatpaks"], env.say)
     if env.downloads and not os.environ.get("EMUBOX_OFFLINE"):
         _own_icons(component, target, record)
 

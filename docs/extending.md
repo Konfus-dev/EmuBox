@@ -54,6 +54,11 @@ Make a folder `apps/<id>/` with two files.
 - The program is fetched onto the drive when the installer runs (needs `flatpak` on the PC), so it
   is ready in Batocera. A component can ask the same for other Flathub programs with
   `"flatpaks": ["org.example.Thing"]`.
+- `seed`: files the program finds already there the first time it starts, as
+  `{"path under its Flatpak home": {JSON content}}`; an existing file is never changed (Discord
+  uses it to skip Vesktop's first-start questions).
+- `replaces_flatpaks`: programs an earlier version of the app used, taken off the drive when the
+  installer next runs (Discord moved to Vesktop: `["com.discordapp.Discord"]`).
 - `window`: how the app's window id starts. Find it on Batocera with `wlrctl toplevel list` while the app is open.
 - `pad`: what each button does. Leave `pad` out for a program that understands controllers
   itself (a game launcher); it then receives the controller untouched.

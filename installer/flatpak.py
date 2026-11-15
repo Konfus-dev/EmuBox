@@ -70,6 +70,39 @@ def wanted_drivers(target: Target) -> list[tuple[str, str]]:
     return sorted(found)
 
 
+def _aimed(target: Target, flatpak: str, run: Callable) -> tuple[Callable[..., bool], list[tuple[str, str]]]:
+    """A way to run flatpak on the drive's programs, and the graphics drivers in use there."""
+    env, scope, drivers = dict(os.environ), [], []
+    if not target.live:   # a drive plugged into a PC: aim this PC's flatpak at the drive
+        drivers = wanted_drivers(target)
+        env["FLATPAK_USER_DIR"] = str(target.path(ON_DRIVE))
+        # Hide this PC's own programs: flatpak counts a runtime the PC has as "already there"
+        # and would leave it off the drive, where Batocera then cannot find it.
+        env["FLATPAK_SYSTEM_DIR"] = tempfile.mkdtemp(prefix="emubox-no-system-")
+        env["FLATPAK_GL_DRIVERS"] = ":".join([name for name, _ in drivers] + ["default"])   # colons, per flatpak(1)
+        scope = ["--user"]
+
+    def flat(*args: str) -> bool:
+        return run([flatpak, *args[:1], *scope, *args[1:]], env=env, check=False).returncode == 0
+    return flat, drivers
+
+
+def retire(target: Target, apps: list[str], say: Callable[[str], None], run: Callable = subprocess.run) -> list[str]:
+    """Take programs an app no longer uses off the drive (Discord's own, once the app moved to
+    Vesktop). Only the programs: what they shared with others stays. Gives the ones taken off."""
+    there = [app for app in apps if is_installed(target, app)]
+    flatpak = shutil.which("flatpak")
+    if not there or not flatpak:
+        return []
+    flat, _drivers = _aimed(target, flatpak, run)
+    gone = []
+    for app in there:
+        say(f"  Taking {app} off the drive (no longer used)...")
+        if flat("uninstall", "-y", "--noninteractive", app):
+            gone.append(app)
+    return gone
+
+
 def preinstall(target: Target, apps: list[str], say: Callable[[str], None],
                run: Callable = subprocess.run) -> list[str]:
     """Download these Flathub programs onto the drive. Gives the ones that are there afterwards."""
@@ -85,18 +118,7 @@ def preinstall(target: Target, apps: list[str], say: Callable[[str], None],
         say(f"  Less than 3 GB free on the drive, so {', '.join(waiting)} is not fetched now; {later}")
         return [app for app in apps if app not in waiting]
 
-    env, scope, drivers = dict(os.environ), [], []
-    if not target.live:   # a drive plugged into a PC: aim this PC's flatpak at the drive
-        drivers = wanted_drivers(target)
-        env["FLATPAK_USER_DIR"] = str(folder)
-        # Hide this PC's own programs: flatpak counts a runtime the PC has as "already there"
-        # and would leave it off the drive, where Batocera then cannot find it.
-        env["FLATPAK_SYSTEM_DIR"] = tempfile.mkdtemp(prefix="emubox-no-system-")
-        env["FLATPAK_GL_DRIVERS"] = ":".join([name for name, _ in drivers] + ["default"])   # colons, per flatpak(1)
-        scope = ["--user"]
-
-    def flat(*args: str) -> bool:
-        return run([flatpak, *args[:1], *scope, *args[1:]], env=env, check=False).returncode == 0
+    flat, drivers = _aimed(target, flatpak, run)
 
     if not flat("remote-add", "--if-not-exists", "flathub", FLATHUB):
         say(f"  Flathub could not be reached, so nothing is fetched now; {later}")
