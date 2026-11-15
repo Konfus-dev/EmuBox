@@ -4,8 +4,8 @@
 #   batocera-vm            test mode: nothing is written to the stick; changes vanish when you close it
 #   batocera-vm --write    changes made inside (settings, saves, scraped art) are kept on the stick
 #
-# A game controller connected to this PC is handed to Batocera while it runs (BATOCERA_VM_PADS=no
-# keeps it here).
+# Game controllers connected to this PC are handed to Batocera while it runs, also ones that
+# connect after it has started (BATOCERA_VM_PADS=no keeps them here).
 # It is for checking menus, settings and that games show up. Games run slowly here because the
 # virtual machine has no real graphics card; use reboot-to-batocera to actually play.
 # It opens full screen: Ctrl+Alt+Q closes it, Ctrl+Alt+G releases the mouse. Do not switch between
@@ -42,31 +42,97 @@ while read -r p mp; do
 done < <(lsblk -rno PATH,MOUNTPOINT "$disk" | tail -n +2)
 
 need=r; [ "$MODE" = write ] && need=rw
-if ! { [ -r "$disk" ] && { [ "$MODE" = test ] || [ -w "$disk" ]; }; }; then
-    echo "Asking for your password to let this session read the stick directly..."
-    pkexec /usr/bin/setfacl -m "u:$(id -un):$need" "$disk" || die "Could not get access to $disk."
+want_pads=yes; [ "${BATOCERA_VM_PADS:-yes}" = no ] && want_pads=no
+
+# One request for your password covers both things that need it: reading the stick directly, and
+# handing game controllers to Batocera. A controller gets a new device file each time it connects
+# (a Bluetooth one every time it wakes), so a small helper stays on for as long as the virtual
+# machine runs and opens each one to you as it appears. It ends when the window closes.
+touch "$run/alive"
+if [ "$want_pads" = yes ] || ! { [ -r "$disk" ] && { [ "$MODE" = test ] || [ -w "$disk" ]; }; }; then
+    echo "Asking for your password: to read the stick, and to hand controllers to Batocera as they connect..."
+    pkexec /bin/bash -c '
+        user=$1 disk=$2 need=$3 alive=$4 pads=$5
+        /usr/bin/setfacl -m "u:$user:$need" "$disk" || exit 1
+        [ "$pads" = yes ] || exit 0
+        while [ -e "$alive" ]; do
+            for event in $(awk "BEGIN { RS = \"\" } /Handlers=[^\n]*js[0-9]/ { if (match(\$0, /event[0-9]+/)) print substr(\$0, RSTART, RLENGTH) }" /proc/bus/input/devices); do
+                [ -e "/dev/input/$event" ] && /usr/bin/setfacl -m "u:$user:rw" "/dev/input/$event" 2>/dev/null
+            done
+            sleep 1
+        done' batocera-vm "$(id -un)" "$disk" "$need" "$run/alive" "$want_pads" &
+    for _ in $(seq 600); do   # until the password has been given and the stick can be read
+        { [ -r "$disk" ] && { [ "$MODE" = test ] || [ -w "$disk" ]; }; } && break
+        kill -0 $! 2>/dev/null || break
+        sleep 0.1
+    done
+    { [ -r "$disk" ] && { [ "$MODE" = test ] || [ -w "$disk" ]; }; } || die "Could not get access to $disk."
 fi
 
 # Game controllers connected to this PC (USB or Bluetooth) are handed to Batocera for as long as
-# the virtual machine runs: it sees the same controller, and this PC does not until you close it.
-pads=()
-if [ "${BATOCERA_VM_PADS:-yes}" != no ]; then
-    while read -r event; do
-        [ -e "/dev/input/$event" ] && pads+=("/dev/input/$event")
-    done < <(awk 'BEGIN { RS = "" } /Handlers=[^\n]*js[0-9]/ { if (match($0, /event[0-9]+/)) print substr($0, RSTART, RLENGTH) }' /proc/bus/input/devices)
-fi
+# the virtual machine runs, including ones that connect, or wake up, after it has started: it sees
+# the same controller, and this PC does not until you close the window. Each sits in one of a few
+# spare slots the virtual machine is given, so it can be put in and taken out while it runs.
 pad_args=()
-for pad in "${pads[@]}"; do
-    if ! { [ -r "$pad" ] && [ -w "$pad" ]; }; then
-        echo "Asking for your password to hand the controller ($pad) to Batocera..."
-        pkexec /usr/bin/setfacl -m "u:$(id -un):rw" "${pads[@]}" || { echo "No access to the controller; starting without it."; pads=(); break; }
-    fi
-done
-for pad in "${pads[@]}"; do pad_args+=(-device "virtio-input-host-pci,evdev=$pad"); done
-[ "${#pads[@]}" -gt 0 ] && echo "Controller(s) handed to Batocera: ${#pads[@]}. They come back to this PC when the window closes."
+if [ "$want_pads" = yes ]; then
+    for n in 0 1 2 3; do pad_args+=(-device "pcie-root-port,id=padslot$n,chassis=$((n + 20)),slot=$((n + 20))"); done
+    pad_args+=(-qmp "unix:$run/qmp,server,nowait")
+    python3 - "$run" <<'WATCH' &
+import json, os, re, socket, sys, time
+run = sys.argv[1]
+
+def pads():
+    """The event device of every game controller this PC has now."""
+    found = []
+    try:
+        for block in open("/proc/bus/input/devices").read().split("\n\n"):
+            if re.search(r"Handlers=.*\bjs\d", block):
+                event = re.search(r"event\d+", block)
+                if event and os.path.exists(f"/dev/input/{event.group()}"):
+                    found.append(f"/dev/input/{event.group()}")
+    except OSError:
+        pass
+    return found
+
+def ask(command, **arguments):
+    """One word to the virtual machine; its answer, or None when it has gone."""
+    try:
+        with socket.socket(socket.AF_UNIX) as s:
+            s.settimeout(3)
+            s.connect(f"{run}/qmp")
+            reader = s.makefile()
+            reader.readline()
+            for message in ({"execute": "qmp_capabilities"}, {"execute": command, "arguments": arguments}):
+                s.sendall(json.dumps(message).encode())
+                while True:
+                    reply = json.loads(reader.readline())
+                    if "return" in reply or "error" in reply:
+                        break
+            return reply
+    except (OSError, ValueError):
+        return None
+
+handed, count = {}, 0          # device file -> (its name in the virtual machine, its slot)
+while os.path.exists(f"{run}/alive"):
+    now = pads()
+    for path in [p for p in handed if p not in now]:      # switched off or unplugged
+        ask("device_del", id=handed.pop(path)[0])
+    for path in now:
+        free = [n for n in range(4) if n not in {slot for _name, slot in handed.values()}]
+        if path in handed or not free or not os.access(path, os.R_OK | os.W_OK):
+            continue
+        count += 1
+        reply = ask("device_add", driver="virtio-input-host-pci", evdev=path, id=f"pad{count}", bus=f"padslot{free[0]}")
+        if reply and "return" in reply:
+            handed[path] = (f"pad{count}", free[0])
+            print(f"Controller handed to Batocera: {path}", flush=True)
+    time.sleep(1)
+WATCH
+    echo "Controllers are handed to Batocera as they connect, and come back to this PC when the window closes."
+fi
 
 cleanup() {
-    rm -rf "$run"
+    rm -rf "$run"   # this also tells the two helpers above to stop
     for p in "${mounted[@]}"; do udisksctl mount -b "$p" >/dev/null 2>&1 || true; done
 }
 trap cleanup EXIT
@@ -92,6 +158,8 @@ cpus=$(( $(nproc) / 2 )); [ "$cpus" -gt 6 ] && cpus=6; [ "$cpus" -lt 2 ] && cpus
 # WLR_NO_HARDWARE_CURSORS (handed to Batocera's compositor through the kernel's command line) has
 # it draw the mouse pointer itself: the virtual screen's own pointer comes out upside down and
 # offset from where it really is.
+# Sound: a short buffer on this PC's side (25 ms; the default is nearer half a second, which is
+# heard as menu sounds trailing the picture). Crackling? Give it more: BATOCERA_VM_AUDIO_US=60000.
 # BATOCERA_VM_DISPLAY and BATOCERA_VM_EXTRA are for troubleshooting, e.g.
 #   BATOCERA_VM_DISPLAY=sdl,gl=on batocera-vm
 qemu-system-x86_64 \
@@ -103,6 +171,7 @@ qemu-system-x86_64 \
     -device ich9-ahci,id=ahci -device ide-hd,drive=stick,bus=ahci.0 \
     -device qemu-xhci -device usb-kbd -device usb-tablet "${pad_args[@]}" \
     -nic user,model=e1000e \
-    -audiodev pipewire,id=snd -device ich9-intel-hda -device hda-duplex,audiodev=snd \
+    -audiodev "pipewire,id=snd,out.latency=${BATOCERA_VM_AUDIO_US:-25000},timer-period=2000" \
+    -device ich9-intel-hda -device hda-duplex,audiodev=snd \
     -device virtio-vga-gl -vga none -display "${BATOCERA_VM_DISPLAY:-gtk,gl=on,zoom-to-fit=on,full-screen=$full}" \
     ${BATOCERA_VM_EXTRA:-}
