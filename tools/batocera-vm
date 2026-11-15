@@ -8,14 +8,16 @@
 # keeps it here).
 # It is for checking menus, settings and that games show up. Games run slowly here because the
 # virtual machine has no real graphics card; use reboot-to-batocera to actually play.
-# Keys: Ctrl+Alt+G releases the mouse, Ctrl+Alt+F toggles fullscreen. Close the window to stop.
+# It opens full screen: Ctrl+Alt+Q closes it, Ctrl+Alt+G releases the mouse. Do not switch between
+# full screen and a window while it runs (Ctrl+Alt+F): Batocera's menus do not follow the change.
+# BATOCERA_VM_WINDOW=1 starts it in a window instead.
 set -euo pipefail
 
 MODE=test
 case "${1:-}" in
     --write) MODE=write ;;
     ""|--test) ;;
-    *) sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+    *) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac
 
 die() { echo "batocera-vm: $1" >&2; exit 1; }
@@ -73,6 +75,12 @@ snap=on
 if [ "$MODE" = write ]; then snap=off; echo "WRITE mode: changes are saved to the stick."
 else echo "Test mode: nothing is written to the stick."; fi
 
+# Full screen from the start. Batocera's menus measure the screen once, when they start; changing
+# the window's size afterwards (going full screen later, dragging a corner) changes the screen
+# under them and leaves them cut off or unresponsive. A real TV never does that. For a window
+# instead: BATOCERA_VM_WINDOW=1 batocera-vm, and leave its size alone while it runs.
+full=on; [ -n "${BATOCERA_VM_WINDOW:-}" ] && full=off
+
 cpus=$(( $(nproc) / 2 )); [ "$cpus" -gt 6 ] && cpus=6; [ "$cpus" -lt 2 ] && cpus=2
 
 # Batocera's menu needs accelerated graphics, so the virtual screen uses this PC's GPU (virgl).
@@ -90,5 +98,5 @@ qemu-system-x86_64 \
     -device qemu-xhci -device usb-kbd -device usb-tablet "${pad_args[@]}" \
     -nic user,model=e1000e \
     -audiodev pipewire,id=snd -device ich9-intel-hda -device hda-duplex,audiodev=snd \
-    -device virtio-vga-gl -vga none -display "${BATOCERA_VM_DISPLAY:-gtk,gl=on,zoom-to-fit=on}" \
+    -device virtio-vga-gl -vga none -display "${BATOCERA_VM_DISPLAY:-gtk,gl=on,zoom-to-fit=on,full-screen=$full}" \
     ${BATOCERA_VM_EXTRA:-}
