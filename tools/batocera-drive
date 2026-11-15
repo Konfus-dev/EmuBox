@@ -1,0 +1,69 @@
+#!/usr/bin/env python3
+"""Print the Batocera data folder (the one holding `system` and `roms`), wherever it is.
+
+    batocera-drive [folder]
+
+Looked for in this order: the folder given; $BATOCERA_DRIVE; /userdata when this is
+Batocera itself; any mounted disk, USB or internal, that holds Batocera's data; a
+partition labelled SHARE that is not mounted yet (it is mounted for you). The other
+batocera-* tools find the drive with this, so they work the same for a USB stick, an
+internal disk, or a folder you name.
+"""
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+
+def looks_right(folder: Path) -> bool:
+    return (folder / "system" / "batocera.conf").is_file() and (folder / "roms").is_dir()
+
+
+def partitions() -> list[dict]:
+    try:
+        listed = json.loads(subprocess.run(["lsblk", "-J", "-o", "PATH,LABEL,MOUNTPOINTS"], capture_output=True, text=True).stdout)
+    except (OSError, ValueError):
+        return []
+    found, queue = [], listed.get("blockdevices", [])
+    while queue:
+        device = queue.pop()
+        found.append(device)
+        queue += device.get("children", [])
+    return found
+
+
+def mounted() -> list[Path]:
+    places = [Path(m) for p in partitions() for m in p.get("mountpoints") or [] if m]
+    for parent in ("/run/media", "/media", "/mnt"):   # and folders lsblk does not know (a network share, say)
+        for pattern in ("*", "*/*"):
+            places += sorted(Path(parent).glob(pattern))
+    return list(dict.fromkeys(p for p in places if looks_right(p)))
+
+
+def find(named: str = "") -> Path:
+    named = named or os.environ.get("BATOCERA_DRIVE", "")
+    if named:
+        folder = Path(named).expanduser()
+        if not looks_right(folder):
+            sys.exit(f"{folder} is not a Batocera data folder (it should hold 'system' and 'roms').")
+        return folder
+    if looks_right(Path("/userdata")):
+        return Path("/userdata")
+    found = mounted()
+    if not found:
+        for part in partitions():
+            if part.get("label") == "SHARE" and not any(part.get("mountpoints") or []):
+                subprocess.run(["udisksctl", "mount", "-b", part["path"]], capture_output=True)
+        found = mounted()
+    if not found:
+        sys.exit("Can't find Batocera's data. Plug the drive in, or name the folder: --drive /path (or BATOCERA_DRIVE=/path).")
+    if len(found) > 1:
+        sys.exit("More than one Batocera drive here:\n  " + "\n  ".join(map(str, found)) + "\nName one: --drive /path (or BATOCERA_DRIVE=/path).")
+    return found[0]
+
+
+if __name__ == "__main__":
+    if sys.argv[1:2] in (["-h"], ["--help"]):
+        sys.exit(__doc__)
+    print(find(sys.argv[1] if len(sys.argv) > 1 else ""))

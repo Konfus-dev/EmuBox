@@ -1,0 +1,27 @@
+{
+  "with": [
+    "apple-music",
+    "bluetooth",
+    "discord",
+    "look",
+    "omen-lights",
+    "rom-patcher",
+    "store",
+    "tweaks",
+    "vault"
+  ],
+  "sounds": "../../Sounds",
+  "graphics_drivers": [
+    "nvidia-590-48-01"
+  ],
+  "vault_pages": [
+    {
+      "name": "ROMs",
+      "url": "https://vimm.net/vault"
+    },
+    {
+      "name": "Hacks",
+      "url": "https://vimm.net/romhacking/hacks"
+    }
+  ]
+}

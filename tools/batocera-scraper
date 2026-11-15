@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Set the ScreenScraper account on the Batocera USB stick, from this PC.
+"""Set the ScreenScraper account on the Batocera drive, from this PC.
 
   batocera-scraper                 asks for your ScreenScraper username and password
   batocera-scraper NAME            asks for the password only
   batocera-scraper --clear         remove the saved account
-  batocera-scraper --show          show what the stick is set to (password hidden)
+  batocera-scraper --show          show what the drive is set to (password hidden)
 
 Use your ScreenScraper username, not your email address. Both are case-sensitive.
 Batocera must be shut down (stick plugged into this PC) when you run this.
@@ -16,14 +16,12 @@ KEYS = ("Scraper", "ScreenScraperUser", "ScreenScraperPass")
 
 
 def find_drive(arg):
-    if arg:
-        return arg
-    path = "/run/media/%s/SHARE" % getpass.getuser()
-    if not os.path.isdir(os.path.join(path, "system")) and os.path.exists("/dev/disk/by-label/SHARE"):
-        subprocess.run(["udisksctl", "mount", "-b", "/dev/disk/by-label/SHARE"], capture_output=True)
-    if not os.path.isdir(os.path.join(path, "system")):
-        sys.exit("Can't find the Batocera stick. Plug it in (or pass --drive /path/to/SHARE).")
-    return path
+    """Batocera's data folder, wherever it is: see batocera-drive."""
+    finder = os.path.join(os.path.dirname(os.path.realpath(__file__)), "batocera-drive")
+    found = subprocess.run([sys.executable, finder] + ([arg] if arg else []), capture_output=True, text=True)
+    if found.returncode:
+        sys.exit(found.stderr.strip())
+    return found.stdout.strip()
 
 
 def line_for(key):
@@ -60,7 +58,7 @@ def main():
                 print(re.sub(r'(name="ScreenScraperPass"\s+value=)"[^"]*"', r'\1"<hidden>"', l.strip()))
                 found = True
         if not found:
-            print("No ScreenScraper account is saved on the stick.")
+            print("No ScreenScraper account is saved on the drive.")
         return 0
     if a.clear:
         values = {"ScreenScraperUser": None, "ScreenScraperPass": None}
@@ -78,7 +76,7 @@ def main():
         with open(conf, "w", errors="surrogateescape") as f:
             f.write(new)
     else:
-        # The file belongs to root on the stick. Write a private copy, then let root put it in place,
+        # The file belongs to root on the drive. Write a private copy, then let root put it in place,
         # so the password never appears on a command line.
         fd, tmp = tempfile.mkstemp(prefix="batocera-scraper-", dir=os.environ.get("XDG_RUNTIME_DIR") or None)
         try:
@@ -91,9 +89,9 @@ def main():
             sys.exit("Could not write the setting (the password prompt was cancelled or failed).")
     os.sync()
     if a.clear:
-        print("ScreenScraper account removed from the stick.")
+        print("ScreenScraper account removed from the drive.")
     else:
-        print('ScreenScraper account "%s" saved on the stick. Scrape in Batocera with Start > Scraper.' % values["ScreenScraperUser"])
+        print('ScreenScraper account "%s" saved on the drive. Scrape in Batocera with Start > Scraper.' % values["ScreenScraperUser"])
     return 0
 
 

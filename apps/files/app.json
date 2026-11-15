@@ -1,0 +1,57 @@
+{
+  "name": "Files",
+  "comes_with": "console",
+  "description": "Batocera's file manager, opened on the drive's folders (games, BIOS, saves, screenshots). D-pad moves, A opens, B goes up a folder, X renames, Y opens the right-click menu, the right stick is a pointer. Select+B hides it, Select+Start closes it.",
+  "command": [
+    "pcmanfm",
+    "/userdata"
+  ],
+  "window": "pcmanfm",
+  "pad": {
+    "up": [
+      "KEY_UP"
+    ],
+    "down": [
+      "KEY_DOWN"
+    ],
+    "left": [
+      "KEY_LEFT"
+    ],
+    "right": [
+      "KEY_RIGHT"
+    ],
+    "a": [
+      "KEY_ENTER"
+    ],
+    "b": [
+      "KEY_LEFTALT",
+      "KEY_UP"
+    ],
+    "x": [
+      "KEY_F2"
+    ],
+    "y": [
+      "KEY_LEFTSHIFT",
+      "KEY_F10"
+    ],
+    "lb": [
+      "KEY_LEFTALT",
+      "KEY_LEFT"
+    ],
+    "rb": [
+      "KEY_LEFTALT",
+      "KEY_RIGHT"
+    ],
+    "start": [
+      "KEY_ESC"
+    ],
+    "select+r3": "rightclick",
+    "left_stick": "scroll",
+    "select+b": "back",
+    "select+start": "close",
+    "guide": "menu",
+    "l3": "osk",
+    "r3": "click",
+    "right_stick": "pointer"
+  }
+}

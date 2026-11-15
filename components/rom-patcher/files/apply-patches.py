@@ -190,7 +190,7 @@ def find_rom(patch_name, patch, roms_dir):
             continue
         if (c[5] if c[5] is not None else crc(read_rom(c[1], c[2]))) == want:
             return c
-    raise PatchError("no game on the stick matches the exact ROM version this patch needs "
+    raise PatchError("no game on the drive matches the exact ROM version this patch needs "
                      "(needs size %d bytes, CRC32 %08X)" % (ssize, want))
 
 

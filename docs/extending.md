@@ -34,6 +34,10 @@ Make a folder `apps/<id>/` with two files.
 
 - `flatpak`: the app's id on [Flathub](https://flathub.org). It is downloaded the first time the app is opened.
 - `args`: extra arguments. Browser-based apps need `--no-sandbox` on Batocera.
+- `command`: instead of `flatpak`, for a program Batocera already has: the words to run, for
+  example `["pcmanfm", "/userdata"]`. Terminal, Files and Claude are made this way.
+- `comes_with`: `"console"` installs the app along with the console tools without asking
+  (leave `question` out).
 - `player`: `true` for a music or video player. Its row in the Guide menu's Apps tab gets a Play
   button, the tab gets music controls, and the strip along the bottom says what is playing.
 - `voice`: `true` for a chat app. The Apps tab gets a microphone mute, and the strip along the

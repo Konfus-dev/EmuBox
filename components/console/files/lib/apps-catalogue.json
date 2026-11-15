@@ -1,0 +1,147 @@
+{
+  "pads": {
+    "desktop": {
+      "up": [
+        "KEY_UP"
+      ],
+      "down": [
+        "KEY_DOWN"
+      ],
+      "left": [
+        "KEY_LEFT"
+      ],
+      "right": [
+        "KEY_RIGHT"
+      ],
+      "a": [
+        "KEY_ENTER"
+      ],
+      "b": [
+        "KEY_ESC"
+      ],
+      "x": [
+        "KEY_SPACE"
+      ],
+      "y": "osk",
+      "lb": [
+        "KEY_LEFTSHIFT",
+        "KEY_TAB"
+      ],
+      "rb": [
+        "KEY_TAB"
+      ],
+      "lt": {
+        "run": "batocera-audio setSystemVolume -5"
+      },
+      "rt": {
+        "run": "batocera-audio setSystemVolume +5"
+      },
+      "start": [
+        "KEY_F11"
+      ],
+      "select+b": "back",
+      "select+start": "close",
+      "guide": "menu",
+      "l3": "osk",
+      "r3": "click",
+      "left_stick": "scroll",
+      "right_stick": "pointer"
+    }
+  },
+  "apps": [
+    {
+      "id": "youtube",
+      "name": "YouTube",
+      "about": "Videos, in EmuBox's built-in web view. D-pad moves between things on the page, A selects.",
+      "web": "https://www.youtube.com"
+    },
+    {
+      "id": "twitch",
+      "name": "Twitch",
+      "about": "Live streams, in EmuBox's built-in web view.",
+      "web": "https://www.twitch.tv"
+    },
+    {
+      "id": "netflix",
+      "name": "Netflix",
+      "about": "Films and series. Runs in Chrome, which can play protected video; needs your own account.",
+      "flatpak": "com.google.Chrome",
+      "args": [
+        "--no-sandbox",
+        "--test-type",
+        "--no-first-run",
+        "--no-default-browser-check",
+        "--password-store=basic",
+        "--kiosk",
+        "--enable-spatial-navigation",
+        "--force-dark-mode",
+        "--app=https://www.netflix.com/"
+      ],
+      "window": "chrome-www.netflix.com",
+      "pad": "desktop"
+    },
+    {
+      "id": "xbox-cloud",
+      "name": "Xbox Cloud Gaming",
+      "about": "Play from the cloud with your own Game Pass. Runs in Chrome; the controller goes straight to the game.",
+      "flatpak": "com.google.Chrome",
+      "args": [
+        "--no-sandbox",
+        "--test-type",
+        "--no-first-run",
+        "--no-default-browser-check",
+        "--password-store=basic",
+        "--kiosk",
+        "--enable-spatial-navigation",
+        "--force-dark-mode",
+        "--app=https://www.xbox.com/play"
+      ],
+      "window": "chrome-www.xbox.com"
+    },
+    {
+      "id": "geforce-now",
+      "name": "GeForce NOW",
+      "about": "Play your PC games from the cloud with your own account. Runs in Chrome; the controller goes straight to the game.",
+      "flatpak": "com.google.Chrome",
+      "args": [
+        "--no-sandbox",
+        "--test-type",
+        "--no-first-run",
+        "--no-default-browser-check",
+        "--password-store=basic",
+        "--kiosk",
+        "--enable-spatial-navigation",
+        "--force-dark-mode",
+        "--app=https://play.geforcenow.com/"
+      ],
+      "window": "chrome-play.geforcenow.com"
+    },
+    {
+      "id": "moonlight",
+      "name": "Moonlight",
+      "about": "Stream games from your own gaming PC (Sunshine or GeForce Experience) on the home network.",
+      "flatpak": "com.moonlight_stream.Moonlight",
+      "args": [],
+      "window": "moonlight"
+    },
+    {
+      "id": "firefox",
+      "name": "Firefox",
+      "about": "A full web browser, with the controller as pointer and keys.",
+      "flatpak": "org.mozilla.firefox",
+      "args": [],
+      "window": "firefox",
+      "pad": "desktop"
+    },
+    {
+      "id": "vlc",
+      "name": "VLC",
+      "about": "Plays almost any video or music file on the drive or the network.",
+      "flatpak": "org.videolan.VLC",
+      "args": [],
+      "window": "vlc",
+      "pad": "desktop",
+      "player": true
+    }
+  ]
+}

@@ -33,8 +33,11 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import shutil
 import subprocess
 import sys
+import threading
 import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -158,6 +161,36 @@ def likely_first(all_systems: list[dict], filename: str) -> tuple[list[dict], in
     return likely + [s for s in all_systems if kind not in s["types"]], len(likely)
 
 
+# Other names a page may use for a system, by the system's folder name.
+ALSO_CALLED = {
+    "psx": ("playstation 1", "playstation one", "ps1", "psone", "psx"), "ps2": ("playstation 2", "ps2"),
+    "ps3": ("playstation 3", "ps3"), "psp": ("playstation portable", "psp"), "psvita": ("playstation vita", "ps vita", "vita"),
+    "nes": ("nintendo entertainment system", "nes", "famicom"), "snes": ("super nintendo", "super nes", "snes", "super famicom"),
+    "n64": ("nintendo 64", "n64"), "gamecube": ("gamecube", "game cube", "ngc"), "wii": ("wii",), "wiiu": ("wii u", "wiiu"),
+    "switch": ("nintendo switch", "switch"), "gb": ("game boy", "gameboy"), "gbc": ("game boy color", "gameboy color", "gbc"),
+    "gba": ("game boy advance", "gameboy advance", "gba"), "nds": ("nintendo ds", "nds"), "3ds": ("nintendo 3ds", "3ds"),
+    "megadrive": ("mega drive", "megadrive", "genesis", "sega genesis"), "mastersystem": ("master system", "sms"),
+    "gamegear": ("game gear", "gamegear"), "saturn": ("sega saturn", "saturn"), "dreamcast": ("dreamcast",),
+    "segacd": ("sega cd", "mega cd"), "sega32x": ("32x",), "xbox": ("xbox",), "xbox360": ("xbox 360", "x360"),
+    "pcengine": ("pc engine", "turbografx", "turbografx-16", "tg16"), "neogeo": ("neo geo", "neogeo"),
+    "atari2600": ("atari 2600",), "c64": ("commodore 64", "c64"), "amiga500": ("amiga",), "dos": ("ms-dos", "dos"),
+    "mame": ("mame", "arcade"), "windows": ("windows", "pc"),
+}
+
+
+def from_page(all_systems: list[dict], page: str) -> dict | None:
+    """The system a page is about, going by its title, address and headings: the longest name of a
+    system found there as whole words, in any case ("PlayStation 2" beats "PlayStation")."""
+    page = " " + page.lower() + " "
+    best, length = None, 0
+    for system in all_systems:
+        names = {system["name"].lower(), system["folder"].lower(), *ALSO_CALLED.get(system["folder"], ())}
+        for name in names:
+            if len(name) > length and len(name) >= 2 and re.search(rf"(?<![a-z0-9]){re.escape(name)}(?![a-z0-9])", page):
+                best, length = system, len(name)
+    return best
+
+
 def free_name(folder: Path, name: str) -> Path:
     """A path in the folder that is not taken: "Game.zip", then "Game (1).zip"..."""
     name = name.replace("/", "_").lstrip(".") or "download"
@@ -215,6 +248,43 @@ def move_problem(file: Path, folder: Path) -> str:
         return f"Cannot reach {folder}: {error.strerror}"
 
 
+ARCHIVES = (".7z", ".zip", ".rar")
+
+
+def needs_unpacking(file: Path, system: dict) -> bool:
+    """An archive in a system that does not list archives among its file types: the menu would
+    ignore it. (Systems that do list them, like most cartridge ones, play them as they are.)"""
+    kind = file.suffix.lower()
+    return kind in ARCHIVES and bool(system.get("types")) and kind not in system["types"]
+
+
+def unpack(archive: Path) -> tuple[bool, str]:
+    """Unpack beside the archive, then remove it. Gives (worked, what was unpacked or why not)."""
+    folder = archive.parent
+    before = set(folder.iterdir())
+    try:
+        if shutil.which("7z") or shutil.which("7zr"):
+            tool = shutil.which("7z") or shutil.which("7zr")
+            done = subprocess.run([tool, "x", "-y", f"-o{folder}", str(archive)], capture_output=True, text=True, check=False)
+            if done.returncode != 0:
+                lines = (done.stderr.strip() or done.stdout.strip()).splitlines()
+                return False, lines[-1] if lines else "the archive could not be read"
+        elif archive.suffix.lower() == ".zip":
+            import zipfile
+            with zipfile.ZipFile(archive) as packed:
+                packed.extractall(folder)
+        else:
+            return False, "no tool here to unpack it"
+    except Exception as error:   # noqa: BLE001  a damaged archive raises its own kinds of error
+        return False, str(error) or "the archive could not be read"
+    fresh = sorted(p for p in set(folder.iterdir()) - before)
+    for extra in fresh:   # sites tuck a note in with the game: not a game
+        if extra.suffix.lower() == ".txt":
+            extra.unlink(missing_ok=True)
+    archive.unlink(missing_ok=True)
+    return True, ", ".join(p.name for p in fresh if p.exists()) or archive.stem
+
+
 def run_command(line: str, settings: Settings, file: Path | None = None, system: str = "",
                 games: str = GAMES) -> tuple[bool, str]:
     """Run a shell line with Vault's variables. Gives (worked, last line it printed)."""
@@ -258,6 +328,9 @@ def ui(settings: Settings, direct: str = "") -> int:
             self.likely = 0
             self.installed = 0
             self.progress: dict[str, float] = {}
+            self.unpacking = 0                 # archives being unpacked right now
+            self.pages: dict[str, str] = {}    # download's file name -> what its page said about itself
+            self.picked: dict | None = None    # the system the page named, for the download being asked about
             settings.downloads.mkdir(parents=True, exist_ok=True)
             self.watcher = Watcher(settings.downloads)
 
@@ -341,7 +414,9 @@ def ui(settings: Settings, direct: str = "") -> int:
                     side = item["url"].split("://", 1)[-1].rstrip("/")
                 else:
                     side = item["folder"]
-                    if index < self.likely:
+                    if item is self.picked:
+                        row.pack_end(label("NAMED ON THE PAGE", "have"), False, False, 0)
+                    elif index < self.likely:
                         row.pack_end(label("PLAYS THIS FILE", "have"), False, False, 0)
                 row.pack_end(label(side, "side", ellipsize=Pango.EllipsizeMode.END, max_width_chars=48), False, False, 0)
                 self.rows.pack_start(row, False, False, 0)
@@ -367,6 +442,7 @@ def ui(settings: Settings, direct: str = "") -> int:
                     self.say(problem, 15)
                     return True
                 state["name"] = path.name
+                self._note_page(path.name)
                 self.watcher.writing.add(path.name)
                 self.progress[path.name] = 0.0
                 download.set_destination(path.as_uri())
@@ -419,8 +495,30 @@ def ui(settings: Settings, direct: str = "") -> int:
                     self._ask(waiting[0])
             return True
 
+        def _note_page(self, name: str) -> None:
+            """Remember what the page a download came from says about itself (title, address,
+            headings): it usually names the console."""
+            view = self.browser.view
+            self.pages[name] = f"{view.get_title() or ''} {view.get_uri() or ''}"
+
+            def got(_view, result) -> None:
+                try:
+                    self.pages[name] += " " + view.evaluate_javascript_finish(result).to_string()
+                except Exception:   # noqa: BLE001  the title and address will have to do
+                    pass
+            try:
+                view.evaluate_javascript(
+                    "Array.from(document.querySelectorAll('h1,h2,[class*=crumb]')).map(e => e.innerText).join(' ').slice(0, 800)",
+                    -1, None, None, None, got)
+            except Exception:   # noqa: BLE001
+                pass
+
         def _ask(self, path: Path) -> None:
             self.choices, self.likely = likely_first(systems(), path.name)
+            self.picked = from_page(self.choices, self.pages.get(path.name, ""))
+            if self.picked:   # the page names a console: that one first, ready to confirm
+                self.choices = [self.picked] + [s for s in self.choices if s is not self.picked]
+                self.likely = 0
             if not self.choices:
                 self.watcher.left.add(path.name)
                 self.say(f"No system folders found in {GAMES}; {path.name} stays in downloads")
@@ -439,7 +537,25 @@ def ui(settings: Settings, direct: str = "") -> int:
                 self._done_asking()
                 return
             worked, said = run_command(settings.command, settings, path, system["folder"])
-            if worked:
+            moved = Path(GAMES) / system["folder"] / path.name
+            if worked and moved.is_file() and needs_unpacking(moved, system):
+                # The system does not play archives: unpack it there, off the screen's thread (it can take a minute).
+                self.installed += 1
+                self.unpacking += 1
+                self.say(f"Unpacking {path.name} for {system['name']}...", 600)
+
+                def work() -> None:
+                    ok, what = unpack(moved)
+                    GLib.idle_add(done, ok, what)
+
+                def done(ok: bool, what: str) -> bool:
+                    self.unpacking -= 1
+                    self.say(f"{what} installed to {system['name']}" if ok
+                             else f"{path.name} is in {system['name']} but could not be unpacked: {what}", 15)
+                    return False
+
+                threading.Thread(target=work, daemon=True).start()
+            elif worked:
                 self.installed += 1
                 self.say(f"{path.name} installed to {system['name']}")
             else:
@@ -538,9 +654,22 @@ def ui(settings: Settings, direct: str = "") -> int:
 
     vault = Vault()
     webview.run(vault, APP_ID)
+    waited = 0
+    while vault.unpacking and waited < 900:   # left while something was still unpacking: let it finish
+        while Gtk.events_pending():
+            Gtk.main_iteration()
+        time.sleep(0.2)
+        waited += 0.2
     if vault.installed:   # have the menu notice the new games, and how much room is left
         space.draw_indicator()
-        run_command(settings.refresh, settings)
+        # Once the menu is back in front: while Vault is still "the running game" it does not take
+        # the refresh, and the new games would not appear until the next restart.
+        env = dict(os.environ, VAULT_GAMES=GAMES, VAULT_DOWNLOADS=str(settings.downloads), VAULT_FILE="", VAULT_SYSTEM="")
+        try:
+            subprocess.Popen(["bash", "-c", f"sleep 5; {settings.refresh}; sleep 6; {settings.refresh}"], env=env,
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        except OSError:
+            pass
     return 0
 
 

@@ -1,10 +1,7 @@
 #!/bin/bash
-# Back up saves, screenshots and settings from the Batocera stick to ~/Batocera-Backups/<date>/
-DRIVE="${1:-/run/media/$USER/SHARE}"
-if [ ! -d "$DRIVE/saves" ] && [ -e /dev/disk/by-label/SHARE ]; then
-    udisksctl mount -b /dev/disk/by-label/SHARE >/dev/null 2>&1
-fi
-[ -d "$DRIVE/saves" ] || { echo "Can't find the Batocera stick. Plug it in (or pass the SHARE path)."; exit 1; }
+# Back up saves, screenshots and settings from the Batocera drive to ~/Batocera-Backups/<date>/
+#   batocera-backup [data folder]     (default: found by batocera-drive)
+DRIVE=$("$(dirname "$(readlink -f "$0")")/batocera-drive" ${1:+"$1"}) || exit 1
 DEST="$HOME/Batocera-Backups/$(date +%Y-%m-%d_%H%M)"
 mkdir -p "$DEST/system" || exit 1
 # flatpak holds installed launchers/games, not save files worth copying

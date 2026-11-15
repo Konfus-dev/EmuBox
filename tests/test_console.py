@@ -13,6 +13,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "components/console/files/lib"))
+import appstore  # noqa: E402
 import audio  # noqa: E402
 import guide  # noqa: E402
 import menusounds  # noqa: E402
@@ -39,14 +40,19 @@ class GuideTests(unittest.TestCase):
     def test_the_tabs_and_what_is_in_them(self):
         self.assertEqual([t.title for t in self.tabs], ["Game", "Settings", "Apps", "Record"])
         settings = {row.label: row.controls for row in self.tabs[1].rows}
-        self.assertEqual(list(settings), ["Volume", "Mute", "Menu sounds", "Menu sound volume", "Lights", "Light brightness",
-                                          "Lights follow the game", "Power", "Plane mode", "Stuck emulator?", "Everything else"])
+        self.assertEqual(list(settings), ["Sound", "Volume", "Mute", "Menu sounds", "Menu sound volume",
+                                          "OMEN Lighting", "Lights", "Brightness", "Follow the game",
+                                          "System", "Power", "Plane mode", "Stuck emulator?", "Everything else"])
         self.assertEqual(settings["Everything else"][0].do, "hotkeygen --send menu")      # Batocera's main menu
         apps = [(row.label, [c.label for c in row.controls]) for row in self.tabs[2].rows]
-        self.assertEqual(apps, [("Apple Music", ["Open"]), ("Discord", ["Open"]), ("Game", ["Back to game"])])   # no Close, no Heroic
-        self.assertTrue(self.tabs[2].rows[0].controls[0].do.endswith(" detach open apple-music"))
+        self.assertEqual(apps, [("Apps", []), ("Apple Music", ["Open"]), ("Discord", ["Open"]),      # no Close, no Heroic
+                                ("Game", []), ("Game", ["Back to game"])])
+        self.assertTrue(self.tabs[2].rows[1].controls[0].do.endswith(" detach open apple-music"))
+        with_tools = guide.layout(APPS + [("terminal", {"name": "Terminal", "command": ["xterm"]})], lights=False)[0][2].rows
+        self.assertEqual([row.label for row in with_tools], ["Apps", "Apple Music", "Discord", "Tools", "Terminal", "Game", "Game"])
+        self.assertFalse(with_tools[3].focusable)                                         # the highlight passes over a heading
         self.assertEqual([t.title for t in guide.layout(APPS, lights=False)[0]], ["Game", "Settings", "Apps", "Record"])
-        self.assertNotIn("Lights", [row.label for row in guide.layout(APPS, lights=False)[0][1].rows])
+        self.assertNotIn("OMEN Lighting", [row.label for row in guide.layout(APPS, lights=False)[0][1].rows])
         volumes = [row.label for tab in self.tabs for row in tab.rows if "Volume" == row.label]
         self.assertEqual(volumes, ["Volume"])                                              # the system volume, once
 
@@ -109,9 +115,47 @@ class GuideTests(unittest.TestCase):
             self.assertTrue(row.label.isascii() and all(c.label.isascii() for c in row.controls), row.label)
 
 
+class AppStoreTests(unittest.TestCase):
+    def test_the_list_of_apps_is_complete_and_plain(self):
+        apps, pads = appstore.catalogue()
+        self.assertGreaterEqual(len(apps), 6)
+        for app in apps:
+            self.assertTrue(app["id"] and app["name"] and app["about"], app)
+            self.assertTrue(bool(app.get("web")) != bool(app.get("flatpak")), app["id"])     # one kind or the other
+            if app.get("pad"):
+                self.assertIn(app["pad"], pads)
+            if app.get("flatpak"):
+                self.assertTrue(app.get("window"), app["id"])                                # the pad mapper needs to find it
+
+    def test_adding_an_app_makes_its_folder_and_its_tile_and_removing_takes_them_away(self):
+        apps, pads = appstore.catalogue()
+        by_id = {app["id"]: app for app in apps}
+        font = REPO / "components/look/files/theme/art/fonts/Michroma-Regular.ttf"
+        with tempfile.TemporaryDirectory() as folder:
+            folder = Path(folder)
+            appstore.add(by_id["youtube"], pads, folder / "apps", folder / "tiles", Path("/root-here"), font)
+            appstore.add(by_id["netflix"], pads, folder / "apps", folder / "tiles", Path("/root-here"), font)
+            self.assertTrue(appstore.is_added(by_id["youtube"], folder / "apps"))
+            made = json.loads((folder / "apps/netflix/app.json").read_text())
+            self.assertEqual((made["flatpak"], made["pad"]["a"], made["added"]), ("com.google.Chrome", ["KEY_ENTER"], True))
+            self.assertIn("webview.py 'https://www.youtube.com' --id youtube", (folder / "tiles/YouTube.sh").read_text())
+            self.assertIn("emubox-app open netflix --wait", (folder / "tiles/Netflix.sh").read_text())
+            self.assertTrue((folder / "tiles/images/YouTube.png").is_file())
+            games = ET.parse(folder / "tiles/gamelist.xml").getroot()
+            self.assertEqual(sorted(g.findtext("name") for g in games), ["Netflix", "YouTube"])
+            appstore.add(by_id["youtube"], pads, folder / "apps", folder / "tiles", Path("/root-here"), font)   # again: still once
+            self.assertEqual(len(ET.parse(folder / "tiles/gamelist.xml").getroot()), 2)
+            appstore.remove(by_id["youtube"], folder / "apps", folder / "tiles")
+            self.assertFalse(appstore.is_added(by_id["youtube"], folder / "apps"))
+            self.assertEqual([g.findtext("name") for g in ET.parse(folder / "tiles/gamelist.xml").getroot()], ["Netflix"])
+            self.assertFalse((folder / "tiles/YouTube.sh").exists())
+        tabs, _ = guide.layout([("youtube", {"name": "YouTube", "web": "https://www.youtube.com"})], lights=False)
+        self.assertIn("webview.py 'https://www.youtube.com' --id youtube", tabs[2].rows[1].controls[0].do)
+
+
 class StartMenuTests(unittest.TestCase):
     def test_settings_become_entries_in_batoceras_menu(self):
-        text = startmenu.build(["EmuBox", "OG Xbox"], [("omen_x", '    <feature name="X" submenu="OMEN LIGHTS" value="omen_x" preset="switchon" />')])
+        text = startmenu.build(["EmuBox", "OG Xbox"], [("omen_x", '    <feature name="X" submenu="OMEN LIGHTING" value="omen_x" preset="switchon" />')])
         root = ET.fromstring(text)
         features = {f.get("value"): f for f in root.find("sharedFeatures")}
         self.assertEqual([f.get("value") for f in root.find("globalFeatures")], list(features))   # each one is switched on globally
@@ -204,7 +248,7 @@ class OmenTests(unittest.TestCase):
         root = ET.fromstring("<x>" + "\n".join(xml for _, xml in pairs) + "</x>")
         by_value = {f.get("value"): f for f in root}
         self.assertEqual(list(by_value), [name for name, _ in pairs])
-        self.assertTrue(all(f.get("submenu") == "OMEN LIGHTS" for f in root))
+        self.assertTrue(all(f.get("submenu") == "OMEN LIGHTING" for f in root))
         self.assertEqual(by_value["omen_lights_enabled"].get("preset"), "switchon")
         self.assertIn("Purple", [c.get("value") for c in by_value["omen_colour_ram_stick_1"]])
         self.omen.changed({"omen_lights_enabled": "0", "omen_lights_brightness": "40.000000", "omen_auto_enabled": "auto",

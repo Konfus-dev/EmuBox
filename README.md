@@ -7,7 +7,7 @@ puts your own BIOS files, games and menu sounds on the drive.
 
 | | | |
 | --- | --- | --- |
-| ![Start-up film](docs/boot.jpg) | ![Home screen](docs/home.jpg) | ![Guide menu with music and a call](docs/guide.jpg) |
+| ![Start-up film](docs/Images/boot.jpg) | ![Home screen](docs/Images/home.jpg) | ![Guide menu with music and a call](docs/Images/guide.jpg) |
 | Starting up | Home | The Guide menu |
 
 Everything goes into Batocera's data folder (the `SHARE` partition), which Batocera's updates
@@ -39,9 +39,11 @@ there is; `./install --remove <name>` takes something off.
 
 - **The look**: the theme, a start-up film, glass-pane menus, and one row of indicators along the
   top (controllers, free space, clock, network).
-- **Apps**: Discord and Apple Music, set up for the controller and already downloaded onto the
-  drive, and a **Store** with free games, Steam, Heroic, itch.io and **Vault**, your own list of
-  store pages whose downloads go straight into your games ([more](docs/vault.md)).
+- **Apps**, a section of their own on the home screen: Discord and Apple Music, set up for the
+  controller and already downloaded onto the drive, plus a Terminal, Files, and Claude Code.
+- **Store**: games (free games, Steam, Heroic, itch.io and **Vault**, your own list of store
+  pages whose downloads go straight into your games, [more](docs/vault.md)) and apps (add
+  YouTube, Twitch, Netflix and others, or anything from Flathub).
 - **The Guide menu**: quick settings, your apps, and bars along the bottom for a call or the
   music that is playing, each with its controls.
 - **Settings** in Batocera's own menu: Start > Game Settings > EmuBox (menu sounds, apps, and the

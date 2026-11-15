@@ -1,0 +1,24 @@
+#!/bin/bash
+# Claude Code in the terminal: fetched onto the drive the first time, then started.
+export HOME=/userdata/system
+export PATH="$HOME/.local/bin:$PATH"
+cd /userdata || exit 1
+
+if ! command -v claude >/dev/null; then
+    echo "Claude Code is not on this drive yet. Downloading it (needs internet)..."
+    echo
+    if ! curl -fsSL https://claude.ai/install.sh | bash; then
+        echo
+        echo "That did not work. Check the network (Start > Network Settings) and open Claude again."
+        read -r -n 1 -p "Press a button to close."
+        exit 1
+    fi
+    hash -r
+fi
+
+claude
+status=$?
+if [ "$status" -ne 0 ]; then   # leave an error on screen long enough to read
+    echo
+    read -r -n 1 -p "Claude stopped (status $status). Press a button to close."
+fi

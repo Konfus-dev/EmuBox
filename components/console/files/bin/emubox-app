@@ -53,11 +53,18 @@ need_app() {
 
 # The app's window, as the compositor names it (empty when there is none).
 window() {
-    wlrctl toplevel list 2>/dev/null | awk -F': ' -v p="$(conf "$1" .window)" 'index($1, p) == 1 { print $1; exit }'
+    # Its name for the compositor has the app's "window" word in it somewhere, in any case.
+    wlrctl toplevel list 2>/dev/null | awk -F': ' -v p="$(conf "$1" .window)" 'p != "" && index(tolower($1), tolower(p)) > 0 { print $1; exit }'
 }
 focused() { local w; w=$(window "$1"); [ -n "$w" ] && wlrctl toplevel find "app_id:$w" state:focused 2>/dev/null; }
-running() { [ -e "$RUN/$1.started" ] && flatpak ps --columns=application 2>/dev/null | grep -qx "$(conf "$1" .flatpak)"; }
-installed() { flatpak info "$(conf "$1" .flatpak)" >/dev/null 2>&1; }
+# An app is a Flathub program ("flatpak") or a program Batocera already has ("command").
+local_app() { [ -z "$(conf "$1" '.flatpak // empty')" ]; }
+running() {
+    [ -e "$RUN/$1.started" ] || return 1
+    if local_app "$1"; then kill -0 "$(cat "$RUN/$1.pid" 2>/dev/null)" 2>/dev/null
+    else flatpak ps --columns=application 2>/dev/null | grep -qx "$(conf "$1" .flatpak)"; fi
+}
+installed() { local_app "$1" || flatpak info "$(conf "$1" .flatpak)" >/dev/null 2>&1; }
 
 # download <name> <flatpak id>
 download() {
@@ -89,7 +96,7 @@ fetch() {
     esac
     flatpak info "$flatpak" >/dev/null 2>&1
 }
-install_app() { fetch "$(conf "$1" .name)" "$(conf "$1" .flatpak)"; }
+install_app() { local_app "$1" || fetch "$(conf "$1" .name)" "$(conf "$1" .flatpak)"; }
 
 start_pad() {
     # An app that understands controllers itself (a game launcher) gets them untouched.
@@ -108,9 +115,15 @@ open_app() {
         install_app "$app" || { echo "emubox-app: $(conf "$app" .name) could not be downloaded; see $LOG" >&2; return 1; }
         # Sound for the sandboxed app (the same fix Batocera applies to its own flatpaks).
         chown -R root:audio /var/run/pulse 2>/dev/null; chmod -R g+rwX /var/run/pulse 2>/dev/null
-        mapfile -t args < <(conf "$app" '.args[]')
+        mapfile -t args < <(conf "$app" '.args // [] | .[]')
         echo "$(date '+%F %T') starting $app" >>"$LOG"
-        setsid flatpak run "$(conf "$app" .flatpak)" "${args[@]}" >>"$LOG" 2>&1 &
+        if local_app "$app"; then
+            mapfile -t command < <(conf "$app" '.command[]')
+            (cd /userdata && HOME=/userdata/system exec setsid "${command[@]}" "${args[@]}") >>"$LOG" 2>&1 &
+            echo $! >"$RUN/$app.pid"
+        else
+            setsid flatpak run "$(conf "$app" .flatpak)" "${args[@]}" >>"$LOG" 2>&1 &
+        fi
         touch "$RUN/$app.started"
         for _ in $(seq 240); do   # up to a minute: first starts download updates
             w=$(window "$app"); [ -n "$w" ] && break
@@ -157,8 +170,12 @@ mic() {
 
 close_app() {
     [ -e "$RUN/mic.muted" ] && mic unmute
-    flatpak kill "$(conf "$1" .flatpak)" 2>/dev/null
-    rm -f "$RUN/$1.started"
+    if local_app "$1"; then
+        [ -e "$RUN/$1.pid" ] && kill -- "-$(cat "$RUN/$1.pid")" 2>/dev/null   # it leads its own group
+    else
+        flatpak kill "$(conf "$1" .flatpak)" 2>/dev/null
+    fi
+    rm -f "$RUN/$1.started" "$RUN/$1.pid"
     [ -e "$RUN/$1.pad.pid" ] && kill "$(cat "$RUN/$1.pad.pid")" 2>/dev/null
     rm -f "$RUN/$1.pad.pid"
 }

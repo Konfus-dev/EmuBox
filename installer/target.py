@@ -36,11 +36,19 @@ class Target:
         """Batocera data folders on this machine: /userdata itself, or mounted drives."""
         if cls.looks_right(LIVE_ROOT):
             return [LIVE_ROOT]
-        found = []
+        found = [Path(line) for line in cls._mount_points() if cls.looks_right(Path(line))]   # any disk, USB or internal
         for parent in MOUNT_PARENTS:
             for pattern in ("*", "*/*"):
                 found += [p for p in sorted(Path(parent).glob(pattern)) if cls.looks_right(p)]
         return list(dict.fromkeys(found))
+
+    @staticmethod
+    def _mount_points() -> list[str]:
+        try:
+            listed = subprocess.run(["lsblk", "-rno", "MOUNTPOINT"], capture_output=True, text=True).stdout
+        except OSError:
+            return []
+        return [line.replace("\\x20", " ") for line in listed.splitlines() if line.startswith("/") and line != "/"]
 
     @property
     def live(self) -> bool:

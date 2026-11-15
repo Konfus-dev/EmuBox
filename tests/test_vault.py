@@ -70,6 +70,17 @@ class VaultTests(unittest.TestCase):
         self.assertEqual((ordered[0]["folder"], likely, len(ordered)), ("psx", 1, 3))
         self.assertEqual(vault.likely_first(found, "Game.zip")[1], 0)
 
+    def test_the_console_is_read_off_the_page(self):
+        found = vault.systems(self.games, (str(self.config),))
+        found += [{"folder": "ps2", "name": "PlayStation 2", "types": set()}, {"folder": "gb", "name": "Game Boy", "types": set()}]
+        pick = lambda page: (vault.from_page(found, page) or {}).get("folder")   # noqa: E731
+        self.assertEqual(pick("Vimm's Lair: The Vault - PLAYSTATION 2 - Some Game https://site.example/vault/123"), "ps2")
+        self.assertEqual(pick("Some Game (playstation) download"), "psx")
+        self.assertEqual(pick("Great GBA roms https://site.example/"), "gba")          # a short name the system also goes by
+        self.assertEqual(pick("Game Boy Advance - Some Game"), "gba")                  # the longer name wins over "Game Boy"
+        self.assertEqual(pick("Game Boy - Some Game"), "gb")
+        self.assertIsNone(vault.from_page(found, "A page about cooking, with gbazaar in its address"))
+
     def test_a_download_is_noticed_once_it_stops_changing(self):
         downloads = self.home / "downloads"
         downloads.mkdir(parents=True)
@@ -127,6 +138,30 @@ class VaultTests(unittest.TestCase):
         self.assertIn("ff7a3cff", text)                  # nine tenths full: the warning colour
         self.assertEqual(other.read_text(), "<theme/>")
         ET.fromstring(text)
+
+    def test_an_archive_is_unpacked_where_the_system_does_not_play_archives(self):
+        import zipfile
+        disc = {"folder": "gamecube", "name": "GameCube", "types": {".iso", ".ciso"}}
+        cartridge = {"folder": "gba", "name": "Game Boy Advance", "types": {".gba", ".zip", ".7z"}}
+        self.assertTrue(vault.needs_unpacking(Path("Game.7z"), disc))
+        self.assertTrue(vault.needs_unpacking(Path("Game.ZIP"), disc))
+        self.assertFalse(vault.needs_unpacking(Path("Game.zip"), cartridge))      # played as it is
+        self.assertFalse(vault.needs_unpacking(Path("Game.iso"), disc))
+        self.assertFalse(vault.needs_unpacking(Path("Game.zip"), {"folder": "x", "name": "x", "types": set()}))   # unknown system: leave it
+        folder = self.games / "gamecube"
+        folder.mkdir()
+        archive = folder / "Game (USA).zip"
+        with zipfile.ZipFile(archive, "w") as packed:
+            packed.writestr("Game (USA).ciso", "disc")
+            packed.writestr("Site Note.txt", "hello")
+        ok, what = vault.unpack(archive)
+        self.assertEqual((ok, what), (True, "Game (USA).ciso"))
+        self.assertEqual(sorted(p.name for p in folder.iterdir()), ["Game (USA).ciso"])   # the archive and the note are gone
+        broken = folder / "Broken.zip"
+        broken.write_text("not an archive")
+        ok, what = vault.unpack(broken)
+        self.assertFalse(ok)
+        self.assertTrue(broken.exists())                                              # nothing is lost when it fails
 
     def test_names_do_not_collide(self):
         (self.home).mkdir()

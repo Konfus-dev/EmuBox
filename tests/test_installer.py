@@ -94,35 +94,38 @@ class ComponentTests(Drive):
 
     def test_apps_pull_in_the_console_tools(self):
         everything = components.discover(REPO)
-        self.assertEqual(components.with_requirements(["discord"], everything), ["console", "discord"])
+        self.assertEqual(components.with_requirements(["discord"], everything),
+                         ["console", "discord", "claude", "files", "terminal"])   # the last three come with the console tools
 
     def test_install_everything_then_remove_an_app(self):
         code, out = run(self.root, "--yes", "--with", "look,discord,apple-music,rom-patcher,tweaks,store,vault")
         self.assertEqual(code, 0, out)
         for path in ("themes/emubox/theme.xml", "system/emubox/bin/emubox-app", "system/emubox/lib/pad.py",
-                     "system/emubox/apps/discord/app.json", "roms/ports/Discord.sh", "roms/ports/images/Apple Music.png",
+                     "system/emubox/apps/discord/app.json", "roms/apps/Discord.sh", "roms/apps/images/Apple Music.png", "system/configs/emulationstation/es_systems_apps.cfg",
                      "system/services/emubox", "system/emubox/tools/apply-patches.py",
-                     "roms/store/Steam.sh", "roms/store/images/Free Games.png", "roms/store/Vault.sh", "roms/store/itch.io.sh", "roms/store/images/itch.io.png",
+                     "roms/store/Games/Steam.sh", "roms/store/images/Free Games.png", "roms/store/Games/Vault.sh", "roms/store/Games/itch.io.sh",
+                     "roms/store/Apps/Flathub.sh", "roms/store/images/itch.io.png",
                      "system/emubox/bin/vault", "system/emubox/lib/vault.py", "system/emubox/lib/webview.py", "system/emubox/lib/webnav.js", "system/emubox/apps/heroic/app.json",
                      "system/configs/emulationstation/es_systems_store.cfg"):
             self.assertTrue((self.root / path).is_file(), path)
-        self.assertIn("emubox-app open discord --wait", (self.root / "roms/ports/Discord.sh").read_text())
+        self.assertIn("emubox-app open discord --wait", (self.root / "roms/apps/Discord.sh").read_text())
         self.assertEqual(self.target.services(), ["old_one", "emubox", "rom_patcher", "tidy_folders"])
         entries = (self.root / "system/configs/emulationstation/es_features_emubox.cfg").read_text()
         self.assertIn('submenu="MENU SOUNDS"', entries)     # EmuBox's settings are in Batocera's menu from the first start
         self.assertEqual(self.target.conf_get("global.shaderset"), "zfast")
-        self.assertEqual((self.root / "roms/ports/gamelist.xml").read_text().count("<game>"), 2)
-        self.assertEqual((self.root / "roms/store/gamelist.xml").read_text().count("<game>"), 5)
+        self.assertEqual((self.root / "roms/apps/gamelist.xml").read_text().count("<game>"), 5)   # two chosen, and Claude, Files and Terminal
+        self.assertEqual((self.root / "roms/store/gamelist.xml").read_text().count("<game>"), 6)
 
         code, out = run(self.root, "--remove", "discord")
         self.assertEqual(code, 0, out)
-        self.assertFalse((self.root / "roms/ports/Discord.sh").exists())
+        self.assertFalse((self.root / "roms/apps/Discord.sh").exists())
         self.assertFalse((self.root / "system/emubox/apps/discord").exists())
         self.assertTrue((self.root / "system/emubox/bin/emubox-app").exists())   # Apple Music still needs it
         menu = self.root / "system/configs/controlcenter/controlcenter.xml"   # as built on Batocera at boot
         make_file(menu).write_text("<features><!-- emubox apps --></features>")
         code, out = run(self.root, "--remove", "apple-music", "store", "vault")
-        self.assertFalse((self.root / "roms/store/Steam.sh").exists())
+        self.assertFalse((self.root / "roms/store/Games/Steam.sh").exists())
+        self.assertFalse((self.root / "roms/store/Games").exists())      # an emptied sub-section goes too
         self.assertFalse((self.root / "system/emubox/bin").exists())
         self.assertFalse(menu.exists())
         self.assertNotIn("emubox", self.target.services())
@@ -219,6 +222,30 @@ class ComponentTests(Drive):
             cli.copy_sound_sets(self.target, mine, said.append, make_film=lambda sound, out: False)
             self.assertIn("keeps EmuBox's own film", said[-1])
 
+    def test_a_setup_file_answers_everything(self):
+        with tempfile.TemporaryDirectory() as folder:
+            make_file(Path(folder) / "mine/Arcade/select.wav")
+            setup = Path(folder) / "setups/me.json"
+            make_file(setup).write_text(json.dumps({
+                "with": ["discord", "store", "vault"], "sounds": "../mine", "download_later": True,
+                "vault_pages": [{"name": "Indie", "url": "https://itch.io/games/free"}]}))
+            for _ in range(2):   # a second run adds nothing twice
+                code, out = run(self.root, "--setup", str(setup))
+                self.assertEqual(code, 0, out)
+            self.assertTrue((self.root / "roms/apps/Discord.sh").is_file())
+            self.assertFalse((self.root / "roms/apps/Apple Music.sh").exists())
+            self.assertTrue((self.root / "system/configs/emubox/sounds/Arcade/select.wav").is_file())   # relative to the file
+            pages = json.loads((self.root / "system/vault/vault.json").read_text())["pages"]
+            self.assertEqual(pages, [{"name": "Indie", "url": "https://itch.io/games/free"}])
+            setup.write_text(json.dumps({"with": ["discord"], "sounds": "../moved-away", "download_later": True}))
+            code, out = run(self.root, "--setup", str(setup))   # a folder that is not on this PC is no reason to stop
+            self.assertEqual(code, 0, out)
+            self.assertIn("moved-away is not here; left out", out)
+            setup.write_text('{"wiht": []}')
+            code, out = run(self.root, "--setup", str(setup))
+            self.assertEqual(code, 1)
+            self.assertIn("not understood: wiht", out)
+
     def test_the_installer_asks_for_your_sounds_and_remembers_the_folder(self):
         with tempfile.TemporaryDirectory() as folder, mock.patch.dict("os.environ", {"EMUBOX_SOUNDS": ""}), \
              mock.patch.object(cli, "SOUNDS_BESIDE", Path(folder) / "nowhere"):
@@ -252,7 +279,7 @@ class ComponentTests(Drive):
         before = sorted(p.relative_to(self.root).as_posix() for p in self.root.rglob("*"))
         run(self.root, "--yes", "--with", "discord")
         self.assertEqual(before, sorted(p.relative_to(self.root).as_posix() for p in self.root.rglob("*")))
-        self.assertEqual((self.root / "roms/ports/gamelist.xml").read_text().count("<game>"), 1)
+        self.assertEqual((self.root / "roms/apps/gamelist.xml").read_text().count("<game>"), 4)   # the one chosen, and Claude, Files and Terminal
 
     def test_lights_are_not_offered_without_the_hardware(self):
         code, out = run(self.root, "--yes", "--with", "omen-lights")
@@ -265,7 +292,7 @@ class ComponentTests(Drive):
         # look n, apple-music n, discord y, seven more n, bios n, games n, go ahead y
         code, out = run(self.root, answers="n\nn\ny\n" + "n\n" * 7 + "n\nn\ny\n")
         self.assertEqual(code, 0, out)
-        self.assertTrue((self.root / "roms/ports/Discord.sh").exists())
+        self.assertTrue((self.root / "roms/apps/Discord.sh").exists())
         self.assertFalse((self.root / "themes/emubox").exists())
 
 
@@ -382,8 +409,10 @@ class SmallThings(unittest.TestCase):
     def test_app_files_are_complete(self):
         for path in (REPO / "apps").glob("*/app.json"):
             app = json.loads(path.read_text())
-            for key in ("name", "flatpak", "args", "window", "pad", "description"):
+            for key in ("name", "window", "pad", "description"):
                 self.assertIn(key, app, f"{path}: {key}")
+            # A Flathub program with its arguments, or a program Batocera already has.
+            self.assertTrue(("flatpak" in app and "args" in app) != ("command" in app), path)
             # The buttons every app shares, so the controller always behaves the same way.
             for button, action in (("a", ["KEY_ENTER"]), ("guide", "menu"), ("l3", "osk"),
                                    ("select+b", "back"), ("select+start", "close")):

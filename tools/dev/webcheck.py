@@ -192,7 +192,9 @@ def drive(direct: bool) -> None:
 REAL_MAIN = Gtk.main
 Gtk.main = lambda: drive(False)
 vault.ui(settings)
-check("the refresh ran on leaving", (WORK / "home/refreshed").exists())
+import time
+time.sleep(7)   # the refresh waits for the menu to be back in front
+check("the refresh ran after leaving", (WORK / "home/refreshed").exists())
 (WORK / "home/downloads/dropped.gba").unlink()   # or the next start would, rightly, ask about it again
 Gtk.main = lambda: drive(True)
 vault.ui(settings, SHOP)

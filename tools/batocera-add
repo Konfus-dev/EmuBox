@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Copy games (and ROM-hack patches) onto the Batocera USB stick, into the right folders.
+"""Copy games (and ROM-hack patches) onto the Batocera drive, into the right folders.
 
   batocera-add game.sfc other.gba            pick the console from the file type
   batocera-add -s psx "My Game.chd"          say which console (needed for .zip/.iso/.chd/.bin...)
@@ -20,14 +20,12 @@ PREFER = {".sfc": "snes", ".smc": "snes", ".nes": "nes", ".gb": "gb", ".gbc": "g
 
 
 def find_drive(arg):
-    if arg:
-        return arg
-    path = "/run/media/%s/SHARE" % getpass.getuser()
-    if not os.path.isdir(os.path.join(path, "roms")) and os.path.exists("/dev/disk/by-label/SHARE"):
-        subprocess.run(["udisksctl", "mount", "-b", "/dev/disk/by-label/SHARE"], capture_output=True)
-    if not os.path.isdir(os.path.join(path, "roms")):
-        sys.exit("Can't find the Batocera stick. Plug it in (or pass --drive /path/to/SHARE).")
-    return path
+    """Batocera's data folder, wherever it is: see batocera-drive."""
+    finder = os.path.join(os.path.dirname(os.path.realpath(__file__)), "batocera-drive")
+    found = subprocess.run([sys.executable, finder] + ([arg] if arg else []), capture_output=True, text=True)
+    if found.returncode:
+        sys.exit(found.stderr.strip())
+    return found.stdout.strip()
 
 
 def ext_map(roms):
@@ -64,7 +62,7 @@ def main():
     ap.add_argument("-s", "--system", help="console folder name, e.g. snes, psx, ps2 (see --list)")
     ap.add_argument("--drive", help="path to the mounted SHARE partition")
     ap.add_argument("--list", action="store_true", help="list console folder names")
-    ap.add_argument("--force", action="store_true", help="overwrite games already on the stick")
+    ap.add_argument("--force", action="store_true", help="overwrite games already on the drive")
     a = ap.parse_args()
     drive = find_drive(a.drive)
     roms = os.path.join(drive, "roms")
@@ -109,7 +107,7 @@ def main():
         size = sum(os.path.getsize(os.path.join(r, n)) for r, _, ns in os.walk(f) for n in ns) \
             if os.path.isdir(f) else os.path.getsize(f)
         if size > shutil.disk_usage(drive).free - 64 * 2**20:
-            print("SKIP  %s: not enough free space on the stick" % name)
+            print("SKIP  %s: not enough free space on the drive" % name)
             skipped += 1
             continue
         try:
@@ -127,7 +125,7 @@ def main():
             subprocess.run([sys.executable, tool, drive])
     os.sync()
     free = shutil.disk_usage(drive).free / 2**30
-    print("\n%d added, %d skipped, %d patch file(s) queued. %.1f GB free on the stick." % (added, skipped, patches, free))
+    print("\n%d added, %d skipped, %d patch file(s) queued. %.1f GB free on the drive." % (added, skipped, patches, free))
     if added or patches:
         print("In Batocera: Start > Game settings > Update gamelists (or just reboot it).")
     return 0

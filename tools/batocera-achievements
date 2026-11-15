@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Set the RetroAchievements account on the Batocera USB stick, from this PC.
+"""Set the RetroAchievements account on the Batocera drive, from this PC.
 
   batocera-achievements            asks for your RetroAchievements username and password
   batocera-achievements NAME       asks for the password only
   batocera-achievements --off      turn achievements off again
-  batocera-achievements --show     show what the stick is set to (password hidden)
+  batocera-achievements --show     show what the drive is set to (password hidden)
 
 Make a free account at retroachievements.org first. Achievements then pop up in supported
 games on older consoles. Batocera must be shut down (stick plugged into this PC) when you run this.
@@ -15,15 +15,12 @@ P = "global.retroachievements"
 
 
 def find_drive(arg):
-    if arg:
-        return arg
-    path = "/run/media/%s/SHARE" % getpass.getuser()
-    conf = os.path.join(path, "system", "batocera.conf")
-    if not os.path.isfile(conf) and os.path.exists("/dev/disk/by-label/SHARE"):
-        subprocess.run(["udisksctl", "mount", "-b", "/dev/disk/by-label/SHARE"], capture_output=True)
-    if not os.path.isfile(conf):
-        sys.exit("Can't find the Batocera stick. Plug it in (or pass --drive /path/to/SHARE).")
-    return path
+    """Batocera's data folder, wherever it is: see batocera-drive."""
+    finder = os.path.join(os.path.dirname(os.path.realpath(__file__)), "batocera-drive")
+    found = subprocess.run([sys.executable, finder] + ([arg] if arg else []), capture_output=True, text=True)
+    if found.returncode:
+        sys.exit(found.stderr.strip())
+    return found.stdout.strip()
 
 
 def set_keys(lines, values):
@@ -62,7 +59,7 @@ def main():
         for l in shown:
             print(re.sub(r"(password\s*=).+", r"\1<hidden>", l))
         if not shown:
-            print("RetroAchievements is not set up on the stick.")
+            print("RetroAchievements is not set up on the drive.")
         return 0
     if a.off:
         values = {P: "0"}
@@ -81,7 +78,7 @@ def main():
         with open(conf, "w", errors="surrogateescape") as f:
             f.write(text)
     else:
-        # The file belongs to root on the stick. Write a private copy, then let root put it in place,
+        # The file belongs to root on the drive. Write a private copy, then let root put it in place,
         # so the password never appears on a command line.
         fd, tmp = tempfile.mkstemp(prefix="batocera-achievements-", dir=os.environ.get("XDG_RUNTIME_DIR") or None)
         try:
@@ -93,8 +90,8 @@ def main():
         if r.returncode != 0:
             sys.exit("Could not write the setting (the password prompt was cancelled or failed).")
     os.sync()
-    print("Achievements turned off on the stick." if a.off else
-          'RetroAchievements account "%s" saved on the stick.' % values[P + ".username"])
+    print("Achievements turned off on the drive." if a.off else
+          'RetroAchievements account "%s" saved on the drive.' % values[P + ".username"])
     return 0
 
 

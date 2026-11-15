@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""OMEN lights: their settings in Batocera's menu, Start > Game Settings > OMEN LIGHTS.
+"""OMEN lights: their settings in Batocera's menu, Start > Game Settings > OMEN LIGHTING.
 
 The lights program (github.com/Konfus-dev/OmenRGB-Controller) acts on one small
 file, /userdata/system/configs/omen-lights/settings.json, the moment it is
@@ -189,11 +189,11 @@ def run(argv: list[str]) -> str:
 
 
 # --- Batocera's Start menu ---------------------------------------------------------
-# Start > Game Settings > OMEN LIGHTS. Batocera saves each choice in batocera.conf as
+# Start > Game Settings > OMEN LIGHTING. Batocera saves each choice in batocera.conf as
 # global.omen_<name>; `changed` (called by the console's startmenu.py whenever that file
 # changes) carries them over into settings.json, which the lights program acts on.
 
-SUBMENU, GROUP = "OMEN LIGHTS", "EMUBOX"
+SUBMENU, GROUP = "OMEN LIGHTING", "EMUBOX"
 SWITCHES = {   # setting: (label, what it does)
     "lights-enabled": ("LIGHTS", "The case and memory lights."),
     "auto-enabled": ("FOLLOW THE GAME", "The lights and the cooler's screen take the running game's colours and artwork."),

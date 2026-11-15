@@ -81,6 +81,11 @@ else echo "Test mode: nothing is written to the stick."; fi
 # instead: BATOCERA_VM_WINDOW=1 batocera-vm, and leave its size alone while it runs.
 full=on; [ -n "${BATOCERA_VM_WINDOW:-}" ] && full=off
 
+# For looking into a running session when something misbehaves: Batocera's console is on a
+# socket only you can reach (socat - UNIX-CONNECT:<that path> gives its shell).
+shell="${XDG_RUNTIME_DIR:-/tmp}/batocera-vm.shell"
+rm -f "$shell"
+
 cpus=$(( $(nproc) / 2 )); [ "$cpus" -gt 6 ] && cpus=6; [ "$cpus" -lt 2 ] && cpus=2
 
 # Batocera's menu needs accelerated graphics, so the virtual screen uses this PC's GPU (virgl).
@@ -92,7 +97,8 @@ cpus=$(( $(nproc) / 2 )); [ "$cpus" -gt 6 ] && cpus=6; [ "$cpus" -lt 2 ] && cpus
 qemu-system-x86_64 \
     -name "Batocera ($MODE mode)" -machine q35,accel=kvm -cpu host -smp "$cpus" -m 6G \
     -kernel "$run/linux" -initrd "$run/initrd.gz" \
-    -append "label=BATOCERA console=tty3 quiet loglevel=0 vt.global_cursor_default=0 WLR_NO_HARDWARE_CURSORS=1" \
+    -append "label=BATOCERA console=tty3 console=ttyS0 quiet loglevel=0 vt.global_cursor_default=0 WLR_NO_HARDWARE_CURSORS=1" \
+    -serial "unix:$shell,server,nowait" \
     -drive file="$disk",format=raw,if=none,id=stick,snapshot=$snap,cache=writeback \
     -device ich9-ahci,id=ahci -device ide-hd,drive=stick,bus=ahci.0 \
     -device qemu-xhci -device usb-kbd -device usb-tablet "${pad_args[@]}" \

@@ -72,6 +72,7 @@ class Row:
     controls: list[Control]
     when: object = ""              # Getter: the row exists only while this gives something
     shown: bool = True
+    heading: bool = False          # a category's name, not a setting
 
     @property
     def focusable(self) -> bool:
@@ -106,6 +107,11 @@ def text(get: object) -> Control:
     return Control("text", get=get)
 
 
+def heading(title: str) -> Row:
+    """A category's name above its rows; the highlight passes over it."""
+    return Row(title, [], heading=True)
+
+
 def truthy(value: str) -> bool:
     return value.strip().lower() not in ("", "0", "false", "off", "no", "null")
 
@@ -131,6 +137,7 @@ def layout(found: list[tuple[str, dict]] | None = None, lights: bool | None = No
     in_menus = f"[ -z \"$({in_game})\" ] && echo yes"
 
     settings = [
+        heading("Sound"),
         Row("Volume", [stepper("batocera-audio getSystemVolume", "batocera-audio setSystemVolume -5",
                                "batocera-audio setSystemVolume +5")]),
         Row("Mute", [switch("batocera-audio getSystemMute", "batocera-audio setSystemVolume mute",
@@ -141,13 +148,15 @@ def layout(found: list[tuple[str, dict]] | None = None, lights: bool | None = No
     ]
     if lights:
         settings += [
+            heading("OMEN Lighting"),
             Row("Lights", [switch(f"{omen} is lights-enabled", f"{omen} set lights-enabled on", f"{omen} set lights-enabled off")]),
-            Row("Light brightness", [stepper(f"{omen} get lights-brightness", f"{omen} step lights-brightness -10",
-                                             f"{omen} step lights-brightness +10")]),
-            Row("Lights follow the game", [switch(f"{omen} is auto-enabled", f"{omen} set auto-enabled on",
-                                                  f"{omen} set auto-enabled off")]),
+            Row("Brightness", [stepper(f"{omen} get lights-brightness", f"{omen} step lights-brightness -10",
+                                       f"{omen} step lights-brightness +10")]),
+            Row("Follow the game", [switch(f"{omen} is auto-enabled", f"{omen} set auto-enabled on",
+                                           f"{omen} set auto-enabled off")]),
         ]
     settings += [
+        heading("System"),
         Row("Power", [chooser("cat /sys/devices/system/cpu/cpufreq/policy0/scaling_governor 2>/dev/null",
                               f"{a} power previous", f"{a} power next")]),
         Row("Plane mode", [switch("batocera-planemode status", "batocera-planemode enable", "batocera-planemode disable")]),
@@ -156,8 +165,20 @@ def layout(found: list[tuple[str, dict]] | None = None, lights: bool | None = No
     ]
 
     listed = [(app_id, app) for app_id, app in found if app.get("menu", True)]
-    app_rows = [Row(app["name"], [button("Open", f"{a} detach open {app_id}", close=True)]) for app_id, app in listed]
-    app_rows.append(Row("Game", [button("Back to game", f"{a} back", close=True)]))
+    def opening(app_id: str, app: dict) -> str:
+        if app.get("web"):   # a site in EmuBox's own web view
+            return f"setsid python3 {lib}/webview.py '{app['web']}' --id {app_id} >/dev/null 2>&1 &"
+        return f"{a} detach open {app_id}"
+
+    def opens(which: list[tuple[str, dict]]) -> list[Row]:
+        return [Row(app["name"], [button("Open", opening(app_id, app), close=True)]) for app_id, app in which]
+
+    # Programs Batocera already has (Terminal, Files, Claude) are tools; the rest are apps.
+    tools = [(app_id, app) for app_id, app in listed if app.get("command")]
+    app_rows = [heading("Apps")] + opens([entry for entry in listed if entry not in tools])
+    if tools:
+        app_rows += [heading("Tools")] + opens(tools)
+    app_rows += [heading("Game"), Row("Game", [button("Back to game", f"{a} back", close=True)])]
 
     game = [
         Row("Playing", [text(in_game)]),
@@ -352,6 +373,8 @@ window { background-color: rgba(1, 12, 1, 0.55); }
 .row { padding: 3px 10px; border: 1px solid transparent; }
 .row.at { background-color: rgba(150, 245, 80, 0.08); border-color: rgba(150, 245, 80, 0.35); }
 .name { font-size: 20px; }
+.heading { padding: 12px 10px 2px 10px; border-bottom: 1px solid rgba(150, 245, 80, 0.3); margin-bottom: 3px; }
+.heading label { font-family: "Michroma", sans-serif; font-size: 14px; color: #c8f03c; }
 .value { font-size: 20px; color: #c8f03c; }
 .control { font-size: 18px; padding: 3px 16px; margin-left: 10px; border: 1px solid #68c43c; border-left-width: 3px;
            background-color: rgba(8, 52, 8, 0.85); }
@@ -534,6 +557,10 @@ def screen(show_now: bool) -> int:
         def _row_widget(self, row: Row, style: str, at: bool, current: Control | None) -> Gtk.Widget:
             box = Gtk.Box(spacing=14)
             box.get_style_context().add_class(style)
+            if row.heading:
+                box.get_style_context().add_class("heading")
+                box.pack_start(label(row.label.upper(), "category", xalign=0), False, False, 0)
+                return box
             if at:
                 box.get_style_context().add_class("at")
             name = label(row.label, "name", xalign=0)
@@ -577,7 +604,10 @@ def screen(show_now: bool) -> int:
             if where:
                 top, height = where[1], widget.get_allocated_height()
                 moving = self.scroller.get_vadjustment()
-                if top < moving.get_value():
+                rows = [r for r in self.model.page().rows if r.focusable]
+                if rows and self.model.rows()[self.model.row] is rows[0]:
+                    moving.set_value(0)                     # the first setting: show its heading too
+                elif top < moving.get_value():
                     moving.set_value(top)
                 elif top + height > moving.get_value() + moving.get_page_size():
                     moving.set_value(top + height - moving.get_page_size())

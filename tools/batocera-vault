@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Set up Vault on the Batocera USB stick, from this PC.
+"""Set up Vault on the Batocera drive, from this PC.
 
   batocera-vault add "Name" https://address    add a page (same name again: change its address)
   batocera-vault rename "Name" "New name"      give a page another name
@@ -10,7 +10,7 @@
   batocera-vault refresh 'shell line'          what runs once on leaving Vault, after any install
   batocera-vault reset                         command, refresh and downloads folder back to the built-in ones
 
-Add  --drive /path/to/SHARE  when the stick is mounted somewhere unusual. The stick's
+Add  --drive /path/to/SHARE  when the drive is mounted somewhere unusual. The stick's
 settings folder belongs to root, so changes ask for your password.
 """
 import getpass, os, subprocess, sys
@@ -20,15 +20,12 @@ READS = ("pages", "show")
 
 
 def find_drive(arg):
-    if arg:
-        return arg
-    path = "/run/media/%s/SHARE" % getpass.getuser()
-    conf = os.path.join(path, "system", "batocera.conf")
-    if not os.path.isfile(conf) and os.path.exists("/dev/disk/by-label/SHARE"):
-        subprocess.run(["udisksctl", "mount", "-b", "/dev/disk/by-label/SHARE"], capture_output=True)
-    if not os.path.isfile(conf):
-        sys.exit("Can't find the Batocera stick. Plug it in (or pass --drive /path/to/SHARE).")
-    return path
+    """Batocera's data folder, wherever it is: see batocera-drive."""
+    finder = os.path.join(os.path.dirname(os.path.realpath(__file__)), "batocera-drive")
+    found = subprocess.run([sys.executable, finder] + ([arg] if arg else []), capture_output=True, text=True)
+    if found.returncode:
+        sys.exit(found.stderr.strip())
+    return found.stdout.strip()
 
 
 def main():

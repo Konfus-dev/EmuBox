@@ -1,0 +1,68 @@
+{
+  "name": "Terminal",
+  "comes_with": "console",
+  "description": "A command line on Batocera itself. Best with a keyboard; without one, click the left stick for the on-screen keyboard. A is Enter, B is Backspace, X is Tab, Y stops a running command (Ctrl+C), LB/RB scroll back. Select+B hides it, Select+Start closes it.",
+  "command": [
+    "xterm",
+    "-fullscreen",
+    "-fa",
+    "DejaVu Sans Mono",
+    "-fs",
+    "15",
+    "-bg",
+    "#061206",
+    "-fg",
+    "#d8ffb0",
+    "-cr",
+    "#c8f03c",
+    "-name",
+    "emubox-terminal",
+    "-T",
+    "Terminal"
+  ],
+  "window": "emubox-terminal",
+  "pad": {
+    "up": [
+      "KEY_UP"
+    ],
+    "down": [
+      "KEY_DOWN"
+    ],
+    "left": [
+      "KEY_LEFT"
+    ],
+    "right": [
+      "KEY_RIGHT"
+    ],
+    "a": [
+      "KEY_ENTER"
+    ],
+    "b": [
+      "KEY_BACKSPACE"
+    ],
+    "x": [
+      "KEY_TAB"
+    ],
+    "y": [
+      "KEY_LEFTCTRL",
+      "KEY_C"
+    ],
+    "lb": [
+      "KEY_LEFTSHIFT",
+      "KEY_PAGEUP"
+    ],
+    "rb": [
+      "KEY_LEFTSHIFT",
+      "KEY_PAGEDOWN"
+    ],
+    "start": [
+      "KEY_ESC"
+    ],
+    "select+b": "back",
+    "select+start": "close",
+    "guide": "menu",
+    "l3": "osk",
+    "r3": "click",
+    "right_stick": "pointer"
+  }
+}

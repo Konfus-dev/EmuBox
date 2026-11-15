@@ -44,6 +44,7 @@ things or update; it only copies what is missing.
 | `./install --list` | show what can be installed, and what is |
 | `./install --remove discord` | take something off again |
 | `./install --yes --with look,discord --games /mnt/games` | no questions (for scripts) |
+| `./install --setup setups/example.json` | your own answers kept in a file: what to install, where your sounds, BIOS files and games are (folders relative to the file), the graphics driver to fetch for the apps, pages for Vault. One command then rebuilds a drive the same way |
 | `./backup-games ~/my-games` | copy the games on a drive into a library folder |
 
 ## What you can install
@@ -51,7 +52,8 @@ things or update; it only copies what is missing.
 | | |
 | --- | --- |
 | **Xbox-style look** | Theme for the menus, a start-up film (the orb waking, then the EmuBox name, with its own sound) that goes straight to the menus without Batocera's loading screen, the EmuBox name on the home screen and on an OMEN cooler's screen, matching colours for the in-game menu, fonts, sounds. One row along the top: a light per controller on the left; how full the drive is, the clock and the network on the right |
-| **Discord**, **Apple Music** | Open from Ports, or over a running game from the in-game menu's **Apps** tab. The installer puts each one's program on the drive (with `flatpak` on the PC), so there is no waiting in Batocera; without that, or with `--download-later`, it downloads the first time you open it |
+| **Discord**, **Apple Music** | Open from **Apps** on the home screen, or over a running game from the in-game menu's **Apps** tab. The installer puts each one's program on the drive (with `flatpak` on the PC), so there is no waiting in Batocera; without that, or with `--download-later`, it downloads the first time you open it |
+| **Terminal**, **Files**, **Claude** | Come with any app, in **Apps**: a command line, Batocera's file manager opened on the drive, and Claude Code in a terminal (it downloads itself the first time and asks you to sign in; a keyboard helps) |
 | **ROM-hack patcher** | Drop a `.ips`/`.bps`/`.ups` file in `patches` and it is applied at boot |
 | **Play settings** | Auto-save, rewind on 8/16-bit systems, a light CRT shader, a tidier network share |
 | **Bluetooth controllers** | Offered when preparing a drive on a PC with paired controllers: copies the pairings so the same controller works in Linux and Batocera without re-pairing |
@@ -88,7 +90,7 @@ song, LT/RT change the volume, Y opens the keyboard.
   pop-up menus alike), choosing, going back and opening the menu.
 - **APPS**: the menu music and whether it waits for your own, music dropping during a call and how
   far, and the ad blocker for web apps.
-- **OMEN LIGHTS** (on a PC with them): on/off, brightness, following the game, a colour per light,
+- **OMEN LIGHTING** (on a PC with them): on/off, brightness, following the game, a colour per light,
   effects and their speed, the cooler's screen, its picture and fit.
 
 (Batocera's main menu cannot take a new entry of its own, so they sit inside Game Settings.)

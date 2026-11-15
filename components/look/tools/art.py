@@ -268,4 +268,5 @@ def system_logo(system, text):
     ImageDraw.Draw(image).text((30, 30), text, font=font, fill=(255, 255, 255, 255))
     image.save(f"{OUT}/logos/{system}.png")
 system_logo("store", "STORE")
+system_logo("apps", "APPS")
 print("art written (sounds: see sounds.py)")

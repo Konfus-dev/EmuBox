@@ -1,0 +1,20 @@
+{
+  "with": [
+    "look",
+    "discord",
+    "store",
+    "vault",
+    "tweaks"
+  ],
+  "sounds": "~/Sounds/menu-sets",
+  "bios": "",
+  "games": "",
+  "graphics_drivers": [],
+  "download_later": false,
+  "vault_pages": [
+    {
+      "name": "Indie games",
+      "url": "https://itch.io/games/free"
+    }
+  ]
+}

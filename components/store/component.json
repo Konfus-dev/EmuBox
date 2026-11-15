@@ -1,31 +1,69 @@
 {
   "title": "Store",
-  "question": "Add a Store to the home screen (free games, Steam, and Heroic for Epic and GOG)?",
+  "question": "Add a Store to the home screen (free games, Flathub apps, Steam, and Heroic for Epic and GOG)?",
   "default": true,
   "order": 25,
-  "requires": ["console"],
-  "renamed_from": ["pc-launchers"],
+  "requires": [
+    "console"
+  ],
+  "renamed_from": [
+    "pc-launchers"
+  ],
   "files": [
-    {"from": "files/es_systems_store.cfg", "to": "system/configs/emulationstation/es_systems_store.cfg"},
-    {"from": "files/heroic", "to": "system/emubox/apps/heroic"}
+    {
+      "from": "files/es_systems_store.cfg",
+      "to": "system/configs/emulationstation/es_systems_store.cfg"
+    },
+    {
+      "from": "files/heroic",
+      "to": "system/emubox/apps/heroic"
+    }
   ],
   "ports": [
     {
-      "system": "store", "name": "Free Games", "script": "files/Free Games.sh", "image": "files/free-games.png",
+      "system": "store",
+      "name": "Free Games",
+      "script": "files/Free Games.sh",
+      "image": "files/free-games.png",
       "genre": "Store",
-      "description": "Batocera's catalogue of homebrew and freely distributable games, for many systems. Pick one and it downloads straight into your library."
+      "description": "Batocera's catalogue of homebrew and freely distributable games, for many systems. Pick one and it downloads straight into your library.",
+      "folder": "Games"
     },
     {
-      "system": "store", "name": "Steam", "script": "files/Steam.sh", "image": "files/steam.png",
+      "system": "store",
+      "name": "Steam",
+      "script": "files/Steam.sh",
+      "image": "files/steam.png",
       "genre": "Store",
-      "description": "Your Steam library and the Steam store. Downloads itself the first time you open it (needs internet, about 3 GB)."
+      "description": "Your Steam library and the Steam store. Downloads itself the first time you open it (needs internet, about 3 GB).",
+      "folder": "Games"
     },
     {
-      "system": "store", "name": "Heroic", "command": "exec /userdata/system/emubox/bin/emubox-app open heroic --wait",
-      "image": "files/heroic.png", "genre": "Store",
-      "description": "Your Epic Games, GOG and Amazon libraries, through the Heroic launcher. Downloads itself the first time you open it (needs internet)."
+      "system": "store",
+      "name": "Heroic",
+      "command": "exec /userdata/system/emubox/bin/emubox-app open heroic --wait",
+      "image": "files/heroic.png",
+      "genre": "Store",
+      "description": "Your Epic Games, GOG and Amazon libraries, through the Heroic launcher. Downloads itself the first time you open it (needs internet).",
+      "folder": "Games"
+    },
+    {
+      "system": "store",
+      "name": "Flathub",
+      "command": "exec python3 /userdata/system/emubox/lib/appstore.py",
+      "image": "files/flathub.png",
+      "genre": "Store",
+      "description": "Apps from Flathub (and a few web ones) that EmuBox knows how to set up for the controller: video, cloud gaming, streaming from your own PC, a browser, a media player. Pick one and it joins the Apps section of the home screen.",
+      "folder": "Apps"
     }
   ],
-  "replaces": ["roms/ports/Install Steam and Heroic.sh"],
+  "replaces": [
+    "roms/ports/Install Steam and Heroic.sh",
+    "roms/store/Add Apps.sh",
+    "roms/store/Free Games.sh",
+    "roms/store/Steam.sh",
+    "roms/store/Heroic.sh",
+    "roms/store/Flathub.sh"
+  ],
   "after": "Store is a new entry on the home screen."
 }

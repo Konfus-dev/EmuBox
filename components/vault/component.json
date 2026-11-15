@@ -3,22 +3,44 @@
   "question": "Add Vault and itch.io to the Store (itch.io, and your own list of store pages; downloads go straight into your games)?",
   "default": true,
   "order": 26,
-  "requires": ["console", "store"],
+  "requires": [
+    "console",
+    "store"
+  ],
   "files": [
-    {"from": "files/vault.py", "to": "system/emubox/lib/vault.py"},
-    {"from": "files/vault", "to": "system/emubox/bin/vault", "mode": "755"}
+    {
+      "from": "files/vault.py",
+      "to": "system/emubox/lib/vault.py"
+    },
+    {
+      "from": "files/vault",
+      "to": "system/emubox/bin/vault",
+      "mode": "755"
+    }
   ],
   "ports": [
     {
-      "system": "store", "name": "itch.io", "image": "files/itch.png", "genre": "Store",
+      "system": "store",
+      "name": "itch.io",
+      "image": "files/itch.png",
+      "genre": "Store",
       "command": "exec /userdata/system/emubox/bin/vault go https://itch.io/games",
-      "description": "Indie games from itch.io, browsed with the controller: the D-pad moves between links, A selects, B goes back, X opens the keyboard. A download is noticed straight away and you are asked which system to install it to."
+      "description": "Indie games from itch.io, browsed with the controller: the D-pad moves between links, A selects, B goes back, X opens the keyboard. A download is noticed straight away and you are asked which system to install it to.",
+      "folder": "Games"
     },
     {
-      "system": "store", "name": "Vault", "script": "files/Vault.sh", "image": "files/vault.png",
+      "system": "store",
+      "name": "Vault",
+      "script": "files/Vault.sh",
+      "image": "files/vault.png",
       "genre": "Store",
-      "description": "Your own list of store pages, browsed with the controller: the D-pad moves between links, A selects, B goes back, X opens the keyboard, the right stick is a pointer. Anything you download is noticed straight away and Vault asks which system to install it to."
+      "description": "Your own list of store pages, browsed with the controller: the D-pad moves between links, A selects, B goes back, X opens the keyboard, the right stick is a pointer. Anything you download is noticed straight away and Vault asks which system to install it to.",
+      "folder": "Games"
     }
   ],
-  "after": "Vault and itch.io are in the Store. Set its pages on Batocera with: /userdata/system/emubox/bin/vault add \"Name\" https://address"
+  "after": "Vault and itch.io are in the Store. Set its pages on Batocera with: /userdata/system/emubox/bin/vault add \"Name\" https://address",
+  "replaces": [
+    "roms/store/itch.io.sh",
+    "roms/store/Vault.sh"
+  ]
 }

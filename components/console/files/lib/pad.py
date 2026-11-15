@@ -72,7 +72,7 @@ def wlrctl(*args: str) -> subprocess.CompletedProcess:
 
 
 class App:
-    """The window we serve, found by the start of its app id."""
+    """The window we serve: the one whose app id has our word in it, in any case."""
 
     def __init__(self, prefix: str):
         self.prefix = prefix
@@ -80,7 +80,7 @@ class App:
     def window(self) -> str | None:
         for line in wlrctl("list").stdout.splitlines():
             app_id = line.split(": ", 1)[0]
-            if app_id.startswith(self.prefix):
+            if self.prefix and self.prefix.lower() in app_id.lower():
                 return app_id
         return None
 

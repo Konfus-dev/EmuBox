@@ -1,12 +1,12 @@
 #!/bin/bash
 # Preview a Batocera menu theme in a window on this PC, using Batocera's own menu program.
 #   batocera-preview [theme-folder-name]     (default: emubox)
-# Themes are read from ~/batocera-preview/themes. Games come from the stick if it is plugged in.
+# Themes are read from ~/batocera-preview/themes. Games come from the Batocera drive if one is found.
 # Keys: arrows move, Enter select, Esc back, Space menu, Backspace options. Close the window to quit.
 P="$HOME/batocera-preview"; R="$P/root"
 THEME="${1:-emubox}"
 [ -d "$P/themes/$THEME" ] || { echo "No theme '$THEME' in $P/themes (have: $(ls "$P/themes" | tr '\n' ' '))"; exit 1; }
-ROMS="/run/media/$USER/SHARE/roms"; [ -d "$ROMS" ] || ROMS="$P/emptyroms"
+ROMS="$("$(dirname "$(readlink -f "$0")")/batocera-drive" 2>/dev/null)/roms"; [ -d "$ROMS" ] || ROMS="$P/emptyroms"
 cat > "$P/userdata/system/configs/emulationstation/es_settings.cfg" <<CFG
 <?xml version="1.0"?>
 <config>

@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shutil
 import subprocess
@@ -51,10 +52,58 @@ def parser() -> argparse.ArgumentParser:
                    help="menu sounds of your own: a folder with one sub-folder per sound set")
     p.add_argument("--download-later", action="store_true",
                    help="do not fetch the apps' programs onto the drive now; each downloads when first opened")
+    p.add_argument("--setup", metavar="FILE",
+                   help="a file of your own answers (see setups/example.json): installs it all without asking")
     p.add_argument("--list", action="store_true", help="show what can be installed and what is installed")
     p.add_argument("--remove", nargs="+", metavar="ID", help="take these components off the drive")
     p.add_argument("--backup-games", metavar="FOLDER", help="copy the drive's games into this library folder")
     return p
+
+
+def read_setup(args, say=lambda text: None) -> dict:
+    """A setup file is your own answers, kept in a file: which components, where your
+    sounds, BIOS files and games are, the pages for Vault. What is typed on the command
+    line still wins. Folders in it are relative to the file (or start with ~ or $HOME),
+    and one that is not there on this PC is left out with a word, not an error, so the
+    same file serves on another PC."""
+    file = expand(args.setup)
+    try:
+        setup = json.loads(file.read_text())
+    except (OSError, ValueError) as problem:
+        raise Stop(f"{file} could not be read: {problem}")
+    unknown = sorted(set(setup) - {"with", "sounds", "bios", "games", "graphics_drivers", "download_later", "vault_pages"})
+    if unknown:
+        raise Stop(f"{file}: not understood: {', '.join(unknown)}")
+
+    def place(where: str) -> str:
+        return where if is_url(where) else str((file.parent / Path(os.path.expandvars(where)).expanduser()).resolve())
+
+    args.yes = True
+    if args.include is None and "with" in setup:
+        args.include = ",".join(setup["with"])
+    for kind in ("sounds", "bios", "games"):
+        if getattr(args, kind) is None and setup.get(kind):
+            where = place(setup[kind])
+            if is_url(where) or Path(where).is_dir():
+                setattr(args, kind, where)
+            else:
+                say(f"  {file.name}: the {kind} folder {where} is not here; left out.")
+    args.download_later = args.download_later or bool(setup.get("download_later"))
+    if setup.get("graphics_drivers"):
+        os.environ.setdefault("EMUBOX_GL_DRIVERS", ":".join(setup["graphics_drivers"]))
+    return setup
+
+
+def add_vault_pages(target: Target, pages: list[dict]) -> list[str]:
+    """Put the setup file's pages in Vault's list on the drive; pages already there stay as they are."""
+    file = target.path("system/vault/vault.json")
+    settings = json.loads(file.read_text()) if file.is_file() else {}
+    have = {page["name"] for page in settings.setdefault("pages", [])}
+    added = [page for page in pages if page["name"] not in have]
+    if added:
+        settings["pages"] += [{"name": page["name"], "url": page["url"]} for page in added]
+        target.write_text("system/vault/vault.json", json.dumps(settings, indent=2) + "\n")
+    return [page["name"] for page in added]
 
 
 def find_target(args, ask: Prompts) -> Target:
@@ -376,6 +425,10 @@ def run_install(args, target: Target, ask: Prompts) -> None:
             copied = copy_sound_sets(target, sounds, ask.say)
             ask.say(f"  {', '.join(copied)}" if copied else f"  No sound sets found in {sounds}.")
         write_start_menu(target)
+        if args.pages and "vault" in ids:
+            added = add_vault_pages(target, args.pages)
+            if added:
+                ask.say(f"Vault pages added: {', '.join(added)}")
         for title, library_, selection in libraries:
             ask.say(f"Copying {title}...")
             library.install(library_, selection, target, ask.say)
@@ -411,8 +464,12 @@ def run_remove(ids: list[str], target: Target, ask: Prompts) -> None:
         done = components.uninstall(component_id, target)
         ask.say(f"Removed {component_id}." if done else f"{component_id} is not installed.")
     remaining = target.manifest()["components"]
-    if "console" in remaining and not any(f"system/emubox/apps/" in f for e in remaining.values() for f in e["files"]):
-        components.uninstall("console", target)   # no apps left that need it
+    # Terminal, Files and Claude come with the console tools, and go with them too.
+    along = [c.id for c in components.discover(REPO).values() if c.spec.get("comes_with") == "console"]
+    chosen_apps = [i for i, e in remaining.items() if i not in along and any("system/emubox/apps/" in f for f in e["files"])]
+    if "console" in remaining and not chosen_apps:
+        for component_id in [i for i in along if i in remaining] + ["console"]:   # no apps left that need it
+            components.uninstall(component_id, target)
         ask.say("Removed the console tools (no apps left).")
 
 
@@ -427,9 +484,12 @@ def run_backup(folder: str, args, target: Target, ask: Prompts) -> None:
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     args = parser().parse_args(argv)
-    ask = Prompts(assume_defaults=args.yes)
+    args.pages = []
+    ask = Prompts(assume_defaults=args.yes or bool(args.setup))
     try:
         ask.say("EmuBox")
+        if args.setup:
+            args.pages = read_setup(args, ask.say).get("vault_pages", [])
         if args.list:
             found = Target.find()
             run_list(Target(expand(args.target)) if args.target else Target(found[0]) if len(found) == 1 else None, ask)

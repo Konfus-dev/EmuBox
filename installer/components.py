@@ -12,6 +12,7 @@ component.json:
     default        the answer when Enter is pressed (true/false)
     order          position in the list of questions
     hidden         true: never asked about; installed when another component requires it
+    comes_with     (apps) the id of a component this app is installed along with, unasked
     requires       ids of components this one needs
     ask            things to type in when the component is chosen:
                    [{"id": "user", "question": "Username", "secret": false, "optional": false,
@@ -23,7 +24,8 @@ component.json:
                    (an app's own program is added by itself); skipped with --download-later
     ports          menu entries: name, description, image, and either "script" (a file here)
                    or "command" (one line to run). They go in Ports unless "system" names
-                   another system folder (for example "store").
+                   another system folder (for example "store"); "folder" puts one in a
+                   sub-section of that system (for example "Games").
     services       Batocera services to switch on
     batocera_conf  {"key": "value"} settings for batocera.conf
     es_settings    {"name": "value"} settings of the menu program
@@ -110,9 +112,13 @@ def _app_spec(app_id: str, app: dict) -> dict:
         "default": app.get("default", True),
         "order": app.get("order", 20),
         "requires": ["console"],
+        "hidden": bool(app.get("comes_with")),
+        "comes_with": app.get("comes_with"),
         "files": [{"from": ".", "to": f"{APPS_ON_DRIVE}/{app_id}"}],
         "flatpaks": [app["flatpak"]] if app.get("flatpak") else [],
+        "replaces": [f"{PORTS}/{app['name']}.sh"],   # apps used to sit among the ports
         "ports": [{
+            "system": "apps",
             "name": app["name"],
             "command": OPEN_APP.format(id=app_id),
             "image": "tile.png",
@@ -152,7 +158,8 @@ def available(component: Component, env: Env) -> bool:
 
 
 def with_requirements(chosen: list[str], everything: dict[str, Component]) -> list[str]:
-    """The chosen ids with what they need added in front, each once."""
+    """The chosen ids with what they need added in front, each once, and after them
+    whatever "comes_with" one of them (Terminal and Files come with the console tools)."""
     ordered: list[str] = []
 
     def add(component_id: str) -> None:
@@ -164,30 +171,48 @@ def with_requirements(chosen: list[str], everything: dict[str, Component]) -> li
 
     for component_id in chosen:
         add(component_id)
+    for component in everything.values():   # the small things that come along unasked
+        if component.spec.get("comes_with") in ordered:
+            add(component.id)
     return ordered
 
 
+def _tile(recorded: str) -> tuple[str, str]:
+    """A recorded tile as (its system's folder, its path inside that without ".sh"):
+    "Discord" is in Ports; "roms/store/Games/Steam" is Games/Steam in roms/store."""
+    parts = recorded.split("/")
+    if parts[0] != "roms" or len(parts) < 3:
+        return PORTS, recorded
+    return "/".join(parts[:2]), "/".join(parts[2:])
+
+
 def _remove_port(target: Target, name: str, folder: str = PORTS) -> None:
+    """Take a tile off: its script, its picture and its line in the system's list.
+    `name` may sit in a sub-section: "Games/Steam"."""
     target.remove(f"{folder}/{name}.sh")
-    target.remove(f"{folder}/images/{name}.png")
+    target.remove(f"{folder}/images/{Path(name).name}.png")
     gamelist.remove_entry(target.path(f"{folder}/gamelist.xml"), f"{name}.sh")
+    sub = target.path(folder) / Path(name).parent
+    if sub != target.path(folder) and sub.is_dir() and not any(sub.iterdir()):
+        sub.rmdir()
 
 
 def _add_port(component: Component, port: dict, target: Target, record: Record) -> None:
     name, folder = port["name"], f"roms/{port.get('system', 'ports')}"
+    inside = f"{port['folder']}/{name}" if port.get("folder") else name   # a sub-section of the system
     if "script" in port:
-        record.files.append(target.copy_file(component.folder / port["script"], f"{folder}/{name}.sh", 0o755))
+        record.files.append(target.copy_file(component.folder / port["script"], f"{folder}/{inside}.sh", 0o755))
     else:
         text = f"#!/bin/bash\n# {name}, installed by EmuBox.\n{port['command']}\n"
-        record.files.append(target.write_text(f"{folder}/{name}.sh", text, 0o755))
+        record.files.append(target.write_text(f"{folder}/{inside}.sh", text, 0o755))
     fields = {"name": name, "desc": port.get("description", ""), "genre": port.get("genre", ""),
               "developer": "EmuBox", "players": "1", "releasedate": f"{date.today().year}0101T000000"}
     if port.get("image"):
         record.files.append(target.copy_file(component.folder / port["image"], f"{folder}/images/{name}.png"))
         fields["image"] = f"./images/{name}.png"
     target.make_dir(target.path(folder))
-    gamelist.set_entry(target.path(f"{folder}/gamelist.xml"), f"{name}.sh", {k: v for k, v in fields.items() if v})
-    record.ports.append(name if folder == PORTS else f"{folder}/{name}")
+    gamelist.set_entry(target.path(f"{folder}/gamelist.xml"), f"{inside}.sh", {k: v for k, v in fields.items() if v})
+    record.ports.append(name if folder == PORTS else f"{folder}/{inside}")
 
 
 def _fill(value, typed: dict[str, str]):
@@ -203,8 +228,9 @@ def install(component: Component, env: Env) -> Record:
     env.component = component
 
     for old in spec.get("replaces", []):
-        if old.startswith(f"{PORTS}/") and old.endswith(".sh"):
-            _remove_port(target, Path(old).stem)
+        if old.startswith("roms/") and old.endswith(".sh"):   # a tile from an older version
+            folder, inside = _tile(old[:-3])
+            _remove_port(target, inside, folder)
         else:
             target.remove(old)
     for service in spec.get("retired_services", []):
@@ -285,8 +311,8 @@ def _take_off(entry: dict, target: Target) -> None:
     for service in entry.get("services", []):
         target.disable_service(service)
     for name in entry.get("ports", []):
-        folder, _, short = name.rpartition("/")   # "roms/store/Steam", or just "Discord" for Ports
-        _remove_port(target, short, folder or PORTS)
+        folder, inside = _tile(name)
+        _remove_port(target, inside, folder)
     for made in entry.get("generated", []):
         path = target.path(made["path"])
         if path.is_file() and made["contains"] in path.read_text(errors="replace"):
