@@ -54,6 +54,8 @@ ES_SYSTEMS = ("/userdata/system/configs/emulationstation/es_systems.cfg",
               "/usr/share/emulationstation/es_systems.cfg")
 DEFAULT_COMMAND = 'mv -n -- "$VAULT_FILE" "$VAULT_GAMES/$VAULT_SYSTEM/"'
 DEFAULT_REFRESH = "curl -s -m 10 http://127.0.0.1:1234/reloadgames"
+# Tidy the names of what was just installed (EmuBox's "names" component), when it is there.
+TIDY_NAMES = "f=/userdata/system/emubox/tools/nicenames.py; [ -f $f ] && python3 $f /userdata >/dev/null 2>&1"
 DEFAULT_PAGES: list[dict] = []    # yours to fill: vault add "Name" https://address
 PARTIAL = (".part", ".crdownload", ".tmp", ".download")
 NOT_GAME_FOLDERS = {"store"}      # system folders that are menus of ours, not places for games
@@ -666,7 +668,7 @@ def ui(settings: Settings, direct: str = "") -> int:
         # the refresh, and the new games would not appear until the next restart.
         env = dict(os.environ, VAULT_GAMES=GAMES, VAULT_DOWNLOADS=str(settings.downloads), VAULT_FILE="", VAULT_SYSTEM="")
         try:
-            subprocess.Popen(["bash", "-c", f"sleep 5; {settings.refresh}; sleep 6; {settings.refresh}"], env=env,
+            subprocess.Popen(["bash", "-c", f"sleep 5; {TIDY_NAMES}; {settings.refresh}; sleep 6; {settings.refresh}"], env=env,
                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
         except OSError:
             pass

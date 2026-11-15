@@ -232,6 +232,9 @@ def main() -> int:
         store.pads.release()
     if store.changed:   # have the menu notice the new games, and how much room is left
         subprocess.run([sys.executable, os.path.join(HERE, "space.py"), "--theme"], check=False)
+        tidy = "/userdata/system/emubox/tools/nicenames.py"   # EmuBox's "names" component, when there
+        if os.path.isfile(tidy):
+            subprocess.run([sys.executable, tidy, "/userdata"], capture_output=True, check=False)
         subprocess.run(["curl", "-s", "http://127.0.0.1:1234/reloadgames"], capture_output=True, check=False)
     return 0
 
