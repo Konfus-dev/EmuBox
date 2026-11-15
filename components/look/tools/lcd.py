@@ -44,7 +44,7 @@ LAYERS = [
     ("rings_a", 1.638, 0, None, None),          # the claw, in front of the orb's edge
 ]
 # The rings sit where theme.xml leaves them after its opening turn.
-RESTING_ANGLE = {"rings_b": 30}
+RESTING_ANGLE = {"rings_b": 30, "rings_a": 90}
 
 
 def pulse(start: float, end: float, period: float, t: float) -> float:

@@ -7,7 +7,7 @@ puts your own BIOS files, games and menu sounds on the drive.
 
 | | | |
 | --- | --- | --- |
-| ![Start-up film](docs/Images/boot.jpg) | ![Home screen](docs/Images/home.jpg) | ![Guide menu, Capture tab](docs/Images/guide.jpg) |
+| ![Start-up film](docs/Images/boot.jpg) | ![Home screen](docs/Images/home.jpg) | ![Guide menu](docs/Images/guide.jpg) |
 | Starting up | Home | The Guide menu |
 
 Everything goes into Batocera's data folder (the `SHARE` partition), which Batocera's updates

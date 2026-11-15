@@ -406,6 +406,29 @@ def copy_sound_sets(target: Target, folder: Path | None, say=lambda text: None, 
     return copied
 
 
+def put_start_up_film(target: Target) -> bool:
+    """The film Batocera plays at start: the chosen sound set's own (its boot.mp4), or EmuBox's.
+    The look puts EmuBox's film in place on every install, and the menus only swap in the set's
+    when they next start, so without this the first start after an install, and every start of a
+    test machine that keeps nothing, shows the wrong one. True when it changed."""
+    lib = REPO / "components" / "console" / "files" / "lib"
+    mine = target.path("system/configs/emubox/sounds")
+    if not mine.is_dir() or not target.path("splash/emubox.mp4").is_file():
+        return False
+    sys.path.insert(0, str(lib))
+    try:
+        import menusounds
+        import settings
+        value = settings.read(target.path("system/configs/emubox/settings.conf"), target.path("system/batocera.conf")).get("ui.sound_set", "")
+        names = [menusounds.BUILT_IN] + sorted(p.name for p in mine.iterdir() if p.is_dir())
+        chosen = menusounds.chosen_set(value, names)
+        return menusounds.start_up_film(chosen, mine, target.path("splash"), target.path("system/emubox/splash/emubox.mp4"))
+    except Exception:   # noqa: BLE001  the menus put it right at their next start anyway
+        return False
+    finally:
+        sys.path.remove(str(lib))
+
+
 def write_start_menu(target: Target) -> bool:
     """EmuBox's entries for Batocera's Start menu (Game Settings), written from the tools now on
     the drive so they are there at the first start; on Batocera the service keeps them current."""
@@ -466,6 +489,8 @@ def run_install(args, target: Target, ask: Prompts) -> None:
             copied = copy_sound_sets(target, sounds, ask.say)
             ask.say(f"  {', '.join(copied)}" if copied else f"  No sound sets found in {sounds}.")
         write_start_menu(target)
+        if put_start_up_film(target):
+            ask.say("The chosen sound set's start-up film is in place.")
         if args.pages and "vault" in ids:
             added = add_vault_pages(target, args.pages)
             if added:

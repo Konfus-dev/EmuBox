@@ -279,6 +279,18 @@ class ComponentTests(Drive):
             self.assertEqual(code, 1)
             self.assertIn("not understood: wiht", out)
 
+    def test_the_chosen_sets_film_is_put_in_place_at_install(self):
+        from installer import cli
+        make_file(self.root / "splash/emubox.mp4").write_bytes(b"emubox's own")
+        make_file(self.root / "system/emubox/splash/emubox.mp4").write_bytes(b"emubox's own")
+        make_file(self.root / "system/configs/emubox/sounds/OG Xbox/boot.mp4").write_bytes(b"the set's own")
+        make_file(self.root / "system/configs/emubox/sounds/Other/select.wav")
+        self.assertTrue(cli.put_start_up_film(self.target))         # nothing chosen: the Xbox set
+        self.assertEqual((self.root / "splash/emubox.mp4").read_bytes(), b"the set's own")
+        make_file(self.root / "system/configs/emubox/settings.conf").write_text("ui.sound_set=EmuBox\n")
+        self.assertTrue(cli.put_start_up_film(self.target))         # EmuBox's own chosen: back it goes
+        self.assertEqual((self.root / "splash/emubox.mp4").read_bytes(), b"emubox's own")
+
     def test_the_installer_asks_for_your_sounds_and_remembers_the_folder(self):
         with tempfile.TemporaryDirectory() as folder, mock.patch.dict("os.environ", {"EMUBOX_SOUNDS": ""}), \
              mock.patch.object(cli, "SOUNDS_BESIDE", Path(folder) / "nowhere"):

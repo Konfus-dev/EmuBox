@@ -114,6 +114,25 @@ def lights():
         bpy.context.collection.objects.link(obj)
 
 
+def even_lights():
+    """Light that looks the same after a quarter turn: four soft lights round the front, one behind.
+    The claw turns 90 degrees on each move and snaps back after; lit like this, the snap can't be seen."""
+    for k in range(4):
+        a = math.radians(45 + 90 * k)
+        data = bpy.data.lights.new(f"key{k}", "AREA")
+        data.energy, data.color, data.size = 900, (0.85, 1.0, 0.8), 5
+        obj = bpy.data.objects.new(f"key{k}", data)
+        obj.location = (7 * math.cos(a), 7 * math.sin(a), 8)
+        obj.rotation_euler = (-Vector(obj.location)).to_track_quat("-Z", "Y").to_euler()
+        bpy.context.collection.objects.link(obj)
+    data = bpy.data.lights.new("rim", "AREA")
+    data.energy, data.color, data.size = 900, (0.6, 1.0, 0.5), 10
+    obj = bpy.data.objects.new("rim", data)
+    obj.location = (0, 0, -9)
+    obj.rotation_euler = (math.pi, 0, 0)
+    bpy.context.collection.objects.link(obj)
+
+
 def holdout_ball():
     """The orb itself, unseen: it hides whatever is behind it, so only what shows round it is kept."""
     bpy.ops.mesh.primitive_uv_sphere_add(radius=1.0, segments=64, ring_count=32)
@@ -126,11 +145,12 @@ def claw(scene):
     """Four metal fingers that come round from behind the orb, hug its edge, and curl out at the tips."""
     orb_camera(scene)
     world_colour(scene, (0.01, 0.05, 0.01), 0.6)
-    lights()
+    even_lights()
     holdout_ball()
     metal = material("claw", GREEN_METAL, metallic=1.0, roughness=0.32, emission=((0.05, 0.3, 0.03), 0.4))
     # (where round the orb the finger starts, how far round it wraps, how far the tip flicks out, how thick)
-    for start, sweep, flick, thick in ((-150, 100, 0.85, 0.17), (-38, 85, 0.65, 0.16), (42, 88, 0.75, 0.17), (128, 96, 1.0, 0.15)):
+    # Four identical fingers, a quarter turn apart: the theme turns the claw 90 degrees per move.
+    for start, sweep, flick, thick in ((-150 + 90 * k, 92, 0.85, 0.16) for k in range(4)):
         spine, radii, steps = [], [], 80
         for i in range(steps + 1):
             u = i / steps
