@@ -109,6 +109,8 @@ song, LT/RT change the volume, Y opens the keyboard.
   network address.
 
 D-pad or stick moves, A presses, left/right changes a value, LB/RB change tab, B or Guide closes.
+The menu opens as the Guide button goes down; its values are read ahead of time and again each
+time it opens (a thin bar under the tabs moves while they are).
 
 Every app shows what the buttons do in a row along the bottom, and its window sits above that
 row. In any app Select+B hides it and Select+Start quits it; holding B hides it too (not in the
@@ -120,6 +122,9 @@ be shown, skipped and paused. It plays in the menus only, and waits while a musi
 is playing.
 
 ### Menu sounds
+
+The sounds are kept loaded in the sound server, so one plays within a few milliseconds of the
+press instead of being read from the drive each time.
 
 EmuBox's own set is synthesised and is what you get unless you bring your own: the installer asks
 for a folder of sound sets (or take `--sounds FOLDER`), one sub-folder per set, named as it should

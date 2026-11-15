@@ -246,6 +246,45 @@ def direction(kind: int, code: int, value: int, centre: float = 0.0, span: float
     return None
 
 
+class Loaded:
+    """The sounds kept ready in the sound server's memory, so playing one is a word to the
+    server (a few milliseconds) and not a new player reading a file from the drive each time.
+    A sound is loaded again only when its file or the volume changes."""
+
+    def __init__(self, scratch: Path = Path("/var/run/emubox/sounds"), run=subprocess.run):
+        self.scratch, self.run = scratch, run
+        self.have: dict[str, tuple] = {}     # kind -> what was loaded (file, when it was written, volume)
+
+    def ready(self, kind: str, file: Path, percent: int) -> bool:
+        try:
+            wanted = (str(file), file.stat().st_mtime, percent)
+        except OSError:
+            return False
+        if self.have.get(kind) == wanted:
+            return True
+        try:
+            self.scratch.mkdir(parents=True, exist_ok=True)
+            copy = self.scratch / f"{kind}.wav"
+            # The server's own volume scale is steep (its 60% is about a fifth of full); match it,
+            # so a sound is as loud this way as when a player was started for it.
+            if not scaled(file, copy, round(100 * (percent / 100) ** 3)):   # False: a kind of file we cannot turn down
+                return False
+            done = self.run(["pactl", "upload-sample", str(copy), f"emubox-{kind}"], capture_output=True, timeout=5)
+        except (OSError, subprocess.SubprocessError):
+            return False
+        if done.returncode == 0:
+            self.have[kind] = wanted
+            return True
+        return False
+
+    def play(self, kind: str) -> bool:
+        try:
+            return self.run(["pactl", "play-sample", f"emubox-{kind}"], capture_output=True, timeout=2).returncode == 0
+        except (OSError, subprocess.SubprocessError):
+            self.have.pop(kind, None)
+            return False
+
+
 def still_down(device, what: str) -> bool:
     """Is this direction really still held? Asked of the controller itself, because the moment
     it is let go can be missed: another program takes the controller for itself (an app, the
@@ -280,13 +319,18 @@ def listen() -> int:
     inverted, in_menus = False, False
     next_scan = next_look = 0.0
     playing: dict[str, subprocess.Popen] = {}   # one voice for moving, one for the rest
+    loaded = Loaded()
+    answered = False                            # has the menu program told us yet whether a game runs?
     held: dict[str, float] = {}                 # a direction being held -> when it next ticks
 
     def play(kind: str) -> None:
         switches = settings.read()
         if kind not in files or not should_play(kind, switches, in_menus):
             return
-        voice = "scroll" if kind == "scroll" else "button"
+        level = volume(switches)
+        if loaded.ready(kind, files[kind], level) and loaded.play(kind):
+            return
+        voice = "scroll" if kind == "scroll" else "button"   # the slower way, should the server refuse
         before = playing.get(voice)
         if before and before.poll() is None:
             before.kill()   # a fresh press cuts the last sound short rather than piling up
@@ -319,9 +363,16 @@ def listen() -> int:
             every = sets(text)
             files = sounds_of(chosen_set(settings.get("ui.sound_set"), every), every)
             inverted = es_setting("InvertButtons", text) == "true"
+            level = volume(settings.read())
+            for kind, file in files.items():   # loaded ahead of the first press, and again after a change
+                loaded.ready(kind, file, level)
         if now >= next_look:
             next_look = now + LOOK_S
-            in_menus = game_running() is False
+            running = game_running()
+            in_menus = running is False
+            answered = answered or running is not None
+            if not answered:
+                next_look = now + 0.2   # just started: the menus are coming up, be ready the moment they are
         for name, due in list(held.items()):   # a held direction keeps ticking, as the menus keep moving
             if now >= due:
                 path, _, what = name.rpartition(":")

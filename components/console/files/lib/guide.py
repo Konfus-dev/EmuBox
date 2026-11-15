@@ -29,6 +29,7 @@ import subprocess
 import sys
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
@@ -41,6 +42,7 @@ APP = ROOT / "bin" / "emubox-app"
 PID = Path("/var/run/emubox/guide.pid")
 RUNNING_GAME = "curl -s -m 1 http://127.0.0.1:1234/runningGame"
 REFRESH_S = 1.5
+TWICE_S = 0.6    # the Guide button heard again this soon after the menu changed is the same press
 LET_GO_S = 2.0   # after a press changed the menu, a toggle within this long is that press being let go
 
 Getter = "str | Callable[[], str]"   # a shell command whose output is the value, or a function
@@ -191,13 +193,14 @@ def layout(found: list[tuple[str, dict]] | None = None, lights: bool | None = No
                  button("Force close", "curl -s http://127.0.0.1:1234/emukill", close=True, confirm=True)],
             when=in_emulator),
     ]
+    open_apps = f"{a} status running"   # their names, one a line: asked once for all of them
     for app_id, app in found:
-        open_now = f"{a} running {app_id} && echo yes"
+        open_now = f"{open_apps} | grep -qxF '{app['name']}' && echo yes"
         game.append(Row(app["name"], [button("Resume", opening(app_id, app), close=True),
                                       button("Hide", f"{a} back {app_id}", close=True),
                                       button("Force close", f"{a} close {app_id}", confirm=True)],
                         when=open_now))
-    something_running = f"{in_game}; {a} status running"
+    something_running = f"{in_game}; {open_apps}"
     record = [Row("Recording", [switch("batocera-record is_running | grep true", "batocera-record start", "batocera-record stop")])]
     tabs = [Tab("Running", game, when=something_running), Tab("Settings", settings), Tab("Apps", app_rows), Tab("Record", record)]
 
@@ -323,24 +326,31 @@ def read(get: object) -> str:
         return ""
 
 
-def refresh(model: Model) -> None:
-    """Read every value the menu shows (slow: commands are run; call it off the screen's thread)."""
+def refresh(model: Model, reader=read) -> None:
+    """Read every value the menu shows, on every tab, so changing tab never waits. The commands
+    are run side by side (call this off the screen's thread: it still takes a moment)."""
     seen: dict[object, str] = {}
 
-    def value(get: object) -> str:
-        if get not in seen:
-            seen[get] = read(get)
-        return seen[get]
+    def fetch(getters) -> None:
+        wanted = [get for get in dict.fromkeys(getters) if get and get not in seen]
+        if not wanted:
+            return
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            for get, result in zip(wanted, pool.map(reader, wanted)):
+                seen[get] = result
 
+    rows = [row for tab in model.tabs for row in tab.rows] + model.bars
+    fetch([tab.when for tab in model.tabs] + [row.when for row in rows])
     for tab in model.tabs:
-        tab.shown = truthy(value(tab.when)) if tab.when else True
-    page = model.page()
-    for row in page.rows + model.bars:
-        row.shown = truthy(value(row.when)) if row.when else True
+        tab.shown = truthy(seen[tab.when]) if tab.when else True
+    for row in rows:
+        row.shown = truthy(seen[row.when]) if row.when else True
+    fetch(control.get for row in rows if row.shown for control in row.controls)   # only what can be seen
+    for row in rows:
         if row.shown:
             for control in row.controls:
                 if control.get:
-                    control.value = value(control.get)
+                    control.value = seen[control.get]
 
 
 class Load:
@@ -400,6 +410,8 @@ scrolledwindow, viewport { background-color: transparent; border: none; }
 .bar { padding: 6px 10px; margin-top: 6px; border: 1px solid rgba(150, 245, 80, 0.45); background-color: rgba(8, 52, 8, 0.6); }
 .bar.at { border-color: #c8f03c; background-color: rgba(150, 245, 80, 0.10); }
 .foot { padding: 8px 28px 10px 28px; border-top: 1px solid rgba(150, 245, 80, 0.4); margin-top: 8px; }
+.reading trough { min-height: 3px; min-width: 0; border: none; background-color: transparent; }
+.reading progress { min-height: 3px; }
 progressbar trough { background-color: rgba(4, 30, 4, 0.9); border: 1px solid #2f7d1e; min-height: 10px; min-width: 180px; }
 progressbar progress { background-image: linear-gradient(to bottom, #f0ff8c, #9adc20); border: none; min-height: 10px; }
 """
@@ -416,6 +428,7 @@ def screen(show_now: bool) -> int:
     gi.require_version("GtkLayerShell", "0.1")
     from gi.repository import Gdk, GLib, Gtk, GtkLayerShell, Pango
 
+    import evdev
     from padinput import Pads
 
     def label(words: str, style: str, **properties) -> Gtk.Label:
@@ -440,6 +453,7 @@ def screen(show_now: bool) -> int:
             self.pads = None
             self.showing = False
             self.deaf_until = 0.0
+            self.changed_at = 0.0
             self.busy = False            # a reading of the values is under way
             self.read_once = False       # until then we do not know whether a game is running
             self.model.tabs[0].shown = False
@@ -458,6 +472,9 @@ def screen(show_now: bool) -> int:
             self.tab_box = Gtk.Box()
             self.tab_box.get_style_context().add_class("tabs")
             pane.pack_start(self.tab_box, False, False, 0)
+            self.reading = Gtk.ProgressBar()          # moves while the values are being read
+            self.reading.get_style_context().add_class("reading")
+            pane.pack_start(self.reading, False, False, 0)
             self.page_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
             self.page_box.get_style_context().add_class("page")
             self.scroller = Gtk.ScrolledWindow()      # a long tab scrolls under the bars rather than pushing them off
@@ -486,8 +503,51 @@ def screen(show_now: bool) -> int:
             GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGUSR1, self._toggle)
             GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGUSR2, self._asked_to_show)
             GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, self._quit)
+            self.watched: dict[str, object] = {}
+            self._watch_pads()
+            GLib.timeout_add_seconds(3, self._watch_pads)
+            GLib.timeout_add(1500, self._read_soon, True)   # read once while hidden: the first opening is ready
             if show_now:
                 self._show()
+
+        # --- the Guide button, heard directly -------------------------------------------
+
+        def _watch_pads(self) -> bool:
+            """Listen to every controller's Guide button ourselves, so the menu opens the moment it
+            is pressed. (Batocera's hotkeys only tell us when it is let go; that later word is then
+            ignored, see _toggle.) Controllers come and go, so this looks again every few seconds."""
+            for path in evdev.list_devices():
+                if path in self.watched:
+                    continue
+                try:
+                    device = evdev.InputDevice(path)
+                    keys = device.capabilities().get(evdev.ecodes.EV_KEY, [])
+                    if evdev.ecodes.BTN_MODE in keys and evdev.ecodes.BTN_SOUTH in keys:
+                        self.watched[path] = device
+                        GLib.io_add_watch(device.fd, GLib.IO_IN | GLib.IO_HUP | GLib.IO_ERR, self._on_watched, device)
+                    else:
+                        device.close()
+                except OSError:
+                    continue
+            return True
+
+        def _on_watched(self, _fd, _condition, device) -> bool:
+            try:
+                events = list(device.read())
+            except BlockingIOError:
+                return True
+            except OSError:                               # unplugged, or gone to sleep
+                self.watched.pop(device.path, None)
+                try:
+                    device.close()
+                except OSError:
+                    pass
+                return False
+            for event in events:
+                if event.type == evdev.ecodes.EV_KEY and event.code == evdev.ecodes.BTN_MODE and event.value == 1 \
+                        and not self.showing and time.monotonic() - self.changed_at > TWICE_S:
+                    self._asked_to_show()
+            return True
 
         # --- showing and hiding ---------------------------------------------------------
 
@@ -495,9 +555,12 @@ def screen(show_now: bool) -> int:
             """The Guide button, from Batocera's hotkeys: it tells us when the button is let go.
             When a press has just opened or closed the menu (an app's pad mapper asking for it, or
             Guide pressed in the menu itself), this is that same press being let go: not a new one."""
-            if time.monotonic() < self.deaf_until:
+            now = time.monotonic()
+            if now < self.deaf_until:
                 self.deaf_until = 0.0
                 return True
+            if now - self.changed_at < TWICE_S:   # the same press, heard twice (a controller that shows up
+                return True                        # as two devices): opening and closing at once otherwise
             self._hide() if self.showing else self._show()
             return True
 
@@ -515,6 +578,7 @@ def screen(show_now: bool) -> int:
 
         def _show(self) -> None:
             self.showing = True
+            self.changed_at = time.monotonic()
             # Drawn at once with what was last read (reading runs a dozen commands); fresh values follow.
             self.model.open_on("Running" if self.model.tabs[0].when and self.model.tabs[0].shown and self.read_once else "Settings")
             self._draw()
@@ -539,6 +603,7 @@ def screen(show_now: bool) -> int:
 
         def _hide(self) -> None:
             self.showing = False
+            self.changed_at = time.monotonic()
             if self.pads:
                 self.pads.release()
                 self.pads = None
@@ -612,7 +677,9 @@ def screen(show_now: bool) -> int:
                 self.tab_box.pack_start(tab_label, False, False, 0)
             self.tab_box.pack_end(label("LB / RB  tabs      A  select      B  close", "hint"), False, False, 0)
             focused = None
-            for row in model.page().rows:
+            if not self.read_once:    # opened before anything could be read (straight after start-up)
+                self.page_box.pack_start(label("Loading...", "name", xalign=0), False, False, 12)
+            for row in model.page().rows if self.read_once else []:
                 if row.shown:
                     widget = self._row_widget(row, "row", row is at, current)
                     self.page_box.pack_start(widget, False, False, 0)
@@ -658,10 +725,12 @@ def screen(show_now: bool) -> int:
             self._read_soon()
             return True
 
-        def _read_soon(self) -> bool:
-            if self.busy or not self.showing:
+        def _read_soon(self, hidden_too: bool = False) -> bool:
+            if self.busy or not (self.showing or hidden_too):
                 return False
             self.busy = True
+            self.reading.set_opacity(1)
+            GLib.timeout_add(90, self._pulse)
 
             def work() -> None:
                 refresh(self.model)
@@ -670,6 +739,7 @@ def screen(show_now: bool) -> int:
 
             def done(address: str) -> bool:
                 self.busy = False
+                self.reading.set_opacity(0)
                 if not self.read_once:   # first reading: now we know whether to start on the Game tab
                     self.read_once = True
                     if self.model.tabs[0].shown:
@@ -681,6 +751,11 @@ def screen(show_now: bool) -> int:
 
             threading.Thread(target=work, daemon=True).start()
             return False
+
+        def _pulse(self) -> bool:
+            if self.busy:
+                self.reading.pulse()
+            return self.busy
 
         # --- input ---------------------------------------------------------------------------
 
