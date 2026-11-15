@@ -1,0 +1,17 @@
+#!/bin/ash
+# Put /boot/boot-custom.sh back when it is missing (Batocera's updater deletes files it did not ship).
+# Runs just before switch_root: /new_root/boot is Batocera's boot partition, mounted read-only, and
+# Batocera has already moved /proc into the new system, so a fresh /proc is mounted for `mount` to
+# use and taken away again afterwards.
+D=/new_root/boot/boot-custom.sh
+[ -f "$D" ] && exit 0
+[ -f /emubox/boot-custom.sh ] || exit 0
+own_proc=n
+[ -e /proc/mounts ] || { mount -t proc proc /proc && own_proc=y; }
+if mount -o remount,rw /new_root/boot; then
+    cp /emubox/boot-custom.sh "$D"
+    mount -o remount,ro /new_root/boot
+    echo "EmuBox: put /boot/boot-custom.sh back"
+fi
+[ "$own_proc" = y ] && umount /proc
+exit 0

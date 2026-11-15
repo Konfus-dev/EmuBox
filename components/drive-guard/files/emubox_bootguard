@@ -1,0 +1,35 @@
+#!/bin/bash
+# EmuBox drive guard keeper. Batocera's updates delete files they did not ship from /boot, among
+# them /boot/boot-custom.sh, which keeps Batocera's storage manager away from the PC's own disks.
+# At every start this puts that file back when it is missing or older than EmuBox's copy, and
+# unmounts any of the PC's own partitions that were mounted while it was missing.
+[ "$1" = "start" ] || exit 0
+SRC=/userdata/system/emubox/boot/boot-custom.sh
+DST=/boot/boot-custom.sh
+LOG=/userdata/system/logs/emubox.log
+say() { echo "$(date '+%F %T') bootguard: $*" >> "$LOG"; }
+
+if [ -f "$SRC" ] && ! cmp -s "$SRC" "$DST"; then
+    if mount -o remount,rw /boot; then
+        cp "$SRC" "$DST" && sync && say "put /boot/boot-custom.sh back (missing or out of date)"
+        mount -o remount,ro /boot
+        bash "$DST" start    # guard drives that appear from now on
+    else
+        say "could not write /boot to put boot-custom.sh back"
+    fi
+fi
+
+# Anything mounted under /media from a disk that is not on USB came from the PC's own disks
+# (Windows, another Linux) while the guard was missing: let go of it.
+for mp in /media/*; do
+    src=$(findmnt -rno SOURCE --mountpoint "$mp" 2>/dev/null | head -n1)   # empty: not a mount point
+    case "$src" in /dev/*) ;; *) continue ;; esac
+    disk=$(lsblk -no PKNAME "$src" 2>/dev/null | head -n1)
+    [ -n "$disk" ] || disk=${src#/dev/}
+    case "$(readlink -f "/sys/block/$disk")" in */usb*) continue ;; esac
+    if umount "$mp"; then
+        rmdir "$mp" 2>/dev/null
+        say "unmounted $src from $mp (the PC's own disk)"
+    fi
+done
+exit 0

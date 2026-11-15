@@ -1,0 +1,26 @@
+#!/bin/bash
+# Build the EmuBox boot loader (a standalone GRUB EFI program) for Batocera on the PC's own disk.
+#
+#   tools/dualboot/build-loader BOOT_UUID OUT.efi [extra kernel arguments]
+#
+# BOOT_UUID is the filesystem id of Batocera's boot partition (lsblk -no UUID /dev/nvme0n1p6).
+# Needs grub-mkstandalone and the x86_64-efi modules: GRUB_MODULES=/path (default: the
+# grub-efi-amd64-bin package's /usr/lib/grub/x86_64-efi). The loader is placed in the PC's EFI
+# partition (EFI/batocera/grubx64.efi) and listed in the boot menu (loader/entries/batocera.conf).
+set -euo pipefail
+[ $# -ge 2 ] || { sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
+here=$(dirname "$(readlink -f "$0")"); repo=$(dirname "$(dirname "$here")")
+uuid=$1 out=$2; shift 2
+modules=${GRUB_MODULES:-/usr/lib/grub/x86_64-efi}
+[ -d "$modules" ] || { echo "No GRUB EFI modules at $modules (set GRUB_MODULES)." >&2; exit 1; }
+work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
+# The early-boot addition: the init wrapper, the hook, and a copy of boot-custom.sh to restore.
+mkdir -p "$work/cpio/emubox"
+install -m 755 "$here/initrd/emubox-init" "$here/initrd/emubox-hook" "$work/cpio/"
+install -m 755 "$repo/components/drive-guard/files/boot-custom.sh" "$work/cpio/emubox/boot-custom.sh"
+(cd "$work/cpio" && find . | cpio -o -H newc -R 0:0 --quiet) > "$work/emubox.cpio"
+sed -e "s/@BOOT_UUID@/$uuid/g" -e "s|@EXTRA_ARGS@|$*|" "$here/grub.cfg" > "$work/grub.cfg"
+grub-mkstandalone --directory="$modules" -O x86_64-efi -o "$out" \
+    --modules="part_gpt part_msdos fat search search_fs_uuid linux echo sleep test normal all_video efi_gop gfxterm memdisk" \
+    --locales="" --fonts="" --themes="" "boot/grub/grub.cfg=$work/grub.cfg" "emubox.cpio=$work/emubox.cpio"
+echo "Built $out"

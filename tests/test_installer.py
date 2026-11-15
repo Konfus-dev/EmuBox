@@ -26,7 +26,7 @@ from installer.target import Target  # noqa: E402
 
 os.environ["EMUBOX_DOWNLOAD_LATER"] = "1"   # the tests never fetch programs from Flathub
 os.environ["EMUBOX_SOUNDS"] = "none"        # nor pick up sound sets that happen to sit beside the repository
-COMPONENT_QUESTIONS = 10   # asked on a PC without the OMEN lights
+COMPONENT_QUESTIONS = 11   # asked on a PC without the OMEN lights
 
 
 def make_drive(root: Path) -> Target:
@@ -269,7 +269,7 @@ class ComponentTests(Drive):
              mock.patch.object(cli, "SOUNDS_BESIDE", Path(folder) / "nowhere"):
             make_file(Path(folder) / "mine" / "Arcade" / "scroll.wav")
             # look n, apple-music n, discord y, seven more n, bios n, games n, sounds y + folder, go ahead y
-            code, out = run(self.root, answers="n\nn\ny\n" + "n\n" * 7 + "n\nn\ny\n" + f"{folder}/mine\ny\n")
+            code, out = run(self.root, answers="n\nn\ny\n" + "n\n" * 8 + "n\nn\ny\n" + f"{folder}/mine\ny\n")
             self.assertEqual(code, 0, out)
             self.assertIn("scroll.wav", out)      # the names are explained when asked
             self.assertIn("Arcade", out)
@@ -308,7 +308,7 @@ class ComponentTests(Drive):
 
     def test_questions_are_asked_and_answered(self):
         # look n, apple-music n, discord y, seven more n, bios n, games n, go ahead y
-        code, out = run(self.root, answers="n\nn\ny\n" + "n\n" * 7 + "n\nn\ny\n")
+        code, out = run(self.root, answers="n\nn\ny\n" + "n\n" * 8 + "n\nn\ny\n")
         self.assertEqual(code, 0, out)
         self.assertTrue((self.root / "roms/apps/Discord.sh").exists())
         self.assertFalse((self.root / "themes/emubox").exists())
@@ -317,7 +317,7 @@ class ComponentTests(Drive):
 class TypedAnswerTests(Drive):
     def test_wifi_is_asked_for_and_written(self):
         # look, apple-music, discord, store, vault n; wifi y + name + password; four more n; bios n, games n; go ahead y
-        code, out = run(self.root, answers="n\nn\nn\nn\nn\ny\nHome Net\np@ss {word}\n" + "n\n" * 4 + "n\nn\ny\n")
+        code, out = run(self.root, answers="n\nn\nn\nn\nn\ny\nHome Net\np@ss {word}\n" + "n\n" * 5 + "n\nn\ny\n")
         self.assertEqual(code, 0, out)
         self.assertEqual(self.target.conf_get("wifi.ssid"), "Home Net")
         self.assertEqual(self.target.conf_get("wifi.key"), "p@ss {word}")

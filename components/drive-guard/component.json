@@ -1,0 +1,11 @@
+{
+  "title": "Keep Batocera off the PC's other disks",
+  "question": "Stop Batocera from mounting or changing the PC's other disks (Windows, Linux) and other Batocera drives? Only USB drives will be offered as games drives.",
+  "default": true,
+  "order": 60,
+  "files": [
+    {"from": "files/boot-custom.sh", "to": "system/emubox/boot/boot-custom.sh", "mode": "755"},
+    {"from": "files/emubox_bootguard", "to": "system/services/emubox_bootguard", "mode": "755"}
+  ],
+  "services": ["emubox_bootguard"]
+}

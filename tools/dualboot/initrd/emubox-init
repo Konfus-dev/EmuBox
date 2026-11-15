@@ -1,0 +1,22 @@
+#!/bin/ash
+# EmuBox: runs Batocera's own /init with one step added just before it hands over to the system
+# (switch_root): /emubox-hook, which puts /boot/boot-custom.sh back when a Batocera update removed it.
+# If Batocera's /init ever changes so that step cannot be placed, it runs unchanged.
+# Only commands Batocera's early-boot busybox has are used (no sed, no chmod, no cmp).
+out=/init.emubox
+found=n
+: > "$out"
+while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+        *"exec switch_root /new_root /sbin/init"*)
+            echo "    /emubox-hook" >> "$out"
+            found=y
+            ;;
+    esac
+    echo "$line" >> "$out"
+done < /init
+# Batocera's early-boot tools have no chmod, so the copy is run through the shell.
+if [ "$found" = y ] && [ -x /bin/ash ]; then
+    exec /bin/ash "$out" "$@"
+fi
+exec /init "$@"

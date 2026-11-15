@@ -13,6 +13,7 @@ Commands for looking after a Batocera drive from a Linux PC. `./install` links t
 | `batocera-scraper`, `batocera-achievements` | set the ScreenScraper / RetroAchievements account |
 | `batocera-vm` | boot the drive in a window (QEMU), without restarting the PC |
 | `batocera-preview` | preview a theme in a window (needs a `~/batocera-preview` folder with Batocera's files) |
+| `dualboot/build-loader` | builds the boot loader for Batocera on the PC's own disk (a GRUB EFI program for the boot menu). It starts Batocera from its partition by filesystem id and puts `/boot/boot-custom.sh` back before Batocera starts when an update removed it |
 
 `dev/` holds helpers for working on EmuBox itself:
 
