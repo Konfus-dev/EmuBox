@@ -81,12 +81,13 @@ Each app adds its own on top (see its `app.json`): in Discord, X mutes, Y search
 through items, LT/RT switch servers; in Apple Music, X or Start plays and pauses, LB/RB change
 song, LT/RT change the volume, Y opens the keyboard.
 
-**Signing in without a keyboard.** The on-screen keyboard has a **PHONE** key: it shows a QR code,
+**Signing in without a keyboard.** In the on-screen keyboard, click the left stick again (or choose
+the **PHONE** key): it shows a QR code,
 and scanning it opens a small page on your phone; what you type there and send is typed into the
 app on the TV. It works on your own network, only while the code is on screen, at an address made
 for that one time; what you send is not encrypted on its way across your network, so use it at
-home, not on a network you do not trust. Apps that need a sign-in say so along the top the first
-few times they open (Discord's own sign-in page also has a QR code for its phone app).
+home, not on a network you do not trust. (Discord's own sign-in page also has a QR code for its
+phone app.)
 
 ### Two menus, two jobs
 
@@ -106,7 +107,10 @@ few times they open (Discord's own sign-in page also has a QR code for its phone
 
 - **Settings**: the system volume and mute, the menu sound set and its volume, the lights' basics,
   power mode, plane mode, stopping a stuck emulator, and **Open full settings** (Batocera's main menu).
-- **Apps**: open an app or a tool, or hide the apps and go back. **Record**: start and stop a recording.
+- **Apps**: open an app or a tool, or hide the apps and go back. **Capture**: take a screenshot (the menu
+  closes first, so it is not in the picture) and start or stop a recording. Both are kept under
+  **Captures** on the home screen (Screenshots and Recordings; on the drive they stay in Batocera's own
+  `screenshots` and `recordings` folders).
 - **Running**, while anything is: the emulator Batocera started (resume, its own settings menu,
   quit, force close) and each app that is open (resume, hide, force close).
 - Each tab's rows sit under headings (Sound, OMEN Lighting, System; Apps, Tools).
@@ -116,8 +120,8 @@ few times they open (Discord's own sign-in page also has a QR code for its phone
   network address.
 
 D-pad or stick moves, A presses, left/right changes a value, LB/RB change tab, B or Guide closes.
-The menu opens as the Guide button goes down; its values are read ahead of time and again each
-time it opens (a thin bar under the tabs moves while they are).
+The menu opens as the Guide button goes down; its values are read a few seconds after start-up and
+again each time it opens. The tab you are on is the bright one.
 
 Every app shows what the buttons do in a row along the bottom, and its window sits above that
 row. In any app Select+B hides it and Select+Start quits it; holding B hides it too (not in the

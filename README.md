@@ -7,7 +7,7 @@ puts your own BIOS files, games and menu sounds on the drive.
 
 | | | |
 | --- | --- | --- |
-| ![Start-up film](docs/Images/boot.jpg) | ![Home screen](docs/Images/home.jpg) | ![Guide menu with music and a call](docs/Images/guide.jpg) |
+| ![Start-up film](docs/Images/boot.jpg) | ![Home screen](docs/Images/home.jpg) | ![Guide menu, Capture tab](docs/Images/guide.jpg) |
 | Starting up | Home | The Guide menu |
 
 Everything goes into Batocera's data folder (the `SHARE` partition), which Batocera's updates
@@ -41,21 +41,27 @@ there is; `./install --remove <name>` takes something off.
 
 - **Tidy game names**: "Pokémon Emerald Version", not "Pokemon - Emerald Version (USA, Europe) [!]";
   the discs of a multi-disc game show once. Only the names in the game lists change, never the files,
-  and new games are tidied at the next start. To rename a game yourself on Batocera: highlight it,
+  and new games are tidied straight after Vault, itch.io or the Store installs them (others at the next
+  start). To rename a game yourself on Batocera: highlight it,
   open its options and choose *Edit this game's metadata*; EmuBox will not change that name again.
 - **Your PC's other disks stay untouched**: Batocera only offers USB drives as extra games drives and
   never mounts Windows, Linux or another Batocera drive; this keeps working through Batocera updates.
-- **The look**: the theme, a start-up film, glass-pane menus, and one row of indicators along the
-  top (controllers, free space, clock, network).
+- **The look**: the theme, a start-up film, glass-pane menus, each system's own console in its
+  row on the home screen, and one row of indicators along the top (controllers, free space, clock,
+  network).
 - **Apps**, a section of their own on the home screen: Discord and Apple Music, set up for the
   controller and already downloaded onto the drive, plus a Terminal, Files, and Claude Code.
 - **Store**: games (free games, Steam, Heroic, itch.io and **Vault**, your own list of store
   pages whose downloads go straight into your games, [more](docs/vault.md)) and apps (add
   YouTube, Twitch, Netflix and others, or anything from Flathub).
-- **Sign in from your phone**: the on-screen keyboard's PHONE key shows a QR code; scan it and
-  type on your phone.
-- **The Guide menu**: quick settings, your apps, and bars along the bottom for a call or the
-  music that is playing, each with its controls.
+- **Sign in from your phone**: in the on-screen keyboard (click the left stick), click the left stick
+  again, or choose PHONE: it shows a QR code; scan it and type on your phone. The keyboard's buttons
+  are listed along its bottom edge.
+- **The Guide menu**: quick settings, your apps, a Capture tab (take a screenshot, start or stop a
+  recording), and bars along the bottom for a call or the music that is playing, each with its
+  controls.
+- **Captures** on the home screen: your screenshots and recordings, in two folders, opened with
+  Batocera's own picture and video viewer.
 - **Settings** in Batocera's own menu: Start > Game Settings > EmuBox (menu sounds, apps, and the
   lights on an HP OMEN PC).
 - **Menu sounds and music**: sounds for moving, choosing and going back, with your own sound sets
