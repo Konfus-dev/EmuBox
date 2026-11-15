@@ -39,7 +39,7 @@ Make a folder `apps/<id>/` with two files.
 - `window`: how the app's window id starts. Find it on Batocera with `wlrctl toplevel list` while the app is open.
 - `pad`: what each button does. Leave `pad` out for a program that understands controllers
   itself (a game launcher); it then receives the controller untouched.
-  Otherwise: Buttons: `a b x y lb rb lt rt start select guide l3 r3 up down left right`,
+  Buttons: `a b x y lb rb lt rt start select guide l3 r3 up down left right`,
   and `select+<button>` for a second layer. Actions:
 
   | Action | Meaning |
