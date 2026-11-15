@@ -1,18 +1,21 @@
 # EmuBox
 
-A console-style setup for [Batocera](https://batocera.org): an Xbox-style look, Discord and Apple
-Music you can drive with a controller, a few quality-of-life settings, and an installer that also
-puts your own BIOS files and games on the drive.
+EmuBox turns a [Batocera](https://batocera.org) drive into something that feels like one console:
+a green dashboard look with its own start-up film, apps you drive with the controller (Discord,
+Apple Music, a web store browser), a quick menu on the Guide button, and an installer that also
+puts your own BIOS files, games and menu sounds on the drive.
 
-![The Apps tab in the in-game menu](docs/apps-tab.png)
+| | | |
+| --- | --- | --- |
+| ![Start-up film](docs/boot.jpg) | ![Home screen](docs/home.jpg) | ![Guide menu with music and a call](docs/guide.jpg) |
+| Starting up | Home | The Guide menu |
 
-Everything goes into Batocera's data folder (`/userdata`, the `SHARE` partition), the part
-Batocera's updates leave alone. Nothing in Batocera itself is changed, and anything installed can
-be taken off again.
+Everything goes into Batocera's data folder (the `SHARE` partition), which Batocera's updates
+leave alone. Nothing in Batocera itself is changed, and anything installed can be taken off again.
 
 ## Install
 
-**From a Linux PC**, with the Batocera drive plugged in and opened in the file manager:
+From a Linux PC, with the Batocera drive plugged in:
 
 ```sh
 git clone https://github.com/Konfus-dev/EmuBox
@@ -20,7 +23,7 @@ cd EmuBox
 ./install
 ```
 
-**On Batocera itself** (over SSH, or from a terminal):
+Or on Batocera itself (over SSH, or from a terminal):
 
 ```sh
 cd /userdata/system
@@ -28,147 +31,29 @@ curl -L https://github.com/Konfus-dev/EmuBox/archive/HEAD.tar.gz | tar xz
 EmuBox-*/install
 ```
 
-The installer finds the drive and asks what you want:
+The installer finds the drive, asks what you want, shows a summary and asks once more before
+changing anything. Run it again any time to add things or update. `./install --list` shows what
+there is; `./install --remove <name>` takes something off.
 
-```
-Install the Xbox-style look (green theme, menu colours, fonts and sounds)? [Y/n]
-Install Apple Music (the web player, set up for the controller)? [Y/n]
-Install Discord (voice and text chat, set up for the controller)? [Y/n]
-...
-Install BIOS files? [y/N] y
-  Where are they? A repository address or a folder: https://github.com/you/your-bios
-Systems in this library:
-   1) PlayStation (7 files, 4 MB)
-   2) PlayStation 2 (18 files, 36 MB)
-Which ones? Numbers like 1,3-5, or Enter for all:
-```
+## What you get
 
-It shows a summary and asks once more before changing anything. Run it again any time to add
-things or update; it only copies what is missing.
+- **The look**: the theme, a start-up film, glass-pane menus, and one row of indicators along the
+  top (controllers, free space, clock, network).
+- **Apps**: Discord and Apple Music, set up for the controller and already downloaded onto the
+  drive, and a **Store** with free games, Steam, Heroic, itch.io and **Vault**, your own list of
+  store pages whose downloads go straight into your games ([more](docs/vault.md)).
+- **The Guide menu**: quick settings, your apps, and bars along the bottom for a call or the
+  music that is playing, each with its controls.
+- **Settings** in Batocera's own menu: Start > Game Settings > EmuBox (menu sounds, apps, and the
+  lights on an HP OMEN PC).
+- **Menu sounds and music**: sounds for moving, choosing and going back, with your own sound sets
+  if you bring some, and menu music you can skip and pause.
+- **Extras**: a ROM-hack patcher, sensible play settings, Wi-Fi and account set-up, Bluetooth
+  controllers shared with the PC.
 
-| Command | Does |
-| --- | --- |
-| `./install` | ask about everything |
-| `./install --list` | show what can be installed, and what is |
-| `./install --remove discord` | take something off again |
-| `./install --yes --with look,discord --games /mnt/games` | no questions (for scripts) |
-| `./backup-games ~/my-games` | copy the games on a drive into a library folder |
+## More
 
-## What you can install
+- [Everything in detail](docs/details.md): each option, the buttons, BIOS and games libraries, sound sets, troubleshooting
+- [Vault](docs/vault.md) · [Adding your own apps and components](docs/extending.md) · [Helper commands for the PC](tools/README.md)
 
-| | |
-| --- | --- |
-| **Xbox-style look** | Theme for the menus, a start-up film (the orb waking, then the EmuBox name, with its own sound) that goes straight to the menus without Batocera's loading screen, the EmuBox name on the home screen and on an OMEN cooler's screen, matching colours for the in-game menu, fonts, sounds. One row along the top: a light per controller on the left; how full the drive is, the clock and the network on the right |
-| **Discord**, **Apple Music** | Open from Ports, or over a running game from the in-game menu's **Apps** tab. The installer puts each one's program on the drive (with `flatpak` on the PC), so there is no waiting in Batocera; without that, or with `--download-later`, it downloads the first time you open it |
-| **ROM-hack patcher** | Drop a `.ips`/`.bps`/`.ups` file in `patches` and it is applied at boot |
-| **Play settings** | Auto-save, rewind on 8/16-bit systems, a light CRT shader, a tidier network share |
-| **Bluetooth controllers** | Offered when preparing a drive on a PC with paired controllers: copies the pairings so the same controller works in Linux and Batocera without re-pairing |
-| **Wi-Fi** | Asks for the network name and password, so Batocera connects by itself |
-| **ScreenScraper account** | For box art, videos and descriptions; with the picture style and extras already chosen |
-| **RetroAchievements account** | Trophies for older games |
-| **Store** | A Store on the home screen: Batocera's catalogue of free games (browse and install with the controller), Steam, and Heroic for Epic and GOG. Each downloads itself the first time you open it |
-| **Vault** | In the Store: your own list of store pages, browsed with the controller. Downloads are noticed straight away, Vault asks which system to install them to, then moves them into your games. See [Vault](docs/vault.md) |
-| **OMEN lights** | Only offered on an HP OMEN PC that has the lights; fetched from [its own repository](https://github.com/Konfus-dev/OmenRGB-Controller) |
-
-### Controller buttons in the apps
-
-| Button | Does |
-| --- | --- |
-| D-pad | Move |
-| A / B | Select / back |
-| Right stick, R3 | Pointer, click |
-| Left stick | Scroll |
-| L3 | On-screen keyboard |
-| Guide, or Select+A | In-game menu |
-| Select+B | Hide the app and go back to the game (it keeps running) |
-| Select+Start | Quit the app |
-
-Each app adds its own on top (see its `app.json`): in Discord, X mutes, Y searches, LB/RB step
-through items, LT/RT switch servers; in Apple Music, X or Start plays and pauses, LB/RB change
-song, LT/RT change the volume, Y opens the keyboard.
-
-### Two menus, two jobs
-
-**Start** opens Batocera's main menu, where every setting lives. EmuBox's own are under
-**Game Settings**, in an EMUBOX block:
-
-- **MENU SOUNDS**: which sound set, the volume, and a switch each for moving (through lists and
-  pop-up menus alike), choosing, going back and opening the menu.
-- **APPS**: the menu music and whether it waits for your own, music dropping during a call and how
-  far, and the ad blocker for web apps.
-- **OMEN LIGHTS** (on a PC with them): on/off, brightness, following the game, a colour per light,
-  effects and their speed, the cooler's screen, its picture and fit.
-
-(Batocera's main menu cannot take a new entry of its own, so they sit inside Game Settings.)
-
-**Guide** opens EmuBox's own quick menu, over the menus or a running game:
-
-- **Settings**: the system volume and mute, the menu sound set and its volume, the lights' basics,
-  power mode, plane mode, stopping a stuck emulator, and **Open full settings** (Batocera's main menu).
-- **Apps**: open an app, or go back to the game. **Record**: start and stop a recording.
-- **Game**, while one runs: resume, the emulator's own options, quit.
-- Along the bottom, a bar for each thing that is live, with its controls: a call (microphone
-  switch), your music app (previous, pause, next), or the menus' own music (the same three).
-  Under them, the processor load and how full the drive is; along the top, the time and the
-  network address.
-
-D-pad or stick moves, A presses, left/right changes a value, LB/RB change tab, B or Guide closes.
-
-The menus' background music is played by EmuBox (Batocera's own is switched off) so that it can
-be shown, skipped and paused. It plays in the menus only, and waits while a music app of yours
-is playing.
-
-### Menu sounds
-
-EmuBox's own set is synthesised and is what you get unless you bring your own: the installer asks
-for a folder of sound sets (or take `--sounds FOLDER`), one sub-folder per set, named as it should
-be listed. What a file does is told by its name: `scroll.wav`, `select.wav`, `back.wav`,
-`menuopen.wav`, and `boot.wav` for the start-up film's sound (the installer makes that set's film
-from it; it needs GStreamer). A sound a set lacks is taken from EmuBox's. Until you choose a set in the menu, one with "xbox" in its name is used when there is one. Such sets are yours and
-stay out of the repository.
-
-## Your BIOS files and games
-
-These are yours, so they are not in this repository. Keep each in a **library**: a folder with one
-sub-folder per system, named as Batocera names them.
-
-```
-my-games/                      my-bios/
-  psx/Some Game (USA).chd        psx/scph5501.bin
-  psx/images/...                 ps2/ps2/SCPH-70012.bin     (as it sits in Batocera's bios folder)
-  snes/Another Game.sfc          segacd/bios_CD_U.bin
-```
-
-A library can be a folder on a drive or NAS, or a private git repository; the installer takes
-either. Multi-disc games count as one game. For games, another Batocera drive works as a library
-too. `./backup-games` makes a games library from a drive, with a `MANIFEST.tsv` of checksums and a
-`.gitignore` for the files too large for GitHub (those stay in the folder only).
-
-On Batocera itself there is no `git`: public GitHub repositories download directly, private ones
-need an access token (`https://TOKEN@github.com/you/repo`) or use a folder on a USB drive.
-
-## How it is put together
-
-```
-install, backup-games    what you run
-installer/               the installer (plain Python, nothing to install)
-apps/<name>/             one app: app.json (what to start, controller buttons) and tile.png
-components/<name>/       everything else: component.json says what to copy and switch on
-components/console/      the console tools every app shares: launcher, controller mapper, keyboard, menu tab
-tools/                   commands for looking after a drive from a Linux PC (see its README); dev/ for development
-tests/                   python3 -m unittest discover tests
-```
-
-Adding an app or a tweak means adding a folder; the installer picks it up and asks about it.
-See [docs/extending.md](docs/extending.md).
-
-## Good to know
-
-- Batocera runs everything as the administrator, and the apps run without the browser sandbox, as
-  Chromium-based programs must there. Treat the drive as a games machine, not a place for
-  sensitive browsing.
-- Controller buttons are read by their Xbox-pad labels.
-- Log on Batocera: `/userdata/system/logs/emubox.log` (`EMUBOX_DEBUG=1` logs every button).
-
-Licence: GPL-3.0-or-later. Fonts: SIL Open Font Licence (see `components/look/files/fonts`).
 EmuBox is not affiliated with Microsoft, Discord or Apple; it ships none of their artwork or software.
