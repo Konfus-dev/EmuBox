@@ -9,6 +9,13 @@ root=/userdata/system/emubox
 
 case "$1" in
     start)
+        # EmuBox's own Guide menu, waiting hidden for the Guide button (lib/guide.py).
+        # Started first, so the Guide button works as soon as possible after start-up.
+        if ! kill -0 "$(cat /var/run/emubox/guide.pid 2>/dev/null)" 2>/dev/null; then
+            ( [ -r /etc/profile.d/xdg.sh ] && . /etc/profile.d/xdg.sh
+              export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}"
+              setsid python3 "$root/lib/guide.py" >>/userdata/system/logs/emubox.log 2>&1 </dev/null & )
+        fi
         # Rebuilt at every boot from Batocera's own menu, so it follows updates.
         # The menu program reads its layout once, when it starts; if it is
         # already running and the layout changed, start it afresh (hidden).
@@ -24,12 +31,6 @@ case "$1" in
         if ! kill -0 "$(cat /var/run/emubox/menusounds.pid 2>/dev/null)" 2>/dev/null; then
             setsid python3 "$root/lib/menusounds.py" >>/userdata/system/logs/emubox.log 2>&1 &
             echo $! >/var/run/emubox/menusounds.pid
-        fi
-        # EmuBox's own Guide menu, waiting hidden for the Guide button (lib/guide.py).
-        if ! kill -0 "$(cat /var/run/emubox/guide.pid 2>/dev/null)" 2>/dev/null; then
-            ( [ -r /etc/profile.d/xdg.sh ] && . /etc/profile.d/xdg.sh
-              export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}"
-              setsid python3 "$root/lib/guide.py" >>/userdata/system/logs/emubox.log 2>&1 </dev/null & )
         fi
         # Earlier versions added a tab to Batocera's own quick menu: take that file away again.
         old=/userdata/system/configs/controlcenter/controlcenter.xml

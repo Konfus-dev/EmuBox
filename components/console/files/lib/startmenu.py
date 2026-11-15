@@ -61,6 +61,12 @@ def add_ons(folder: Path = HERE) -> list:
     return found
 
 
+def ascii_label(words: str) -> str:
+    import unicodedata
+    plain = unicodedata.normalize("NFKD", words).encode("ascii", "ignore").decode()
+    return plain.strip() or "Sound set"
+
+
 def build(sound_sets: list[str], extra: list[tuple[str, str]]) -> str:
     """The whole file. `extra` is [(setting name, <feature> xml)] from the add-ons."""
     own: list[tuple[str, str]] = []
@@ -68,7 +74,8 @@ def build(sound_sets: list[str], extra: list[tuple[str, str]]) -> str:
         if not kind:
             continue
         submenu = next(title for start, title in SUBMENUS.items() if name.startswith(start))
-        choices = [(one, one) for one in sound_sets] if name == "ui.sound_set" else None
+        # Labels in plain letters: Batocera's menu can crash on others ("Série" is shown as "Serie").
+        choices = [(ascii_label(one), one) for one in sound_sets] if name == "ui.sound_set" else None
         own.append((settings.conf_key(name), feature(settings.conf_key(name), label, submenu, what, kind, choices)))
     every = own + extra
     return "\n".join(

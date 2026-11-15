@@ -133,7 +133,8 @@ def look(words: list[str], state: dict) -> list[list[str]]:
     wanted = menu_music_wanted(switches, menusounds.game_running() is False, music_sounding(playing, words),
                                music.HELD.exists())
     paused = music.ask("get_property", "pause")
-    if paused is None and wanted and not state.get("player"):
+    player = state.get("player")
+    if paused is None and wanted and (player is None or player.poll() is not None):   # never started, or it died
         state["player"] = music.start()
     elif paused is not None and paused == wanted:
         music.ask("set_property", "pause", not wanted)

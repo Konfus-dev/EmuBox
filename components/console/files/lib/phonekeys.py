@@ -215,7 +215,7 @@ def screen() -> int:
         pixels = GdkPixbuf.Pixbuf.new_from_data(picture.tobytes(), GdkPixbuf.Colorspace.RGB, False, 8,
                                                 picture.width, picture.height, picture.width * 3)
         box.pack_start(Gtk.Image.new_from_pixbuf(pixels.copy()), False, False, 0)
-        box.pack_start(label("Scan this with your phone's camera (same Wi-Fi as this PC). Select a box on "
+        box.pack_start(label("Scan this with your phone's camera (on the same network as EmuBox). Select a box on "
                              "the page here, then type on the phone and press Send.", "words"), False, False, 0)
         box.pack_start(label("It works on your own network only while this is showing. What you send is "
                              "not encrypted on the way.", "small"), False, False, 0)

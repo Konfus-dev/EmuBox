@@ -28,12 +28,14 @@ DIRECTIONS = {"x": ("left", "right"), "y": ("up", "down")}
 
 
 class Pads:
-    def __init__(self, on_press: Callable[[str], None]):
+    def __init__(self, on_press: Callable[[str], None], paths: list[str] | None = None):
+        """Take the controllers: those at `paths` when the caller already knows them (opening every
+        input device to find them is slow on a PC with many), otherwise every one there is."""
         self.on_press = on_press
         self.devices: list[evdev.InputDevice] = []
         self.timers: dict[str, int] = {}
         self.stick = {"x": 0, "y": 0}
-        for path in evdev.list_devices():
+        for path in paths or evdev.list_devices():
             try:
                 device = evdev.InputDevice(path)
                 if e.BTN_SOUTH not in device.capabilities().get(e.EV_KEY, []):

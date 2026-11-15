@@ -38,7 +38,7 @@ class GuideTests(unittest.TestCase):
         self.model.open_on("Settings")
 
     def test_the_tabs_and_what_is_in_them(self):
-        self.assertEqual([t.title for t in self.tabs], ["Running", "Settings", "Apps", "Record"])
+        self.assertEqual([t.title for t in self.tabs], ["Running", "Settings", "Apps", "Capture"])
         settings = {row.label: row.controls for row in self.tabs[1].rows}
         self.assertEqual(list(settings), ["Sound", "Volume", "Mute", "Menu sounds", "Menu sound volume",
                                           "OMEN Lighting", "Lights", "Brightness", "Follow the game",
@@ -51,7 +51,7 @@ class GuideTests(unittest.TestCase):
         with_tools = guide.layout(APPS + [("terminal", {"name": "Terminal", "command": ["xterm"]})], lights=False)[0][2].rows
         self.assertEqual([row.label for row in with_tools], ["Apps", "Apple Music", "Discord", "Tools", "Terminal", "Return", "Hide apps"])
         self.assertFalse(with_tools[3].focusable)                                         # the highlight passes over a heading
-        self.assertEqual([t.title for t in guide.layout(APPS, lights=False)[0]], ["Running", "Settings", "Apps", "Record"])
+        self.assertEqual([t.title for t in guide.layout(APPS, lights=False)[0]], ["Running", "Settings", "Apps", "Capture"])
         self.assertNotIn("OMEN Lighting", [row.label for row in guide.layout(APPS, lights=False)[0][1].rows])
         volumes = [row.label for tab in self.tabs for row in tab.rows if "Volume" == row.label]
         self.assertEqual(volumes, ["Volume"])                                              # the system volume, once

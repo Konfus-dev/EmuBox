@@ -109,7 +109,11 @@ def read(file: Path | None = None, batocera: Path | None = None) -> dict[str, st
 def _save(file: Path, own: dict[str, str]) -> None:
     try:
         file.parent.mkdir(parents=True, exist_ok=True)
-        file.write_text("".join(f"{n}={v}\n" for n, v in sorted(own.items())))
+        # Written aside and then moved into place: several programs read this file all the time,
+        # and one must never see it half written (and save that back over the real one).
+        part = file.with_name(f".{file.name}.{os.getpid()}")
+        part.write_text("".join(f"{n}={v}\n" for n, v in sorted(own.items())))
+        os.replace(part, file)
     except OSError:
         pass
 

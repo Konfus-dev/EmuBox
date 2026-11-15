@@ -23,7 +23,8 @@ Your own sets go in /userdata/system/configs/emubox/sounds/<Name>/ and show up
 by that name; a sound a set lacks is taken from EmuBox. Until you choose one,
 an Xbox set is used when the drive has one (a folder with "xbox" in its name),
 else EmuBox's own. Each sound has its own
-on/off switch and they share one volume, all in the in-game menu's Apps tab.
+on/off switch and they share one volume, all under Start > Game Settings > EmuBox
+(and the Guide menu's Settings tab).
 
 Moving makes its sound here too, for the d-pad, the left stick and the arrow
 keys, so it is heard in the pop-up menus as well as in the lists (the menu
@@ -71,7 +72,7 @@ README = """Sound sets for the menus.
 Make a folder here, named as you want it listed (for example "My Sounds"), and put in any of:
   scroll.wav   select.wav   back.wav   menuopen.wav
 WAV files, 16-bit. After the next boot the folder is offered under
-in-game menu (Guide) > Apps > Menu sounds > Sound set. A sound the folder lacks is taken from EmuBox.
+Start > Game Settings > EmuBox > Sound set. A sound the folder lacks is taken from EmuBox.
 """
 
 

@@ -6,9 +6,9 @@
     bin/emubox-guide    show it, or hide it when it is showing (what the Guide button runs)
 
 Batocera's own quick menu cannot hold controls in its bottom strip, so EmuBox draws
-this one itself. Along the top: the time and the network address. Tabs: Settings (the
-few settings worth having one press away, and a way into the full ones), Apps, Record,
-and Game while a game is running. Along the bottom: a bar for each app that is doing
+this one itself. Along the top: the time and the network address. Tabs: Running (while a
+game or an app is open), Settings (the few settings worth having one press away, and a way
+into the full ones), Apps and Capture (a screenshot, or a recording). Along the bottom: a bar for each app that is doing
 something (a call with its microphone switch, the music with its buttons), then the
 processor load and how full the drive is.
 
@@ -41,6 +41,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 APP = ROOT / "bin" / "emubox-app"
 PID = Path("/var/run/emubox/guide.pid")
+WARM_UP_S = 6   # first reading of the values, while hidden: soon, but not in the busiest seconds of start-up
 REFRESH_S = 1.5
 TWICE_S = 0.6    # the Guide button heard again this soon after the menu changed is the same press
 LET_GO_S = 2.0   # after a press changed the menu, a toggle within this long is that press being let go
@@ -136,8 +137,19 @@ def apps(folder: Path | None = None) -> list[tuple[str, dict]]:
 # (python, bash, jq: read off a USB drive every time) made every opening of the menu a burst of
 # forty of them, which is felt as lag in everything else: the menus, the sounds, the buttons.
 
+_RUNNING: list = [0.0, ""]   # when running_game last asked, and the answer
+
+
 def running_game() -> str:
-    """The name of what Batocera's menu started (a game, or an app from its tile); '' for nothing."""
+    """The name of what Batocera's menu started (a game, or an app from its tile); '' for nothing.
+    Several rows ask during one reading of the values, so the answer is kept for a moment."""
+    if time.monotonic() - _RUNNING[0] < 1.5:
+        return _RUNNING[1]
+    _RUNNING[:] = [time.monotonic(), _ask_running_game()]
+    return _RUNNING[1]
+
+
+def _ask_running_game() -> str:
     try:
         with urllib.request.urlopen("http://127.0.0.1:1234/runningGame", timeout=1) as reply:
             game = json.loads(reply.read().decode(errors="replace") or "{}")
@@ -272,8 +284,15 @@ def layout(found: list[tuple[str, dict]] | None = None, lights: bool | None = No
                                       button("Force close", f"{a} close {app_id}", confirm=True)],
                         when=open_now))
     something_running = lambda: running_game() or " ".join(open_now_names())   # noqa: E731
-    record = [Row("Recording", [switch("batocera-record is_running | grep true", "batocera-record start", "batocera-record stop")])]
-    tabs = [Tab("Running", game, when=something_running), Tab("Settings", settings), Tab("Apps", app_rows), Tab("Record", record)]
+    # Screenshots go to /userdata/screenshots and recordings to /userdata/recordings (Batocera's own
+    # places), both shown under Captures on the home screen. The menu closes first, so it is not in
+    # the picture; a note says where the picture went.
+    reload = "curl -s -m 5 http://127.0.0.1:1234/reloadgames >/dev/null"
+    shot = (f"sleep 0.7; batocera-screenshot >/dev/null 2>&1 && {{ python3 {lib}/toast.py 'Screenshot saved to Captures' 3 & {reload}; }}")
+    record = [Row("Screenshot", [button("Take one", shot, close=True)]),
+              Row("Recording", [switch("batocera-record is_running | grep true", "batocera-record start",
+                                       f"batocera-record stop; {reload}")])]
+    tabs = [Tab("Running", game, when=something_running), Tab("Settings", settings), Tab("Apps", app_rows), Tab("Capture", record)]
 
     # One bar for each app that is doing something, with what you would want to reach for.
     bars = []
@@ -468,8 +487,9 @@ window { background-color: rgba(1, 12, 1, 0.55); }
 .tabs { padding: 14px 28px 0 28px; }
 .tab { font-family: "Michroma", sans-serif; font-size: 17px; color: #6fa85c; padding: 9px 26px; margin-right: 8px;
        border: 1px solid #2f7d1e; border-top: 3px solid #2f7d1e; border-bottom: none; background-color: rgba(4, 30, 4, 0.8); }
-.tab.open { color: #f0ffd7; border-color: #a8f65c; border-top-color: #c8f03c;
-            background-image: linear-gradient(to bottom, rgba(120, 255, 60, 0.30), rgba(4, 30, 4, 0)); }
+.tab.open { color: #0a2a00; font-weight: bold; border-color: #f0ffd7; border-top: 3px solid #f0ffd7;
+            background-image: linear-gradient(to bottom, #f0ff8c, #9adc20);
+            box-shadow: 0 0 14px rgba(200, 255, 80, 0.55); }
 .hint { font-size: 16px; color: #8fcf6a; }
 .page { padding: 14px 28px; border-top: 1px solid rgba(150, 245, 80, 0.4); }
 .row { padding: 3px 10px; border: 1px solid transparent; }
@@ -491,14 +511,34 @@ scrolledwindow, viewport { background-color: transparent; border: none; }
 .bar { padding: 6px 10px; margin-top: 6px; border: 1px solid rgba(150, 245, 80, 0.45); background-color: rgba(8, 52, 8, 0.6); }
 .bar.at { border-color: #c8f03c; background-color: rgba(150, 245, 80, 0.10); }
 .foot { padding: 8px 28px 10px 28px; border-top: 1px solid rgba(150, 245, 80, 0.4); margin-top: 8px; }
-.reading trough { min-height: 3px; min-width: 0; border: none; background-color: transparent; }
-.reading progress { min-height: 3px; }
 progressbar trough { background-color: rgba(4, 30, 4, 0.9); border: 1px solid #2f7d1e; min-height: 10px; min-width: 180px; }
 progressbar progress { background-image: linear-gradient(to bottom, #f0ff8c, #9adc20); border: none; min-height: 10px; }
 """
 
 
 def screen(show_now: bool) -> int:
+    # One Guide at a time. The boot service and the Guide button (bin/emubox-guide) can both start
+    # one while the other is still loading; the second hands its request to the first and goes.
+    import fcntl
+    PID.parent.mkdir(parents=True, exist_ok=True)
+    lock = open(PID.with_suffix(".lock"), "w")   # noqa: SIM115 (held for as long as we run)
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        if show_now:
+            for _ in range(80):              # until the first one has said who it is
+                try:
+                    os.kill(int(PID.read_text()), signal.SIGUSR2)
+                    break
+                except (OSError, ValueError):
+                    time.sleep(0.1)
+        return 0
+    # Known from now on, so the Guide button reaches us while we are still loading; a press
+    # that arrives before the screen is ready is kept and answered once it is.
+    pending: list[str] = []
+    signal.signal(signal.SIGUSR1, lambda *_: pending.append("toggle"))
+    signal.signal(signal.SIGUSR2, lambda *_: pending.append("show"))
+    PID.write_text(str(os.getpid()))
     os.environ.setdefault("XDG_RUNTIME_DIR", "/var/run")
     os.environ.setdefault("WAYLAND_DISPLAY", "wayland-0")
     if os.environ.get("HOME", "/") == "/":
@@ -554,9 +594,6 @@ def screen(show_now: bool) -> int:
             self.tab_box = Gtk.Box()
             self.tab_box.get_style_context().add_class("tabs")
             pane.pack_start(self.tab_box, False, False, 0)
-            self.reading = Gtk.ProgressBar()          # moves while the values are being read
-            self.reading.get_style_context().add_class("reading")
-            pane.pack_start(self.reading, False, False, 0)
             self.page_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
             self.page_box.get_style_context().add_class("page")
             self.scroller = Gtk.ScrolledWindow()      # a long tab scrolls under the bars rather than pushing them off
@@ -586,11 +623,13 @@ def screen(show_now: bool) -> int:
             GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGUSR2, self._asked_to_show)
             GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, self._quit)
             self.watched: dict[str, object] = {}
+            self.not_pads: set[str] = set()   # input devices already looked at that are no controller
+            self.other_pads: set[str] = set() # controllers without a Guide button: taken too when open
             self._watch_pads()
             GLib.timeout_add_seconds(3, self._watch_pads)
             # Read everything once while hidden, so the first opening is ready; not straight away,
             # while the system is still starting and has better things to do.
-            GLib.timeout_add_seconds(20, self._read_soon, True)
+            GLib.timeout_add_seconds(WARM_UP_S, self._read_soon, True)
             if show_now:
                 self._show()
 
@@ -600,9 +639,10 @@ def screen(show_now: bool) -> int:
             """Listen to every controller's Guide button ourselves, so the menu opens the moment it
             is pressed. (Batocera's hotkeys only tell us when it is let go; that later word is then
             ignored, see _toggle.) Controllers come and go, so this looks again every few seconds."""
-            for path in evdev.list_devices():
-                if path in self.watched:
-                    continue
+            present = set(evdev.list_devices())
+            self.not_pads &= present          # a device that went away may come back as something else
+            self.other_pads &= present
+            for path in sorted(present - self.not_pads - self.other_pads - set(self.watched)):
                 try:
                     device = evdev.InputDevice(path)
                     keys = device.capabilities().get(evdev.ecodes.EV_KEY, [])
@@ -611,6 +651,7 @@ def screen(show_now: bool) -> int:
                         GLib.io_add_watch(device.fd, GLib.IO_IN | GLib.IO_HUP | GLib.IO_ERR, self._on_watched, device)
                     else:
                         device.close()
+                        (self.other_pads if evdev.ecodes.BTN_SOUTH in keys else self.not_pads).add(path)
                 except OSError:
                     continue
             return True
@@ -662,18 +703,37 @@ def screen(show_now: bool) -> int:
 
         def _show(self) -> None:
             asked = time.monotonic()
-            GLib.idle_add(lambda: note(f"opened in {(time.monotonic() - asked) * 1000:.0f} ms") and False)
+            steps: list[str] = []
+
+            def step(name: str, since: list[float] = [asked]) -> None:
+                now = time.monotonic()
+                steps.append(f"{name} {(now - since[0]) * 1000:.0f}")
+                since[0] = now
+
+            def opened() -> bool:
+                took = (time.monotonic() - asked) * 1000
+                # The steps are worth a line only when opening was slow: they say where the time went.
+                note(f"opened in {took:.0f} ms" + (f" ({', '.join(steps)} ms)" if took > 400 else ""))
+                return False
+
+            GLib.idle_add(opened)
             self.showing = True
             self.changed_at = time.monotonic()
             # Drawn at once with what was last read (reading runs a dozen commands); fresh values follow.
             self.model.open_on("Running" if self.model.tabs[0].when and self.model.tabs[0].shown and self.read_once else "Settings")
             self._draw()
+            step("draw")
             self._read_soon()
             self._footer()
+            step("footer")
             GtkLayerShell.set_keyboard_mode(self, GtkLayerShell.KeyboardMode.EXCLUSIVE)
             self.show_all()
+            step("show")
             self._take_pads(20)
-            GLib.timeout_add(int(REFRESH_S * 1000), self._tick)
+            step("pads")
+            if getattr(self, "ticking", None):     # shown again before the last timer noticed the hide
+                GLib.source_remove(self.ticking)
+            self.ticking = GLib.timeout_add(int(REFRESH_S * 1000), self._tick)
 
         def _take_pads(self, tries: int) -> bool:
             """Take the controllers. Whoever had them (an app's pad mapper) lets go a moment after
@@ -682,7 +742,7 @@ def screen(show_now: bool) -> int:
                 return False
             if self.pads:
                 self.pads.release()
-            self.pads = Pads(self._on_pad)
+            self.pads = Pads(self._on_pad, [*self.watched, *sorted(self.other_pads)] or None)
             if not self.pads.devices and tries > 0:
                 GLib.timeout_add(100, self._take_pads, tries - 1)
             return False
@@ -807,6 +867,7 @@ def screen(show_now: bool) -> int:
 
         def _tick(self) -> bool:
             if not self.showing:
+                self.ticking = None
                 return False
             self._footer()
             self._read_soon()
@@ -816,8 +877,6 @@ def screen(show_now: bool) -> int:
             if self.busy or not (self.showing or hidden_too):
                 return False
             self.busy = True
-            self.reading.set_opacity(1)
-            GLib.timeout_add(90, self._pulse)
 
             def work() -> None:
                 began = time.monotonic()
@@ -830,7 +889,6 @@ def screen(show_now: bool) -> int:
 
             def done(address: str) -> bool:
                 self.busy = False
-                self.reading.set_opacity(0)
                 if not self.read_once:   # first reading: now we know whether to start on the Game tab
                     self.read_once = True
                     if self.model.tabs[0].shown:
@@ -879,11 +937,6 @@ def screen(show_now: bool) -> int:
             GLib.timeout_add(90, moving)
             threading.Thread(target=work, daemon=True).start()
 
-        def _pulse(self) -> bool:
-            if self.busy:
-                self.reading.pulse()
-            return self.busy
-
         # --- input ---------------------------------------------------------------------------
 
         def _act(self, key: str) -> None:
@@ -924,9 +977,9 @@ def screen(show_now: bool) -> int:
                 self._act(key)
             return True
 
-    PID.parent.mkdir(parents=True, exist_ok=True)
-    PID.write_text(str(os.getpid()))
     guide = Guide()
+    if pending and not guide.showing:
+        guide._show()
     try:
         Gtk.main()
     finally:

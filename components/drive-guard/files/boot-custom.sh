@@ -44,6 +44,29 @@ echo "$(date '+%F %T') passed on: $DEV" >> /var/log/emubox-drive-guard.log
 exec /usr/bin/batocera-storage-udev.real "$@"
 GUARD
     chmod 755 "$H"
+
+    # --- the start-up film keeps its sound (added 2026-11-15) ---
+    # Batocera sets up the sound output (S27audioconfig) just before the film starts (S28splash).
+    # When the TV's sound is not ready yet it keeps retrying in the background, and the retry that
+    # finally works switches the output while the film plays, cutting its sound off. So the film
+    # waits for that (10 seconds at most); when the first try works there is no wait at all.
+    S=/etc/init.d/S28splash
+    if [ -f "$S" ] && ! grep -q EMUBOX "$S"; then
+        cp -p "$S" /etc/init.d/.S28splash.batocera
+        cat > "$S" <<'SPLASH'
+#!/bin/sh
+# EMUBOX: wait for Batocera's sound set-up to finish, then start the film (see /boot/boot-custom.sh).
+if [ "$1" = "start" ]; then
+    n=0
+    while [ $n -lt 20 ] && pgrep -f /etc/init.d/S27audioconfig >/dev/null 2>&1; do
+        sleep 0.5; n=$((n + 1))
+    done
+    [ $n -gt 0 ] && echo "$(date '+%F %T') film waited $((n / 2)) s for the sound set-up" >> /var/log/emubox-boot.log
+fi
+exec /etc/init.d/.S28splash.batocera "$@"
+SPLASH
+        chmod 755 "$S"
+    fi
     exit 0
 fi
 
@@ -59,6 +82,12 @@ if [ "$1" = "stop" ] && [ -f /boot/boot.stale ] && grep -q '^boot-custom' /boot/
         sync
         mount -o remount,ro /boot
     fi
+fi
+
+# --- stop: keep this start's timings, for finding what is slow (Batocera keeps them in memory) ---
+if [ "$1" = "stop" ] && [ -d /userdata/system/logs ]; then
+    cat /var/run/boot.log /var/log/emubox-boot.log /var/log/emubox-drive-guard.log \
+        > /userdata/system/logs/last-boot.log 2>/dev/null
 fi
 
 # --- stop: shutdown tracer and Wi-Fi power-down (added 2026-11-13) ------------------------------
@@ -100,8 +129,5 @@ for n in /sys/class/net/wl*; do
 done
 [ -e /sys/class/net/wlan0 ] || say "wifi: no Wi-Fi interface is present now"
 
-# Show kernel messages on screen from here on, so a hang leaves its last lines visible.
-dmesg -n 7 2>/dev/null
-chvt 3 2>/dev/null
 say "handing over to unmount and power-off"
 exit 0

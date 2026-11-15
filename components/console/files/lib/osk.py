@@ -55,10 +55,11 @@ BOTTOM = [("ABC ⇧", "shift", 2), ("#+=", "symbols", 1), ("space", "space", 2),
 # --- the buttons (shown along the bottom, so nobody has to remember them) ---------
 PROMPTS = [("A", "Type"), ("B", "Backspace"), ("X", "Space"), ("Y", "Shift"),
            ("☰", "Enter"), ("LB RB", "Move cursor"), ("LT", "Symbols"), ("RT", "Tab"),
-           ("⧉", "Close")]
+           ("L3", "Phone"), ("⧉", "Close")]
 
 REPEAT_DELAY_MS, REPEAT_EVERY_MS = 380, 95  # holding a direction or backspace
 STICK_THRESHOLD = 0.6  # how far the stick must be pushed to count as a direction
+L3_SETTLE_S = 0.6      # a left-stick click this soon after opening is the one that opened us
 
 CSS = b"""
 window { background-color: rgba(2, 18, 2, 0.94); border-top: 2px solid #82e846; }
@@ -94,6 +95,7 @@ class Keyboard(Gtk.Window):
             Gdk.Screen.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
         self.phone = False  # set when the PHONE key ends the keyboard: the phone keyboard follows
+        self.opened_at = time.monotonic()
         self.shift = 0  # 0 off, 1 next letter only, 2 locked
         self.symbols = False
         self.row, self.col = 1, 0
@@ -108,6 +110,7 @@ class Keyboard(Gtk.Window):
         self._build()
         self.show_all()
 
+        self.trigger_axes: dict[str, dict[int, str]] = {}
         self.pads = self._grab_pads()
         self.held: dict[str, int] = {}  # action being repeated -> GLib timer
         self.stick = {"x": 0, "y": 0}
@@ -231,8 +234,11 @@ class Keyboard(Gtk.Window):
         evdev.ecodes.BTN_WEST: "shift", evdev.ecodes.BTN_NORTH: "space",
         evdev.ecodes.BTN_TL: "left", evdev.ecodes.BTN_TR: "right",
         evdev.ecodes.BTN_START: "enter", evdev.ecodes.BTN_SELECT: "close",
-        evdev.ecodes.BTN_THUMBL: "close", evdev.ecodes.BTN_MODE: "close",
+        evdev.ecodes.BTN_THUMBL: "phone-l3", evdev.ecodes.BTN_MODE: "close",
         evdev.ecodes.BTN_TL2: "symbols", evdev.ecodes.BTN_TR2: "tab",
+        # A d-pad that reports as buttons rather than as a hat.
+        evdev.ecodes.BTN_DPAD_UP: "up", evdev.ecodes.BTN_DPAD_DOWN: "down",
+        evdev.ecodes.BTN_DPAD_LEFT: "move-left", evdev.ecodes.BTN_DPAD_RIGHT: "move-right",
     }
     REPEATING = ("backspace", "left", "right", "up", "down", "move-left", "move-right")
 
@@ -241,6 +247,12 @@ class Keyboard(Gtk.Window):
             print("pad:", what, file=sys.stderr, flush=True)
         if what == "close":
             Gtk.main_quit()
+        elif what == "phone-l3":
+            # Clicking the left stick again: type on a phone. Not in the first moments, when it
+            # can be the click that opened the keyboard, heard a second time (a controller
+            # that shows up as two devices).
+            if time.monotonic() - self.opened_at > L3_SETTLE_S:
+                self.press("phone")
         elif what == "type":
             self.press_focused()
         elif what.startswith("move-") or what in ("up", "down"):
@@ -308,9 +320,9 @@ class Keyboard(Gtk.Window):
                     if value != self.stick[axis]:
                         self.stick[axis] = value
                         self._direction(axis, value)
-                elif event.code in (e.ABS_Z, e.ABS_RZ) and e.BTN_TL2 not in self.BUTTONS_PRESENT(device):
+                elif event.code in self._triggers(device):
                     # Triggers that report as axes (Xbox pads): treat a firm pull as a press.
-                    name = "symbols" if event.code == e.ABS_Z else "tab"
+                    name = "symbols" if self._triggers(device)[event.code] == "lt" else "tab"
                     info = device.absinfo(event.code)
                     pulled = event.value > (info.max + info.min) / 2
                     key = f"trigger-{name}"
@@ -321,9 +333,23 @@ class Keyboard(Gtk.Window):
                         self.held.pop(key, None)
         return True
 
-    @staticmethod
-    def BUTTONS_PRESENT(device) -> list[int]:
-        return device.capabilities().get(evdev.ecodes.EV_KEY, [])
+    def _triggers(self, device) -> dict[int, str]:
+        """Which axes are this controller's triggers (as pad.py works it out): Z/RZ on most pads
+        without trigger buttons; the brake and gas axes on an Xbox pad over Bluetooth in its plain
+        form, whose Z/RZ are the right stick. Worked out once per controller."""
+        known = self.trigger_axes.get(device.path)
+        if known is None:
+            e = evdev.ecodes
+            capabilities = device.capabilities()
+            axes = {code for code, _info in capabilities.get(e.EV_ABS, [])}
+            if e.ABS_RX not in axes and {e.ABS_Z, e.ABS_RZ} <= axes:
+                known = {e.ABS_BRAKE: "lt", e.ABS_GAS: "rt"}
+            elif e.BTN_TL2 in capabilities.get(e.EV_KEY, []):
+                known = {}
+            else:
+                known = {e.ABS_Z: "lt", e.ABS_RZ: "rt"}
+            self.trigger_axes[device.path] = known
+        return known
 
 
 def running_pid() -> int | None:
