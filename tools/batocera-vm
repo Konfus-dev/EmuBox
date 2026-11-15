@@ -162,17 +162,25 @@ cpus=$(( $(nproc) / 2 )); [ "$cpus" -gt 6 ] && cpus=6; [ "$cpus" -lt 2 ] && cpus
 # graphics card and its sound card is an emulated one, so sound here can stutter when the screen
 # is busy; that says nothing about the real thing. More buffer rides out more of it at the price
 # of sounds trailing the picture (BATOCERA_VM_AUDIO_US=200000); less does the opposite (=25000).
+# The phone keyboard (on-screen keyboard > PHONE) serves its page on ports 8377-8386. The virtual
+# machine's network is private to this PC, so those ports are passed on from this PC, and Batocera is
+# told this PC's address (emubox.phonehost=) to put in the QR code: a phone on the same network can
+# then reach it. Without a network address here the phone keyboard says it cannot be reached.
+host_ip=$(ip -4 route get 192.0.2.1 2>/dev/null | sed -n 's/.* src \([0-9.]*\).*/\1/p')
+phone_fwd=""
+for port in $(seq 8377 8386); do phone_fwd+=",hostfwd=tcp::$port-:$port"; done
+
 # BATOCERA_VM_DISPLAY and BATOCERA_VM_EXTRA are for troubleshooting, e.g.
 #   BATOCERA_VM_DISPLAY=sdl,gl=on batocera-vm
 qemu-system-x86_64 \
     -name "Batocera ($MODE mode)" -machine q35,accel=kvm -cpu host -smp "$cpus" -m 6G \
     -kernel "$run/linux" -initrd "$run/initrd.gz" \
-    -append "label=BATOCERA console=tty3 console=ttyS0 quiet loglevel=0 vt.global_cursor_default=0 WLR_NO_HARDWARE_CURSORS=1" \
+    -append "label=BATOCERA console=tty3 console=ttyS0 quiet loglevel=0 vt.global_cursor_default=0 WLR_NO_HARDWARE_CURSORS=1${host_ip:+ emubox.phonehost=$host_ip}" \
     -serial "unix:$shell,server,nowait" \
     -drive file="$disk",format=raw,if=none,id=stick,snapshot=$snap,cache=writeback \
     -device ich9-ahci,id=ahci -device ide-hd,drive=stick,bus=ahci.0 \
     -device qemu-xhci -device usb-kbd -device usb-tablet "${pad_args[@]}" \
-    -nic user,model=e1000e \
+    -nic "user,model=e1000e$phone_fwd" \
     -audiodev "pipewire,id=snd,out.latency=${BATOCERA_VM_AUDIO_US:-80000},timer-period=5000" \
     -device ich9-intel-hda -device hda-duplex,audiodev=snd \
     -device virtio-vga-gl -vga none -display "${BATOCERA_VM_DISPLAY:-gtk,gl=on,zoom-to-fit=on,full-screen=$full}" \

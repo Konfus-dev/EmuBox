@@ -59,7 +59,7 @@ PROMPTS = [("A", "Type"), ("B", "Backspace"), ("X", "Space"), ("Y", "Shift"),
 
 REPEAT_DELAY_MS, REPEAT_EVERY_MS = 380, 95  # holding a direction or backspace
 STICK_THRESHOLD = 0.6  # how far the stick must be pushed to count as a direction
-L3_SETTLE_S = 0.6      # a left-stick click this soon after opening is the one that opened us
+L3_SETTLE_S = 0.3      # a left-stick click this soon after opening is the one that opened us
 
 CSS = b"""
 window { background-color: rgba(2, 18, 2, 0.94); border-top: 2px solid #82e846; }
@@ -251,7 +251,12 @@ class Keyboard(Gtk.Window):
             # Clicking the left stick again: type on a phone. Not in the first moments, when it
             # can be the click that opened the keyboard, heard a second time (a controller
             # that shows up as two devices).
-            if time.monotonic() - self.opened_at > L3_SETTLE_S:
+            after = time.monotonic() - self.opened_at
+            # Noted in logs/emubox.log, so a click that seems lost can be explained.
+            print(f"{time.strftime('%F %T')} osk: left-stick click {after:.2f} s after opening"
+                  f"{'' if after > L3_SETTLE_S else ' (taken as the one that opened the keyboard)'}",
+                  file=sys.stderr, flush=True)
+            if after > L3_SETTLE_S:
                 self.press("phone")
         elif what == "type":
             self.press_focused()

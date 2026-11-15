@@ -625,3 +625,50 @@ class AudioTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SysLoad(unittest.TestCase):
+    """The Guide menu's memory and graphics card figures."""
+
+    def setUp(self):
+        import sysload
+        self.sysload = sysload
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+
+    def test_memory_in_use_is_total_minus_available(self):
+        info = Path(self.tmp.name) / "meminfo"
+        info.write_text("MemTotal:       8000000 kB\nMemFree:  100 kB\nMemAvailable:   6000000 kB\n")
+        self.assertEqual(self.sysload.memory(str(info)), (2000000 * 1024, 8000000 * 1024))
+        self.assertEqual(self.sysload.memory(str(Path(self.tmp.name) / "missing")), (0, 0))
+
+    def test_gpu_from_the_kernel_or_nothing(self):
+        busy = Path(self.tmp.name) / "card0" / "device"
+        busy.mkdir(parents=True)
+        (busy / "gpu_busy_percent").write_text("37\n")
+        gpu = self.sysload.Gpu(sysfs=str(Path(self.tmp.name) / "card*/device/gpu_busy_percent"), nvml="libnot-there.so")
+        self.assertEqual((gpu.source, gpu.percent()), ("kernel", 37))
+        none = self.sysload.Gpu(sysfs=str(Path(self.tmp.name) / "nothing*"), nvml="libnot-there.so")
+        self.assertIsNone(none.percent())
+
+
+class PhoneKeys(unittest.TestCase):
+    def test_the_vm_passes_the_pcs_address(self):
+        import phonekeys
+        with tempfile.NamedTemporaryFile("w", suffix="cmdline") as cmdline:
+            cmdline.write("label=BATOCERA quiet emubox.phonehost=192.168.0.70 loglevel=0\n")
+            cmdline.flush()
+            self.assertEqual(phonekeys.address(cmdline.name), "192.168.0.70")
+
+    def test_an_unknown_address_gets_a_page_not_an_empty_one(self):
+        import urllib.error
+        import urllib.request
+        import phonekeys
+        server = phonekeys.serve("right", lambda *_: None, host="127.0.0.1")
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        port = server.server_address[1]
+        with self.assertRaises(urllib.error.HTTPError) as gone:
+            urllib.request.urlopen(f"http://127.0.0.1:{port}/k/wrong")
+        with gone.exception:
+            self.assertIn(b"This code has expired", gone.exception.read())

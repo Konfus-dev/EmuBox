@@ -82,8 +82,16 @@ PAGE = """<!doctype html>
 """
 
 
-def address() -> str:
-    """This machine's address on the home network ('' when it has none)."""
+def address(cmdline: str = "/proc/cmdline") -> str:
+    """This machine's address on the home network ('' when it has none). In EmuBox's virtual
+    machine (tools/batocera-vm) that is the PC's address, which passes the page on: the
+    machine's own is private to the PC."""
+    try:
+        for word in open(cmdline).read().split():
+            if word.startswith("emubox.phonehost="):
+                return word.split("=", 1)[1]
+    except OSError:
+        pass
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
             probe.connect(("192.0.2.1", 9))      # nothing is sent: this only asks which address would be used
@@ -107,6 +115,16 @@ def typing(typer):
     return type_out
 
 
+GONE = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EmuBox keyboard</title></head>
+<body style="margin:0;padding:18px;background:#021202;color:#d6f9b8;font:18px system-ui,sans-serif">
+<h1 style="font-size:20px;color:#c8f03c">This code has expired</h1>
+<p>Each code works once, while it is on the TV. Open the keyboard on the TV again, choose PHONE
+(or click the left stick), and scan the new code.</p></body></html>
+"""
+
+
 def serve(token: str, on_type, on_done=lambda: None, ports=PORTS, host: str = "") -> ThreadingHTTPServer:
     """The page and what it sends, at /k/<token> only. Runs on its own thread; .shutdown() stops it."""
     path = f"/k/{token}"
@@ -126,8 +144,10 @@ def serve(token: str, on_type, on_done=lambda: None, ports=PORTS, host: str = ""
         def do_GET(self) -> None:   # noqa: N802
             if self.path == path:
                 self.reply(200, PAGE.encode(), "text/html; charset=utf-8")
-            else:
+            elif self.path == "/favicon.ico":
                 self.reply(404)
+            else:   # an old code, or one cut short: say so rather than show an empty page
+                self.reply(404, GONE.encode(), "text/html; charset=utf-8")
 
         def do_POST(self) -> None:   # noqa: N802
             if self.path != path + "/do":

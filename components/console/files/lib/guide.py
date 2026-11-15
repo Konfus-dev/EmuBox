@@ -36,6 +36,7 @@ from pathlib import Path
 from typing import Callable
 
 import space
+import sysload
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
@@ -512,6 +513,7 @@ scrolledwindow, viewport { background-color: transparent; border: none; }
 .bar.at { border-color: #c8f03c; background-color: rgba(150, 245, 80, 0.10); }
 .foot { padding: 8px 28px 10px 28px; border-top: 1px solid rgba(150, 245, 80, 0.4); margin-top: 8px; }
 progressbar trough { background-color: rgba(4, 30, 4, 0.9); border: 1px solid #2f7d1e; min-height: 10px; min-width: 180px; }
+.foot progressbar trough { min-width: 120px; }
 progressbar progress { background-image: linear-gradient(to bottom, #f0ff8c, #9adc20); border: none; min-height: 10px; }
 """
 
@@ -603,11 +605,21 @@ def screen(show_now: bool) -> int:
 
             foot = Gtk.Box(spacing=18)
             foot.get_style_context().add_class("foot")
-            foot.pack_start(label("CPU", "small"), False, False, 0)
-            self.cpu = Gtk.ProgressBar(valign=Gtk.Align.CENTER)
-            foot.pack_start(self.cpu, False, False, 0)
-            self.cpu_text = label("", "small")
-            foot.pack_start(self.cpu_text, False, False, 0)
+            # Processor, memory and graphics card load on the left (each a word, a bar and a figure),
+            # how full the drive is on the right. The GPU is left out where the PC cannot tell it.
+            def meter(word: str) -> tuple:
+                parts = (label(word, "small"), Gtk.ProgressBar(valign=Gtk.Align.CENTER), label("", "small", width_chars=4, xalign=0))
+                for part in parts:
+                    foot.pack_start(part, False, False, 0)
+                return parts
+
+            _, self.cpu, self.cpu_text = meter("CPU")
+            _, self.ram, self.ram_text = meter("RAM")
+            self.gpu_parts = meter("GPU")
+            for part in self.gpu_parts:      # shown or not by _footer alone, not by show_all()
+                part.set_no_show_all(True)
+            _, self.gpu, self.gpu_text = self.gpu_parts
+            self.gpu_load = sysload.Gpu()
             self.free_text = label("", "small")
             foot.pack_end(self.free_text, False, False, 0)
             self.free = Gtk.ProgressBar(valign=Gtk.Align.CENTER)
@@ -859,6 +871,15 @@ def screen(show_now: bool) -> int:
             percent = self.load.percent()
             self.cpu.set_fraction(percent / 100)
             self.cpu_text.set_text(f"{percent}%")
+            used, total = sysload.memory()
+            self.ram.set_fraction(used / total if total else 0)
+            self.ram_text.set_text(f"{round(100 * used / total)}%" if total else "")
+            gpu = self.gpu_load.percent()
+            for part in self.gpu_parts:
+                part.set_visible(gpu is not None)
+            if gpu is not None:
+                self.gpu.set_fraction(gpu / 100)
+                self.gpu_text.set_text(f"{gpu}%")
             total, free = space.usage()
             self.free.set_fraction(1 - free / total if total else 0)
             self.free_text.set_text(f"{space.size(free)} free" if total else "")
