@@ -115,7 +115,8 @@ time it opens (a thin bar under the tabs moves while they are).
 Every app shows what the buttons do in a row along the bottom, and its window sits above that
 row. In any app Select+B hides it and Select+Start quits it; holding B hides it too (not in the
 terminal, where B is Backspace). In a browser-based app B goes back, and on the page the app
-opened on it leaves. Opening an app shows "Opening ..." until its window is there.
+opened on it leaves. Opening an app shows "Opening ..." until its window is there (from the Guide menu, the menu itself
+says so the instant Open is pressed).
 
 The menus' background music is played by EmuBox (Batocera's own is switched off) so that it can
 be shown, skipped and paused. It plays in the menus only, and waits while a music app of yours

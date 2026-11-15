@@ -117,11 +117,13 @@ class Pad:
         self.strip: subprocess.Popen | None = None        # the row of button hints under the app
         self.in_front = False
         self.pointer_shown = False
+        self.layouts: dict[str, tuple[dict, dict]] = {}   # a controller's device file -> its axes (see _axes)
         self.home: str | None = None                      # the window's title on the page the app opened on
         self.b_since: float | None = None                 # when B went down, until it has been acted on
         self.hold_b = config.get("hold_b", True)          # false where B is held on purpose (Backspace in a terminal)
         keys = {e.ecodes[k] for action in self.map.values() if isinstance(action, list) for k in action}
         keys.add(e.KEY_BACK)                              # "web-back": a browser's own Back key
+        keys |= {e.KEY_LEFTALT, e.KEY_LEFTMETA, e.KEY_S, e.KEY_H}   # showing and hiding the pointer
         self.out = UInput(
             {e.EV_KEY: sorted(keys | set(MOUSE_BUTTONS.values())), e.EV_REL: [e.REL_X, e.REL_Y, e.REL_WHEEL]},
             name="EmuBox app controller",
@@ -268,20 +270,39 @@ class Pad:
                 return
             info = device.absinfo(event.code)
             span = (info.max - info.min) or 1
-            if event.code in (e.ABS_Z, e.ABS_RZ) and e.BTN_TL2 not in device.capabilities().get(e.EV_KEY, []):
-                name = "lt" if event.code == e.ABS_Z else "rt"  # triggers that are axes
+            triggers, sticks = self._axes(device)
+            if event.code in triggers:
+                name = triggers[event.code]
                 pulled = (event.value - info.min) / span > TRIGGER_PULLED
                 if pulled != (name in self.down):
                     self._button(name, pulled)
                 return
-            where = {e.ABS_X: ("left_stick", 0), e.ABS_Y: ("left_stick", 1),
-                     e.ABS_RX: ("right_stick", 0), e.ABS_RY: ("right_stick", 1)}.get(event.code)
+            where = sticks.get(event.code)
             if where:
                 stick, index = where
                 value = (event.value - info.min) / span * 2 - 1
                 self.sticks[stick][index] = 0.0 if abs(value) < STICK_DEADZONE else value
                 if self.map.get(stick) == "dpad":
                     self._stick_as_dpad(stick)
+
+    def _axes(self, device: evdev.InputDevice) -> tuple[dict, dict]:
+        """Which of this controller's axes are the triggers and which the sticks. Most pads have
+        the right stick on RX/RY and the triggers on Z/RZ (or as buttons). An Xbox pad over
+        Bluetooth without its own driver (its plain form: in a virtual machine, on some systems)
+        has the right stick on Z/RZ and the triggers on the brake and gas axes."""
+        known = self.layouts.get(device.path)
+        if known is None:
+            capabilities = device.capabilities()
+            axes = {code for code, _info in capabilities.get(e.EV_ABS, [])}
+            sticks = {e.ABS_X: ("left_stick", 0), e.ABS_Y: ("left_stick", 1)}
+            if e.ABS_RX not in axes and {e.ABS_Z, e.ABS_RZ} <= axes:
+                sticks.update({e.ABS_Z: ("right_stick", 0), e.ABS_RZ: ("right_stick", 1)})
+                triggers = {e.ABS_BRAKE: "lt", e.ABS_GAS: "rt"}
+            else:
+                sticks.update({e.ABS_RX: ("right_stick", 0), e.ABS_RY: ("right_stick", 1)})
+                triggers = {} if e.BTN_TL2 in capabilities.get(e.EV_KEY, []) else {e.ABS_Z: "lt", e.ABS_RZ: "rt"}
+            known = self.layouts[device.path] = (triggers, sticks)
+        return known
 
     def _move(self, dt: float) -> bool:
         """Pointer and wheel movement from the sticks. True while there is any."""
@@ -332,10 +353,20 @@ class Pad:
         if show == self.pointer_shown or "pointer" not in self.map.values():
             return
         self.pointer_shown = show
+        # The window manager's own shortcut for it (Alt+Super+S shows, Alt+Super+H hides), pressed
+        # on our keyboard and let go again in order. Batocera's batocera-mouse sends the same from
+        # a pretend keyboard of its own, which leaves Alt and Super held as far as the app can
+        # tell: every key we sent after it was then ignored.
+        chord = [e.KEY_LEFTALT, e.KEY_LEFTMETA, e.KEY_S if show else e.KEY_H]
         try:
-            subprocess.run(["batocera-mouse", "show" if show else "hide"], timeout=3, check=False,
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        except (OSError, subprocess.TimeoutExpired):
+            for key in chord:
+                self.out.write(e.EV_KEY, key, 1)
+                self.out.syn()
+            time.sleep(0.03)
+            for key in reversed(chord):
+                self.out.write(e.EV_KEY, key, 0)
+                self.out.syn()
+        except OSError:
             pass
 
     def _show_strip(self, show: bool) -> None:

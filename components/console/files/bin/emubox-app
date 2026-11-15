@@ -53,6 +53,7 @@ need_app() {
 
 # The app's window, as the compositor names it (empty when there is none).
 window() {
+    if web_app "$1"; then wlrctl toplevel list 2>/dev/null | awk -F': ' -v p="emubox-web-$1" '$1 == p { print $1; exit }'; return; fi
     # Its name for the compositor has the app's "window" word in it somewhere, in any case.
     wlrctl toplevel list 2>/dev/null | awk -F': ' -v p="$(conf "$1" .window)" 'p != "" && index(tolower($1), tolower(p)) > 0 { print $1; exit }'
 }
@@ -66,7 +67,8 @@ running() {
     if local_app "$1"; then kill -0 "$(cat "$RUN/$1.pid" 2>/dev/null)" 2>/dev/null
     else flatpak ps --columns=application 2>/dev/null | grep -qx "$(conf "$1" .flatpak)"; fi
 }
-installed() { local_app "$1" || flatpak info "$(conf "$1" .flatpak)" >/dev/null 2>&1; }
+here() { [ -d "/userdata/saves/flatpak/binaries/app/$1/current/active" ] || flatpak info "$1" >/dev/null 2>&1; }   # the folder answers at once
+installed() { local_app "$1" || here "$(conf "$1" .flatpak)"; }
 
 # download <name> <flatpak id>
 download() {
@@ -85,7 +87,7 @@ download() {
 # Download behind a full-screen notice (B cancels), so the screen never looks frozen.
 fetch() {
     local name=$1 flatpak=$2
-    flatpak info "$flatpak" >/dev/null 2>&1 && return
+    here "$flatpak" && return
     python3 "$ROOT/lib/notice.py" "Downloading $name" -- "$0" download "$name" "$flatpak" 2>>"$LOG"
     case $? in
     0 | 1 | 130) ;;   # done, failed (the notice said so), or cancelled with B
@@ -136,7 +138,9 @@ open_app() {
         touch "$RUN/$app.started"
         # A program can take ten seconds to show itself: say so meanwhile, so it never looks
         # as if nothing happened. (Up to a minute: a first start may fetch updates.)
-        python3 "$ROOT/lib/notice.py" "Opening $(conf "$app" .name)" -- "$0" await "$app" 2>>"$LOG" || await "$app"
+        # (The Guide menu says it itself when the app is opened from there: EMUBOX_NOTICE=no.)
+        if [ "$EMUBOX_NOTICE" = no ]; then await "$app"
+        else python3 "$ROOT/lib/notice.py" "Opening $(conf "$app" .name)" -- "$0" await "$app" 2>>"$LOG" || await "$app"; fi
         w=$(window "$app")
         [ -n "$w" ] || { echo "emubox-app: $app did not open a window; see $LOG" >&2; return 1; }
         if has_hints "$app"; then

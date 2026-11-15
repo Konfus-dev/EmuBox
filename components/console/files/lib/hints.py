@@ -79,7 +79,7 @@ def glyph(button: str) -> str:
 
 
 CSS = b"""
-window { background-color: rgba(11, 71, 11, 0.97); }
+window { background-color: #0b470b; }   /* solid: nothing behind it shows through or needs blending */
 * { font-family: "Rajdhani", sans-serif; color: #d6f9b8; }
 .glyph { background-color: #124a10; border: 2px solid #96f550; border-radius: 12px;
          font-family: "Michroma", sans-serif; font-size: 11px; padding: 1px 8px; color: #f0ffd7; }

@@ -62,6 +62,8 @@ class Control:
     more: str = ""
     close: bool = False            # hide the menu once pressed
     confirm: bool = False          # a second press is needed
+    busy: str = ""                 # said on the menu itself while `wait` runs, in place of closing at once
+    wait: str = ""                 # a command that ends when what the button started is on screen
     value: str = ""                # last value read
 
     @property
@@ -90,8 +92,8 @@ class Tab:
     shown: bool = True
 
 
-def button(label: str, do: str, close: bool = False, confirm: bool = False) -> Control:
-    return Control("button", label=label, do=do, close=close, confirm=confirm)
+def button(label: str, do: str, close: bool = False, confirm: bool = False, busy: str = "", wait: str = "") -> Control:
+    return Control("button", label=label, do=do, close=close, confirm=confirm, busy=busy, wait=wait)
 
 
 def switch(get: object, on: str, off: str) -> Control:
@@ -169,10 +171,13 @@ def layout(found: list[tuple[str, dict]] | None = None, lights: bool | None = No
 
     listed = [(app_id, app) for app_id, app in found if app.get("menu", True)]
     def opening(app_id: str, app: dict) -> str:
-        return f"{a} detach open {app_id}"
+        return f"EMUBOX_NOTICE=no {a} detach open {app_id}"   # the menu says "Opening ..." itself, at once
+
+    def open_button(words: str, app_id: str, app: dict) -> Control:
+        return button(words, opening(app_id, app), close=True, busy=f"Opening {app['name']}", wait=f"{a} await {app_id}")
 
     def opens(which: list[tuple[str, dict]]) -> list[Row]:
-        return [Row(app["name"], [button("Open", opening(app_id, app), close=True)]) for app_id, app in which]
+        return [Row(app["name"], [open_button("Open", app_id, app)]) for app_id, app in which]
 
     # Programs Batocera already has (Terminal, Files, Claude) are tools; the rest are apps.
     tools = [(app_id, app) for app_id, app in listed if app.get("command")]
@@ -196,7 +201,7 @@ def layout(found: list[tuple[str, dict]] | None = None, lights: bool | None = No
     open_apps = f"{a} status running"   # their names, one a line: asked once for all of them
     for app_id, app in found:
         open_now = f"{open_apps} | grep -qxF '{app['name']}' && echo yes"
-        game.append(Row(app["name"], [button("Resume", opening(app_id, app), close=True),
+        game.append(Row(app["name"], [open_button("Resume", app_id, app),
                                       button("Hide", f"{a} back {app_id}", close=True),
                                       button("Force close", f"{a} close {app_id}", confirm=True)],
                         when=open_now))
@@ -395,6 +400,7 @@ window { background-color: rgba(1, 12, 1, 0.55); }
 .row { padding: 3px 10px; border: 1px solid transparent; }
 .row.at { background-color: rgba(150, 245, 80, 0.08); border-color: rgba(150, 245, 80, 0.35); }
 .name { font-size: 20px; }
+.opening { font-family: "Michroma", sans-serif; font-size: 28px; color: #c8f03c; }
 .heading { padding: 12px 10px 2px 10px; border-bottom: 1px solid rgba(150, 245, 80, 0.3); margin-bottom: 3px; }
 .heading label { font-family: "Michroma", sans-serif; font-size: 14px; color: #c8f03c; }
 .value { font-size: 20px; color: #c8f03c; }
@@ -454,6 +460,7 @@ def screen(show_now: bool) -> int:
             self.showing = False
             self.deaf_until = 0.0
             self.changed_at = 0.0
+            self.waiting = None          # set while "Opening ..." is up
             self.busy = False            # a reading of the values is under way
             self.read_once = False       # until then we do not know whether a game is running
             self.model.tabs[0].shown = False
@@ -602,6 +609,7 @@ def screen(show_now: bool) -> int:
             return False
 
         def _hide(self) -> None:
+            self.waiting = None
             self.showing = False
             self.changed_at = time.monotonic()
             if self.pads:
@@ -745,12 +753,48 @@ def screen(show_now: bool) -> int:
                     if self.model.tabs[0].shown:
                         self.model.open_on("Running")
                 self.network.set_text(address or "No network")
-                if self.showing:
+                if self.showing and self.waiting is None:
                     self._draw()
                 return False
 
             threading.Thread(target=work, daemon=True).start()
             return False
+
+        def _wait_for(self, control: Control) -> None:
+            """Stay up saying what is being opened until it is on screen (its window is there), so
+            the press is answered at once; then get out of the way. B stops waiting."""
+            self.waiting = token = object()
+            for box in (self.page_box, self.bar_box):
+                for child in box.get_children():
+                    box.remove(child)
+            words = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18, valign=Gtk.Align.CENTER, halign=Gtk.Align.CENTER)
+            words.pack_start(label(control.busy, "opening"), False, False, 0)
+            bar = Gtk.ProgressBar()
+            words.pack_start(bar, False, False, 0)
+            words.pack_start(label("B  stop waiting", "hint"), False, False, 0)
+            self.page_box.pack_start(words, True, True, 60)
+            self.page_box.show_all()
+
+            def moving() -> bool:
+                if self.waiting is token:
+                    bar.pulse()
+                return self.waiting is token
+
+            def finished() -> bool:
+                if self.waiting is token:
+                    self._hide()
+                return False
+
+            def work() -> None:
+                try:
+                    subprocess.run(["bash", "-c", control.wait], timeout=75, check=False,
+                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                except (OSError, subprocess.TimeoutExpired):
+                    pass
+                GLib.idle_add(finished)
+
+            GLib.timeout_add(90, moving)
+            threading.Thread(target=work, daemon=True).start()
 
         def _pulse(self) -> bool:
             if self.busy:
@@ -762,11 +806,19 @@ def screen(show_now: bool) -> int:
         def _act(self, key: str) -> None:
             if not self.showing:
                 return
+            if self.waiting is not None:        # "Opening ...": only B, to stop waiting
+                if key in ("b", "guide"):
+                    self._hide()
+                return
+            pressed = self.model.current()
             result = self.model.press(key)
             for command in self.model.ran:
                 if command:
                     subprocess.Popen(["bash", "-c", command], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                      start_new_session=True)
+            if result == "close" and key == "a" and pressed is not None and pressed.wait:
+                self._wait_for(pressed)
+                return
             if result == "close":
                 if key == "guide":
                     self.deaf_until = time.monotonic() + LET_GO_S
