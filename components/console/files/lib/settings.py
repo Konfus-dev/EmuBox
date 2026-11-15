@@ -26,7 +26,7 @@ BATOCERA = Path(os.environ.get("EMUBOX_BATOCERA_CONF", "/userdata/system/batocer
 # name: (value when not set, label in the menu, kind, what it does)
 # kind: "switch", "slider" (0..100), "choice" (startmenu.py supplies the choices) or "" (not shown)
 KNOWN = {
-    "ui.sound_set": ("EmuBox", "SOUND SET", "choice", "Which set of sounds the menus use. Your own sets are the folders the installer copied."),
+    "ui.sound_set": ("", "SOUND SET", "choice", "Which set of sounds the menus use. Your own sets are the folders the installer copied. Auto: your Xbox set when there is one, else EmuBox's."),
     "ui.sound_volume": ("60", "VOLUME", "slider", "How loud the menu sounds are."),
     "ui.sound.scroll": ("on", "MOVING", "switch", "A sound when you move through a list or a menu."),
     "ui.sound.select": ("on", "CHOOSING", "switch", "A sound when you choose something."),

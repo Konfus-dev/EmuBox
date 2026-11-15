@@ -20,7 +20,9 @@ menuopen.wav, and optionally boot.mp4: the start-up film with that set's
 sound (made on a PC with the look's tools/splash.py --sound), used from the
 next start while the set is chosen. "EmuBox" is the active theme's own (art/sounds in its folder).
 Your own sets go in /userdata/system/configs/emubox/sounds/<Name>/ and show up
-by that name; a sound a set lacks is taken from EmuBox. Each sound has its own
+by that name; a sound a set lacks is taken from EmuBox. Until you choose one,
+an Xbox set is used when the drive has one (a folder with "xbox" in its name),
+else EmuBox's own. Each sound has its own
 on/off switch and they share one volume, all in the in-game menu's Apps tab.
 
 Moving makes its sound here too, for the d-pad, the left stick and the arrow
@@ -121,6 +123,15 @@ def sets(text: str, mine: Path = MINE, themes=THEMES) -> dict[str, Path]:
     return found
 
 
+def chosen_set(value: str, names) -> str:
+    """The set in use: the one chosen, or, with nothing chosen (or a set that has gone), an
+    Xbox set when the drive has one, else EmuBox's own."""
+    names = list(names)
+    if value in names:
+        return value
+    return next((name for name in names if "xbox" in name.lower()), BUILT_IN)
+
+
 def neighbour(chosen: str, names: list[str], forward: bool) -> str:
     """The set after (or before) the chosen one, going round; the built-in one when there is no list."""
     if not names:
@@ -180,12 +191,14 @@ def apply(text: str | None = None, mine: Path = MINE, themes=THEMES, switches: d
     folder = theme_folder(text, themes)
     if not folder or not (folder / "scroll-now.wav").exists():
         return False   # a theme that is not ours: its scroll sound is its own business
-    source = sounds_of(switches.get("ui.sound_set", BUILT_IN), sets(text, mine, themes)).get("scroll")
+    every = sets(text, mine, themes)
+    using = chosen_set(switches.get("ui.sound_set", ""), every)
+    source = sounds_of(using, every).get("scroll")
     if not source:
         return False
     # We play the moving sound ourselves, everywhere (lists and pop-up menus alike), so the
     # menu program's copy is kept silent: otherwise lists would sound twice.
-    start_up_film(switches.get("ui.sound_set", BUILT_IN), mine)
+    start_up_film(using, mine)
     return scaled(source, folder / "scroll-now.wav", 0)
 
 
@@ -287,7 +300,8 @@ def listen() -> int:
                 except OSError:
                     continue
             text = es_text()
-            files = sounds_of(settings.get("ui.sound_set"), sets(text))
+            every = sets(text)
+            files = sounds_of(chosen_set(settings.get("ui.sound_set"), every), every)
             inverted = es_setting("InvertButtons", text) == "true"
         if now >= next_look:
             next_look = now + LOOK_S
@@ -334,10 +348,10 @@ def main(argv: list[str]) -> int:
     if action == "sets":
         print("\n".join(sets(es_text())))
     elif action == "set-now":
-        chosen = settings.get("ui.sound_set")
-        print(chosen if chosen in sets(es_text()) else BUILT_IN)
+        print(chosen_set(settings.get("ui.sound_set"), sets(es_text())))
     elif action in ("next", "previous"):
-        settings.write("ui.sound_set", neighbour(settings.get("ui.sound_set"), list(sets(es_text())), action == "next"))
+        names = list(sets(es_text()))
+        settings.write("ui.sound_set", neighbour(chosen_set(settings.get("ui.sound_set"), names), names, action == "next"))
         apply()
     elif action == "set" and rest:
         settings.write("ui.sound_set", rest[0])

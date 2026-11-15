@@ -277,6 +277,10 @@ class AudioTests(unittest.TestCase):
             with wave.open(str(Path(folder) / "half.wav"), "rb") as wav:
                 self.assertEqual(int.from_bytes(wav.readframes(1), "little", signed=True), 10000)
             self.assertEqual(menusounds.volume({"ui.sound_volume": "250"}), 100)
+            self.assertEqual(menusounds.chosen_set("", found), "EmuBox")                    # nothing chosen, no Xbox set
+            self.assertEqual(menusounds.chosen_set("", ["EmuBox", "Battlefront", "OG Xbox"]), "OG Xbox")   # an Xbox set is the default
+            self.assertEqual(menusounds.chosen_set("Battlefront", ["EmuBox", "Battlefront", "OG Xbox"]), "Battlefront")
+            self.assertEqual(menusounds.chosen_set("Gone", ["EmuBox", "OG Xbox"]), "OG Xbox")
             names = list(found)
             self.assertEqual([menusounds.neighbour("EmuBox", names, True), menusounds.neighbour("My Set", names, True),
                               menusounds.neighbour("EmuBox", names, False), menusounds.neighbour("gone", names, True)],
