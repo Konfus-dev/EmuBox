@@ -197,8 +197,9 @@ media() {
 # One line for the in-game menu's status strip: nothing when there is nothing to say.
 status() {
     case $1 in
-    music) local title; title=$(media title)
-           [ -n "$title" ] && { [ -n "$(media sounding)" ] && echo "Now playing: $title" || echo "Paused: $title"; } ;;
+    music) local title; title=$(media title)   # kept short: a long line would push the menu off the screen
+           [ "${#title}" -gt 34 ] && title="${title:0:32}..."
+           [ -n "$title" ] && { [ -n "$(media sounding)" ] && echo "Playing: $title" || echo "Paused: $title"; } ;;
     call)  if pactl list short source-outputs 2>/dev/null | grep -q .; then
                pactl get-source-mute @DEFAULT_SOURCE@ 2>/dev/null | grep -q yes && echo "In a call - microphone muted" || echo "In a call"
            fi ;;

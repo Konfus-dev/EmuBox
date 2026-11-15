@@ -24,6 +24,17 @@ BATOCERA_MENU = """<features>
 \t\t<tab display="Shortcuts" target="Shortcuts" />
 \t</feature>
 \t<hgroup name="Shortcuts" display="Shortcuts"></hgroup>
+\t<vgroup name="Bottom bar" role="footer">
+\t\t<feature display="CPU:">
+\t\t\t<text display="12" />
+\t\t</feature>
+\t\t<feature display="Temp:">
+\t\t\t<text display="40" />
+\t\t</feature>
+\t\t<feature display="Resolution:">
+\t\t\t<text display="1280x720" />
+\t\t</feature>
+\t</vgroup>
 </features>
 """
 APPS = [
@@ -46,10 +57,17 @@ class MenuTests(unittest.TestCase):
         self.assertEqual(actions["Open the menu"], "hotkeygen --send menu")      # the emulator's menu, or Batocera's
         self.assertEqual([tab.get("display") for tab in root.iter("tab")], ["Shortcuts", "Apps"])
 
-    def test_what_is_going_on_is_shown_in_a_strip_along_the_bottom(self):
+    def test_what_is_going_on_is_shown_in_batoceras_own_bottom_bar(self):
         root = ET.fromstring(menu.build(BATOCERA_MENU, APPS))
-        strip = next(group for group in root.iter("vgroup") if group.get("role") == "footer")
-        self.assertEqual([t.get("display").split(" status ")[1].rstrip("}") for t in strip.iter("text")], ["music", "call"])
+        bars = [group for group in root.iter("vgroup") if group.get("role") == "footer"]
+        self.assertEqual(len(bars), 1)                       # a second bar pushes the menu off the screen
+        columns = list(bars[0].iter("feature"))
+        self.assertEqual(len(columns), 3)                    # and so do more than three things in it
+        self.assertEqual(columns[0].get("display"), "CPU:")
+        self.assertEqual([t.get("display").split(" status ")[1].rstrip("}") for t in bars[0].iter("text")
+                          if " status " in t.get("display")], ["music", "call"])
+        plain = "<features><feature name=\"shortcuts_tabs\"></feature></features>"
+        self.assertNotIn("status music", menu.build(plain, APPS))   # no bar we know: nothing is added
 
     def test_nothing_in_the_menu_is_left_blank_or_fancy(self):
         # Batocera refuses a whole menu over one empty label, and crashes on a label that is not

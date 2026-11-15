@@ -16,6 +16,7 @@ import glob
 import importlib.util
 import json
 import os
+import re
 import sys
 from xml.sax.saxutils import quoteattr
 
@@ -89,28 +90,35 @@ def apps_tab(listed: list[tuple[str, dict]], extras: bool = True) -> str:
     return "\n".join(rows) + "\n"
 
 
-def status_bar() -> str:
-    """A strip along the bottom of the menu for what is going on right now: the song, a call.
-    Each line shows itself only while it has something to say."""
+def with_status(menu: str) -> str:
+    """What is going on right now (the song, a call) in the strip along the bottom of the menu.
+
+    Batocera's own bottom bar is the place: a second bar, or more than three things in the one,
+    makes the whole menu wider than the screen. So the song and the call take the places of the
+    temperature and the resolution; the processor load stays. A menu without that bar is left as it is."""
     c = EMUBOX_APP
-    return "\n".join([
-        '\t<vgroup name="Now" role="footer">',
-        '\t\t<feature>',
-        f'\t\t\t<text display="${{{c} status music}}" refresh="2" align="left" />',
-        f'\t\t\t<text display="${{{c} status call}}" refresh="2" align="right" />',
-        '\t\t</feature>',
-        '\t</vgroup>',
-    ]) + "\n"
+    start = menu.find('role="footer"')
+    end = menu.find("</vgroup>", start)
+    if start < 0 or end < 0:
+        return menu
+    bar = menu[start:end]
+    kept = re.sub(r'[ \t]*<feature display="(?:Temp:|Resolution:)">.*?</feature>\n', "", bar, flags=re.S)
+    if kept == bar:
+        return menu   # not the bar we know: do not crowd it
+    ours = (f'\t\t<feature>\n\t\t\t<text display="${{{c} status music}}" refresh="2" align="left" />\n\t\t</feature>\n'
+            f'\t\t<feature>\n\t\t\t<text display="${{{c} status call}}" refresh="2" align="left" />\n\t\t</feature>\n\t')
+    return menu[:start] + kept + ours + menu[end:]
 
 
 def build(menu: str, found: list[tuple[str, dict]] | None = None, extras: bool = True) -> str:
     found = apps() if found is None else found
     listed = [(app_id, app) for app_id, app in found if app.get("menu", True)]
+    menu = with_status(menu)
     at = menu.index('name="shortcuts_tabs"')
     end = menu.index(TABS_END, at)
     menu = menu[:end] + '\t<tab display="Apps" target="Apps" />\n\t' + menu[end:]
     close = menu.rindex("</features>")
-    return menu[:close] + apps_tab(listed, extras) + status_bar() + menu[close:]
+    return menu[:close] + apps_tab(listed, extras) + menu[close:]
 
 
 def extra_rows(folder: str | None = None) -> list[str]:
