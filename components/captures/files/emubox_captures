@@ -1,0 +1,37 @@
+#!/bin/bash
+# EmuBox Captures: the two folders of the "Captures" home-screen entry show what is in
+# /userdata/screenshots and /userdata/recordings, where Batocera saves them. Batocera's menu skips
+# folders that are links, and folders named "Screenshots", so the folders are real ones named Shots
+# and Clips (their game list shows them as "Screenshots" and "Recordings"), Batocera's folders are
+# mounted onto them ("bind") at every start, and taken off again at shutdown so the drive unmounts
+# cleanly. Batocera's own
+# "Screenshots" entry is hidden by the installer (the same pictures would show twice).
+C=/userdata/roms/captures
+PAIRS="Shots:/userdata/screenshots Clips:/userdata/recordings"
+case "$1" in
+    start)
+        mkdir -p /userdata/screenshots /userdata/recordings "$C"
+        for old in Screenshots Recordings; do              # from an earlier version: links, or empty folders
+            [ -L "$C/$old" ] && rm -f "$C/$old"
+            [ -d "$C/$old" ] && rmdir "$C/$old" 2>/dev/null
+        done
+        for pair in $PAIRS; do
+            name=${pair%%:*}; dest=${pair#*:}
+            mkdir -p "$C/$name"
+            findmnt -rn --mountpoint "$C/$name" >/dev/null 2>&1 || mount --bind "$dest" "$C/$name"
+        done
+        # The menu has read its lists already: have it look again once it is ready.
+        ( for i in $(seq 60); do
+              curl -s --connect-timeout 1 http://127.0.0.1:1234/isIdle | grep -q true && break
+              sleep 2
+          done
+          curl -s http://127.0.0.1:1234/reloadgames >/dev/null ) &
+        ;;
+    stop)
+        for pair in $PAIRS; do
+            name=${pair%%:*}
+            findmnt -rn --mountpoint "$C/$name" >/dev/null 2>&1 && umount "$C/$name"
+        done
+        ;;
+esac
+exit 0

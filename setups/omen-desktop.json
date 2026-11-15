@@ -2,6 +2,7 @@
   "with": [
     "apple-music",
     "bluetooth",
+    "captures",
     "discord",
     "drive-guard",
     "look",

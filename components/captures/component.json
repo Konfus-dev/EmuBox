@@ -1,0 +1,20 @@
+{
+  "title": "Captures",
+  "question": "Add Captures to the home screen (your screenshots and recordings, in two folders)?",
+  "default": true,
+  "order": 65,
+  "files": [
+    {"from": "files/es_systems_captures.cfg", "to": "system/configs/emulationstation/es_systems_captures.cfg"},
+    {"from": "files/emubox_captures", "to": "system/services/emubox_captures", "mode": "755"}
+  ],
+  "folders": {
+    "Shots": {"system": "captures", "title": "Screenshots", "image": "files/screenshots.png",
+                    "description": "Pictures of the screen, taken with Screenshot in the Guide menu's Capture tab (or Batocera's own screenshot hotkey)."},
+    "Clips": {"system": "captures", "title": "Recordings", "image": "files/recordings.png",
+                   "description": "Videos of the screen, made with Recording in the Guide menu's Capture tab."}
+  },
+  "es_settings": {
+    "captures.FolderViewMode": "always"
+  },
+  "services": ["emubox_captures"]
+}

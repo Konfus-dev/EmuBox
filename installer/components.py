@@ -251,8 +251,8 @@ def install(component: Component, env: Env) -> Record:
     for name, folder in spec.get("folders", {}).items():   # a sub-section of a system: its picture and words
         system = f"roms/{folder.get('system', 'ports')}"
         record.files.append(target.copy_file(component.folder / folder["image"], f"{system}/images/{name}.png"))
-        gamelist.set_entry(target.path(f"{system}/gamelist.xml"), name,
-                           {"name": name, "desc": folder.get("description", ""), "image": f"./images/{name}.png"}, tag="folder")
+        gamelist.set_entry(target.path(f"{system}/gamelist.xml"), name,   # "title": shown instead of the folder's name
+                           {"name": folder.get("title", name), "desc": folder.get("description", ""), "image": f"./images/{name}.png"}, tag="folder")
     typed = env.answers.get(component.id, {})
     for key, value in spec.get("batocera_conf", {}).items():
         target.conf_set(key, _fill(value, typed))

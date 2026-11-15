@@ -128,8 +128,9 @@ def glass(draw_size, pts, top, bottom, fill_alpha, edge, glow, s, edge_w=2.5, gl
     im.alpha_composite(with_alpha(Image.new("RGB", n, edge), line))
     return im
 
-def pod(im, cx, cy, r, s, bright):
-    """Small glass sphere at the left of each row, with a dark socket in the middle."""
+def pod(im, cx, cy, r, s, bright, socket=True):
+    """Small glass sphere at the left of each row, with a dark socket in the middle (without one,
+    the theme sets the system's own picture into it)."""
     d = ImageDraw.Draw(im); cx, cy, r = cx * s, cy * s, r * s
     ring = Image.new("L", im.size, 0); ImageDraw.Draw(ring).ellipse((cx - r, cy - r, cx + r, cy + r), outline=255, width=3 * s)
     im.alpha_composite(glow_of(ring, (190, 255, 90) if bright else (120, 240, 60), 6 * s, 1.8 if bright else 1.1))
@@ -138,8 +139,9 @@ def pod(im, cx, cy, r, s, bright):
     im.alpha_composite(with_alpha(radial(im.size, (cx - r * 0.3, cy - r * 0.35), r * 1.5, inner, outer), disc, 245))
     d = ImageDraw.Draw(im)
     d.ellipse((cx - r, cy - r, cx + r, cy + r), outline=(215, 255, 150, 255) if bright else (130, 235, 70, 255), width=3 * s)
-    d.ellipse((cx - r * 0.5, cy - r * 0.5, cx + r * 0.5, cy + r * 0.5), fill=(2, 30, 2, 235), outline=(150, 240, 80, 255), width=2 * s)
-    d.ellipse((cx - r * 0.2, cy - r * 0.2, cx + r * 0.2, cy + r * 0.2), fill=(235, 255, 150, 255) if bright else (90, 200, 50, 255))
+    if socket:
+        d.ellipse((cx - r * 0.5, cy - r * 0.5, cx + r * 0.5, cy + r * 0.5), fill=(2, 30, 2, 235), outline=(150, 240, 80, 255), width=2 * s)
+        d.ellipse((cx - r * 0.2, cy - r * 0.2, cx + r * 0.2, cy + r * 0.2), fill=(235, 255, 150, 255) if bright else (90, 200, 50, 255))
     hi = Image.new("L", im.size, 0); ImageDraw.Draw(hi).ellipse((cx - r * 0.72, cy - r * 0.82, cx - r * 0.05, cy - r * 0.42), fill=170)
     im.alpha_composite(with_alpha(Image.new("RGB", im.size, (255, 255, 255)), hi.filter(ImageFilter.GaussianBlur(2 * s))))
 
@@ -156,9 +158,53 @@ def row(name, bright, w=806, h=119):
         glass((w, h), pts, (226, 250, 84), (150, 214, 28), 250, (245, 255, 185), (200, 255, 80), s, 3, 9, 1.9, im)
     else:
         glass((w, h), pts, (22, 110, 18), (6, 58, 6), 170, (120, 228, 66), (110, 240, 60), s, 2.5, 6, 0.9, im)
-    pod(im, 50, y, 38, s, bright)
+    pod(im, 50, y, 38, s, bright, socket=False)
     im.resize((w, h), Image.LANCZOS).save(f"{OUT}/{name}")
 row("row.png", False); row("row_selected.png", True)
+
+def badge(name, draw):
+    """A picture for the sphere of a home-screen row whose system has no console picture in
+    Batocera's Carbon theme: EmuBox's Store and Apps, and a socket for anything else."""
+    s = 4; n = 120; im = Image.new("RGBA", (n * s, n * s), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
+    ink, deep = (236, 255, 170, 255), (2, 30, 2, 235)
+    draw(d, s, ink, deep)
+    im = im.resize((n, n), Image.LANCZOS)
+    glow = glow_of(im.split()[3], (150, 255, 80), 4, 0.9)
+    out = Image.new("RGBA", (n, n), (0, 0, 0, 0)); out.alpha_composite(glow); out.alpha_composite(im)
+    os.makedirs(f"{OUT}/badges", exist_ok=True); out.save(f"{OUT}/badges/{name}.png")
+
+def _download(d, s, ink, deep):          # the Store: an arrow down into a tray
+    w = 7 * s
+    d.line((60 * s, 18 * s, 60 * s, 70 * s), fill=ink, width=w)
+    d.polygon([(36 * s, 52 * s), (84 * s, 52 * s), (60 * s, 80 * s)], fill=ink)
+    d.line([(22 * s, 74 * s), (22 * s, 96 * s), (98 * s, 96 * s), (98 * s, 74 * s)], fill=ink, width=w, joint="curve")
+
+def _tiles(d, s, ink, deep):             # Apps: a grid of rounded tiles
+    for x in (26, 64):
+        for y in (26, 64):
+            d.rounded_rectangle((x * s, y * s, (x + 30) * s, (y + 30) * s), radius=7 * s, fill=ink)
+
+def _socket(d, s, ink, deep):            # anything else: the sphere's old socket
+    d.ellipse((38 * s, 38 * s, 82 * s, 82 * s), fill=deep, outline=(150, 240, 80, 255), width=3 * s)
+    d.ellipse((52 * s, 52 * s, 68 * s, 68 * s), fill=(150, 240, 80, 255))
+
+def _camera(d, s, ink, deep):            # Captures: a camera
+    d.rounded_rectangle((16 * s, 36 * s, 104 * s, 94 * s), radius=10 * s, fill=ink)
+    d.rectangle((40 * s, 26 * s, 66 * s, 38 * s), fill=ink)
+    d.ellipse((42 * s, 44 * s, 78 * s, 80 * s), fill=deep)
+    d.ellipse((51 * s, 53 * s, 69 * s, 71 * s), fill=ink)
+
+def _film(d, s, ink, deep):              # Recordings: a strip of film with a record dot
+    d.rounded_rectangle((14 * s, 30 * s, 106 * s, 90 * s), radius=8 * s, fill=ink)
+    for x in range(22, 104, 14):
+        d.rectangle((x * s, 34 * s, (x + 7) * s, 40 * s), fill=deep)
+        d.rectangle((x * s, 80 * s, (x + 7) * s, 86 * s), fill=deep)
+    d.ellipse((47 * s, 47 * s, 73 * s, 73 * s), fill=(214, 40, 30, 255))
+
+badge("store", _download); badge("apps", _tiles); badge("default", _socket); badge("captures", _camera)
+# The two folders of Captures get the same pictures (camera, film), larger, for the list's media panel.
+for folder, draw in (("screenshots", _camera), ("recordings", _film)):
+    badge(f"folder-{folder}", draw)
 
 def shape(name, w, h, cut, top, bottom, alpha, edge=(130, 232, 70), glow=(110, 240, 60), strength=1.1, tab=0):
     s = 2; pts = cut_poly(8, 8, w - 8, h - 8, cut)
@@ -269,4 +315,5 @@ def system_logo(system, text):
     image.save(f"{OUT}/logos/{system}.png")
 system_logo("store", "STORE")
 system_logo("apps", "APPS")
+system_logo("captures", "CAPTURES")
 print("art written (sounds: see sounds.py)")
