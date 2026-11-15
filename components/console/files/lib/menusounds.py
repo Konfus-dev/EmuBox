@@ -32,8 +32,7 @@ menu program's own copy (art/sounds/scroll-now.wav in the theme) is kept silent.
 Every change, to the set, the volume or a switch, is heard at once.
 
 Silent whenever something else has the controller or the screen: during a
-game, inside an app, the in-game menu or the on-screen keyboard, and while
-your own music has made the menus quiet.
+game, inside an app, the Guide menu or the on-screen keyboard.
 """
 from __future__ import annotations
 
@@ -57,7 +56,6 @@ THEMES = (Path("/userdata/themes"), Path("/usr/share/emulationstation/themes"))
 MINE = Path("/userdata/system/configs/emubox/sounds")
 SPLASH = Path("/userdata/splash")                           # where Batocera looks for a start-up film
 OWN_FILM = Path("/userdata/system/emubox/splash/emubox.mp4")   # EmuBox's own, kept to go back to
-QUIET_FLAG = Path("/var/run/emubox/menus-quiet")   # kept by audio.py while your music plays
 RUNNING_GAME = "http://127.0.0.1:1234/runningGame"
 SOUTH, EAST, START = 304, 305, 315                 # BTN_SOUTH, BTN_EAST, BTN_START
 ENTER, ESCAPE, SPACE = 28, 1, 57                   # a keyboard's keys for the same three things
@@ -96,8 +94,8 @@ def sound_for(code: int, inverted: bool) -> str:
             ENTER: "select", ESCAPE: "back", SPACE: "menuopen"}.get(code, "")
 
 
-def should_play(kind: str, switches: dict[str, str], in_menus: bool, quiet: bool) -> bool:
-    return switches.get(f"ui.sound.{kind}", "on").lower() in settings.ON and in_menus and not quiet
+def should_play(kind: str, switches: dict[str, str], in_menus: bool) -> bool:
+    return switches.get(f"ui.sound.{kind}", "on").lower() in settings.ON and in_menus
 
 
 def theme_folder(text: str, themes=THEMES) -> Path | None:
@@ -268,7 +266,7 @@ def listen() -> int:
 
     def play(kind: str) -> None:
         switches = settings.read()
-        if kind not in files or not should_play(kind, switches, in_menus, QUIET_FLAG.exists()):
+        if kind not in files or not should_play(kind, switches, in_menus):
             return
         voice = "scroll" if kind == "scroll" else "button"
         before = playing.get(voice)

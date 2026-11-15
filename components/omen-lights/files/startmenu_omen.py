@@ -244,26 +244,35 @@ def features() -> list[tuple[str, str]]:
 
 
 def changed(chosen: dict[str, str]) -> None:
-    """Carry what was chosen in Batocera's menu over into the lights' settings file."""
-    def picked(name: str) -> str:
-        value = chosen.get(key(name), "")
-        return "" if value == "auto" else value
+    """Carry what was chosen in Batocera's menu over into the lights' settings file.
 
-    before = load()
+    Only what is new there: the Guide menu changes the same settings, and a choice in Batocera's
+    menu that we have already carried over must not undo a later change made elsewhere. What we
+    have carried over is noted in the file under "_seen" (the lights program ignores it)."""
+    values = load()
+    seen = dict(values.get("_seen", {}))
+    fresh = {name: value for name, value in chosen.items()
+             if name.startswith("omen_") and value not in ("", "auto") and seen.get(name) != value}
+    if not fresh:
+        return
+
+    def picked(name: str) -> str:
+        return fresh.get(key(name), "")
+
+    todo = []
     for name in SWITCHES:
         if picked(name):
-            put(name, picked(name) in ON)
+            todo.append(["set", name, "on" if picked(name) in ON else "off"])
     for name in SLIDERS:
         if picked(name):
             try:
-                put(name, max(0, min(100, int(float(picked(name))))))
+                todo.append(["set", name, str(max(0, min(100, int(float(picked(name))))))])
             except ValueError:
                 pass
-    todo = []
     if picked("colour-menus"):
         todo.append(["colour", "menus", picked("colour-menus")])
-    if picked("colour-all") and picked("colour-all") != before.get("_all", ""):
-        todo.append(["colour", "all", picked("colour-all")])     # only when it is newly chosen: it overrides each light
+    if picked("colour-all"):
+        todo.append(["colour", "all", picked("colour-all")])
     for zone in ZONES:
         if picked(f"colour-{zone}"):
             todo.append(["colour", zone, picked(f"colour-{zone}")])
@@ -284,11 +293,10 @@ def changed(chosen: dict[str, str]) -> None:
             run(command)
         except (IndexError, KeyError, ValueError):
             continue
-    if picked("colour-all"):
-        values = load()
-        if values.get("_all") != picked("colour-all"):
-            values["_all"] = picked("colour-all")    # a note to ourselves; the lights program ignores it
-            save(values)
+    values = load()
+    seen.update(fresh)
+    values["_seen"] = seen
+    save(values)
 
 
 def main(argv: list[str]) -> int:

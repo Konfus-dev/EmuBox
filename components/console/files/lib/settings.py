@@ -6,17 +6,15 @@
     settings.py is <name>       print "true" when it is on (nothing when off)
     settings.py set <name> <value>
 
-You change them in Batocera's own menu: Start > Game Settings > EmuBox (the
-entries are put there by startmenu.py). Batocera keeps what you choose in
-batocera.conf, as global.emubox_<name>; that is read here, and wins. Anything
-not chosen there has the value given below. `set` is for scripts: it writes
-/userdata/system/configs/emubox/settings.conf and, when Batocera already has a
-line for the setting, that line too.
+You change them in Batocera's own menu, Start > Game Settings > EmuBox (the
+entries are put there by startmenu.py; Batocera keeps those choices in
+batocera.conf as global.emubox_<name>), or in EmuBox's Guide menu, which keeps
+its changes in /userdata/system/configs/emubox/settings.conf. Whichever was
+changed last wins. Anything never chosen has the value given below.
 """
 from __future__ import annotations
 
 import os
-import re
 import sys
 from pathlib import Path
 
@@ -32,7 +30,8 @@ KNOWN = {
     "ui.sound.select": ("on", "CHOOSING", "switch", "A sound when you choose something."),
     "ui.sound.back": ("on", "GOING BACK", "switch", "A sound when you go back."),
     "ui.sound.menuopen": ("on", "OPENING THE MENU", "switch", "A sound when the main menu opens."),
-    "music.quiet_menu": ("on", "QUIET MENUS UNDER MY MUSIC", "switch", "While a music app plays, the menu music and sounds are silent."),
+    "music.menu": ("on", "MENU MUSIC", "switch", "Background music in the menus (Batocera's songs, or yours in the music folder)."),
+    "music.quiet_menu": ("on", "PAUSE IT WHILE MY MUSIC PLAYS", "switch", "While a music app plays, the menu music waits."),
     "call.lower_music": ("on", "TURN MUSIC DOWN DURING A CALL", "switch", "While an app uses the microphone, music and menus drop in volume."),
     "call.music_volume": ("20", "MUSIC VOLUME DURING A CALL", "slider", "How loud music stays during a call."),
     "web.block_ads": ("on", "BLOCK ADS IN WEB APPS", "switch", "Keeps adverts and trackers out of Vault and other web apps."),
@@ -55,33 +54,64 @@ def from_batocera(text: str, prefix: str = "global.") -> dict[str, str]:
     return found
 
 
-def read(file: Path | None = None, batocera: Path | None = None) -> dict[str, str]:
-    values = {name: known[0] for name, known in KNOWN.items()}
+def _own(file: Path) -> dict[str, str]:
+    found = {}
     try:
-        for line in (file or FILE).read_text().splitlines():
-            name, found, value = line.partition("=")
-            if found and not line.lstrip().startswith("#"):
-                values[name.strip()] = value.strip()
+        for line in file.read_text().splitlines():
+            name, has, value = line.partition("=")
+            if has and not line.lstrip().startswith("#"):
+                found[name.strip()] = value.strip()
     except OSError:
         pass
+    return found
+
+
+def _chosen(name: str, raw: str) -> str:
+    """A value as Batocera's menu saves it, in our terms ("" when nothing is chosen there)."""
+    kind = KNOWN[name][2]
+    if raw in ("", "auto"):
+        return ""
+    if kind == "switch":
+        return "on" if raw in ON else "off"
+    if kind == "slider":
+        try:
+            return str(int(float(raw)))
+        except ValueError:
+            return ""
+    return raw
+
+
+def read(file: Path | None = None, batocera: Path | None = None) -> dict[str, str]:
+    """Every setting's value. Two places can change one: Batocera's menu (batocera.conf) and
+    EmuBox itself (the Guide menu, scripts: our own file). Whichever changed it last wins: we note
+    what Batocera's menu said when we last looked ("seen.<name>"), so a different value there now
+    is a newer choice."""
+    file = file or FILE
+    own = _own(file)
     try:
-        chosen = from_batocera((batocera or BATOCERA).read_text(errors="replace"))
+        theirs = from_batocera((batocera or BATOCERA).read_text(errors="replace"))
     except OSError:
-        chosen = {}
+        theirs = {}
+    values, noted = {}, False
     for name, known in KNOWN.items():
-        value = chosen.get(conf_key(name), "")
-        if value in ("", "auto"):
-            continue
-        if known[2] == "switch":
-            values[name] = "on" if value in ON else "off"
-        elif known[2] == "slider":
-            try:
-                values[name] = str(int(float(value)))
-            except ValueError:
-                pass
-        else:
+        chosen = _chosen(name, theirs.get(conf_key(name), ""))
+        if chosen and chosen != own.get(f"seen.{name}", ""):
+            own[name], own[f"seen.{name}"], noted = chosen, chosen, True
+        values[name] = own.get(name, known[0])
+    for name, value in own.items():           # settings of other tools that keep theirs here
+        if name not in values and not name.startswith("seen."):
             values[name] = value
+    if noted:
+        _save(file, own)
     return values
+
+
+def _save(file: Path, own: dict[str, str]) -> None:
+    try:
+        file.parent.mkdir(parents=True, exist_ok=True)
+        file.write_text("".join(f"{n}={v}\n" for n, v in sorted(own.items())))
+    except OSError:
+        pass
 
 
 def get(name: str, file: Path | None = None) -> str:
@@ -94,28 +124,10 @@ def on(name: str, file: Path | None = None) -> bool:
 
 def write(name: str, value: str, file: Path | None = None, batocera: Path | None = None) -> None:
     file = file or FILE
-    kept = {}
-    try:
-        for line in file.read_text().splitlines():
-            key, found, old = line.partition("=")
-            if found and key.strip() != name:
-                kept[key.strip()] = old.strip()
-    except OSError:
-        pass
-    if name not in KNOWN or value != KNOWN[name][0]:
-        kept[name] = value
-    file.parent.mkdir(parents=True, exist_ok=True)
-    file.write_text("".join(f"{n}={v}\n" for n, v in sorted(kept.items())))
-    # Batocera's own line, when there is one, or it would go on winning.
-    batocera = batocera or BATOCERA
-    try:
-        text = batocera.read_text(errors="replace")
-        pattern = re.compile(rf"^global\.{re.escape(conf_key(name))}=.*$", re.MULTILINE)
-        if pattern.search(text):
-            shown = ("1" if value.lower() in ON else "0") if KNOWN.get(name, ("", "", ""))[2] == "switch" else value
-            batocera.write_text(pattern.sub(lambda _: f"global.{conf_key(name)}={shown}", text))
-    except OSError:
-        pass
+    read(file, batocera)          # first take note of what Batocera's menu says now, so ours counts as newer
+    own = _own(file)
+    own[name] = value
+    _save(file, own)
 
 
 def main(argv: list[str]) -> int:

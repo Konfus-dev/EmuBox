@@ -4,16 +4,14 @@
     audio.py           run until stopped (the emubox service starts it at boot)
     audio.py --once    look once, act, and print what was done
 
-Two rules, each with a switch in the in-game menu's Apps tab (see settings.py):
+- The menus' own music (music.py plays it) runs in the menus only: it stops for a game, and
+  while a music app of yours is playing, and comes back afterwards.
+- While an app is using the microphone (a call), your music and the menu music drop to a
+  fifth of their volume, and come back when the call ends.
 
-  - While a music app is playing, the menus are silent: Batocera's menu music
-    does not play over yours. (Its menu sounds come out of the same pipe, so
-    they are silent too.) They come back when the music pauses or stops.
-  - While an app is using the microphone (a call), music and the menus drop to
-    a fifth of their volume, and come back when the call ends.
-
-A music app is one whose app.json says "player": true. Everything here is
-undone when it no longer applies, and only what this program changed is put back.
+A music app is one whose app.json says "player": true. Each rule has a switch (see
+settings.py). Everything is undone when it no longer applies, and only what this program
+changed is put back.
 """
 from __future__ import annotations
 
@@ -25,12 +23,13 @@ import sys
 import time
 from pathlib import Path
 
+import menusounds
+import music
 import settings
 
 os.environ.setdefault("XDG_RUNTIME_DIR", "/var/run")
 ROOT = Path(__file__).resolve().parent.parent
-MENU = "emulationstation"
-QUIET_FLAG = Path("/var/run/emubox/menus-quiet")
+MENU_MUSIC = "emubox menu music"   # our own player (music.py), as the sound server names it
 EVERY_S = 2.0
 
 
@@ -64,41 +63,41 @@ def volume(stream: dict) -> int:
     return 100
 
 
+def music_sounding(playing: list[dict], music_words: list[str]) -> bool:
+    """Is a music app of yours playing right now?"""
+    return any(not s.get("corked") and any(word in who(s) for word in music_words) for s in playing)
+
+
+def menu_music_wanted(switches: dict[str, str], in_menus: bool, yours_playing: bool, held: bool) -> bool:
+    """Should the menus' own music be playing? In the menus only, not over your music, not when
+    you paused it by hand."""
+    on = lambda name: switches.get(name, "on").lower() in settings.ON   # noqa: E731
+    if not on("music.menu") or not in_menus or held:
+        return False
+    return not (yours_playing and on("music.quiet_menu"))
+
+
 def plan(playing: list[dict], recording: list[dict], music_words: list[str], switches: dict[str, str],
          state: dict) -> list[list[str]]:
-    """The pactl commands that bring the sound in line with the rules.
+    """The pactl commands that make music give way to a call, and bring it back afterwards.
 
     `playing` and `recording` are pactl's lists of sink inputs and source outputs.
-    `state` remembers what we changed: {"muted": {index}, "lowered": {index: volume before}}."""
-    muted, lowered = state.setdefault("muted", set()), state.setdefault("lowered", {})
+    `state` remembers what we changed: {"lowered": {index: volume before}}."""
+    lowered = state.setdefault("lowered", {})
     on = lambda name: switches.get(name, "").lower() in settings.ON   # noqa: E731
     commands: list[list[str]] = []
     here = {stream["index"] for stream in playing}
-    muted &= here                       # streams that ended take their changes with them
-    for index in set(lowered) - here:
+    for index in set(lowered) - here:   # streams that ended take their changes with them
         del lowered[index]
 
     callers = [who(stream) for stream in recording if "peak detect" not in str(stream.get("properties", {})).lower()]
     in_call = bool(callers)
-    menus = [s for s in playing if MENU in who(s)]
-    music = [s for s in playing if MENU not in who(s) and any(word in who(s) for word in music_words)]
-    music_sounding = any(not s.get("corked") for s in music)
-
-    for stream in menus:                # rule one: the menus are silent under your music
-        index = stream["index"]
-        if on("music.quiet_menu") and music_sounding:
-            if not stream.get("mute"):
-                commands.append(["set-sink-input-mute", str(index), "1"])
-                muted.add(index)
-        elif index in muted:
-            commands.append(["set-sink-input-mute", str(index), "0"])
-            muted.discard(index)
-
+    music = [s for s in playing if any(word in who(s) for word in list(music_words) + [MENU_MUSIC])]
     try:
         level = max(0, min(100, int(switches.get("call.music_volume", "20"))))
     except ValueError:
         level = 20
-    for stream in music + menus:        # rule two: music makes way for a call
+    for stream in music:
         index = stream["index"]
         if on("call.lower_music") and in_call:
             if index not in lowered and volume(stream) > level:
@@ -125,14 +124,19 @@ def listing(what: str) -> list[dict]:
 
 
 def look(words: list[str], state: dict) -> list[list[str]]:
-    commands = plan(listing("sink-inputs"), listing("source-outputs"), words, settings.read(), state)
+    switches = settings.read()
+    playing = listing("sink-inputs")
+    commands = plan(playing, listing("source-outputs"), words, switches, state)
     for command in commands:
         pactl(*command)
-    try:   # menusounds.py keeps quiet while the menus are muted
-        QUIET_FLAG.parent.mkdir(parents=True, exist_ok=True)
-        QUIET_FLAG.touch() if state.get("muted") else QUIET_FLAG.unlink(missing_ok=True)
-    except OSError:
-        pass
+    # The menus' own music: start the player the first time it is wanted, then pause and resume it.
+    wanted = menu_music_wanted(switches, menusounds.game_running() is False, music_sounding(playing, words),
+                               music.HELD.exists())
+    paused = music.ask("get_property", "pause")
+    if paused is None and wanted and not state.get("player"):
+        state["player"] = music.start()
+    elif paused is not None and paused == wanted:
+        music.ask("set_property", "pause", not wanted)
     return commands
 
 
@@ -144,6 +148,7 @@ def main(argv: list[str]) -> int:
         for command in look(words, state):
             print("pactl", *command)
         return 0
+    music.HELD.unlink(missing_ok=True)
     try:
         while True:
             menu.look()
@@ -151,11 +156,10 @@ def main(argv: list[str]) -> int:
             time.sleep(EVERY_S)
     except KeyboardInterrupt:
         pass
-    finally:   # leave nothing muted or lowered behind
-        for index in state.get("muted", set()):
-            pactl("set-sink-input-mute", str(index), "0")
+    finally:   # leave nothing lowered behind, and no music playing to nobody
         for index, before in state.get("lowered", {}).items():
             pactl("set-sink-input-volume", str(index), f"{before}%")
+        music.ask("quit")
     return 0
 
 

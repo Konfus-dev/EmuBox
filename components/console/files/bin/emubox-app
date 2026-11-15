@@ -12,7 +12,9 @@
 #   emubox-app running <app>         exit status 0 if it is running
 #   emubox-app play <app>            play/pause; opens the app first when it is not running
 #   emubox-app media PlayPause|Next|Previous|title|playing
-#   emubox-app status music|call     a line for the in-game menu's status strip (empty when idle)
+#   emubox-app status music|call     a line for the Guide menu's app bars (empty when idle)
+#   emubox-app power next|previous   step the processor's power mode
+#   emubox-app music line|toggle|next|previous   the menus' own background music (lib/music.py)
 #   emubox-app setting [is|get|set <name> [value]]   EmuBox's switches (see lib/settings.py)
 #   emubox-app pads                  note the connected controllers in the log (for troubleshooting)
 #   emubox-app list                  the apps that are set up
@@ -194,7 +196,16 @@ media() {
     esac
 }
 
-# One line for the in-game menu's status strip: nothing when there is nothing to say.
+# The processor's power mode, stepped through from the Guide menu.
+power() {
+    local modes=(highperformance balanced powersaver) at
+    at=$(cat "$RUN/power" 2>/dev/null); at=${at:-1}
+    case $1 in next) at=$(( (at + 1) % 3 )) ;; previous) at=$(( (at + 2) % 3 )) ;; *) echo "emubox-app power next|previous" >&2; exit 2 ;; esac
+    echo "$at" >"$RUN/power"
+    batocera-power-mode "${modes[$at]}" >/dev/null 2>&1
+}
+
+# One line for the Guide menu's app bars: nothing when there is nothing to say.
 status() {
     case $1 in
     music) local title; title=$(media title)   # kept short: a long line would push the menu off the screen
@@ -237,6 +248,8 @@ detach)   shift; setsid "$0" "$@" </dev/null >/dev/null 2>&1 & ;;
 mic)      mic "$2" ;;
 setting)  shift; exec python3 "$ROOT/lib/settings.py" "$@" ;;
 status)   status "$2" ;;
+power)    power "$2" ;;
+music)    shift; exec python3 "$ROOT/lib/music.py" "$@" ;;
 open)     need_app "$2"; open_app "$2" || exit 1; if [ "$3" = --wait ]; then wait_until_left "$2"; fi ;;
 back)     [ -n "$2" ] && need_app "$2"; back "$2" ;;
 close)    need_app "$2"; close_app "$2" ;;
@@ -248,5 +261,5 @@ media)    media "$2" ;;
 play)     need_app "$2"; play "$2" ;;
 pads)     pads ;;
 list)     list_apps ;;
-*)        sed -n '2,19s/^# \{0,1\}//p' "$0" >&2; exit 2 ;;
+*)        sed -n '2,21s/^# \{0,1\}//p' "$0" >&2; exit 2 ;;
 esac

@@ -206,7 +206,7 @@ class Pad:
             self.waiting_for = subprocess.Popen([sys.executable, OSK])
         elif action == "menu":
             self.hand_over()
-            subprocess.Popen(["batocera-controlcenter"], start_new_session=True)
+            subprocess.Popen([os.path.join(os.path.dirname(HERE), "bin", "emubox-guide")], start_new_session=True)
         elif action in ("back", "close"):
             self.hand_over()
             subprocess.Popen([EMUBOX_APP, action, self.name], start_new_session=True)

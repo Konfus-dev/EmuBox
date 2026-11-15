@@ -14,29 +14,12 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "components/console/files/lib"))
 import audio  # noqa: E402
-import menu  # noqa: E402
+import guide  # noqa: E402
 import menusounds  # noqa: E402
+import music  # noqa: E402
 import startmenu  # noqa: E402
 import settings  # noqa: E402
 
-BATOCERA_MENU = """<features>
-\t<feature name="shortcuts_tabs">
-\t\t<tab display="Shortcuts" target="Shortcuts" />
-\t</feature>
-\t<hgroup name="Shortcuts" display="Shortcuts"></hgroup>
-\t<vgroup name="Bottom bar" role="footer">
-\t\t<feature display="CPU:">
-\t\t\t<text display="12" />
-\t\t</feature>
-\t\t<feature display="Temp:">
-\t\t\t<text display="40" />
-\t\t</feature>
-\t\t<feature display="Resolution:">
-\t\t\t<text display="1280x720" />
-\t\t</feature>
-\t</vgroup>
-</features>
-"""
 APPS = [
     ("apple-music", {"name": "Apple Music", "player": True}),
     ("discord", {"name": "Discord", "voice": True}),
@@ -44,39 +27,86 @@ APPS = [
 ]
 
 
-class MenuTests(unittest.TestCase):
-    def test_the_apps_tab_has_the_apps_then_the_quick_controls(self):
-        root = ET.fromstring(menu.build(BATOCERA_MENU, APPS))
-        apps = next(group for group in root.iter("hgroup") if group.get("name") == "Apps")
-        rows = [(row.get("display"), [b.get("display") for b in row.iter("button")]) for row in apps.iter("feature")]
-        self.assertEqual(rows, [("Apple Music", ["Open", "Play", "Close"]), ("Discord", ["Open", "Close"]),
-                                ("Music", ["<", "||", ">"]), ("Mute my microphone", []), ("Volume", ["-", "+"]),
-                                ("Options and settings", ["Open the menu", "Back to game"])])
-        actions = {b.get("display"): b.get("action") for b in apps.iter("button")}
-        self.assertTrue(actions["Open"].endswith(" detach open discord"))       # the menu's 3-second limit
-        self.assertEqual(actions["Open the menu"], "hotkeygen --send menu")      # the emulator's menu, or Batocera's
-        self.assertEqual([tab.get("display") for tab in root.iter("tab")], ["Shortcuts", "Apps"])
+class GuideTests(unittest.TestCase):
+    def setUp(self):
+        self.tabs, self.bars = guide.layout(APPS, lights=True)
+        self.model = guide.Model(self.tabs, self.bars)
+        self.tabs[0].shown = False                        # no game running
+        for bar in self.bars:
+            bar.shown = False                             # no call, no music
+        self.model.open_on("Settings")
 
-    def test_what_is_going_on_is_shown_in_batoceras_own_bottom_bar(self):
-        root = ET.fromstring(menu.build(BATOCERA_MENU, APPS))
-        bars = [group for group in root.iter("vgroup") if group.get("role") == "footer"]
-        self.assertEqual(len(bars), 1)                       # a second bar pushes the menu off the screen
-        columns = list(bars[0].iter("feature"))
-        self.assertEqual(len(columns), 3)                    # and so do more than three things in it
-        self.assertEqual(columns[0].get("display"), "CPU:")
-        self.assertEqual([t.get("display").split(" status ")[1].rstrip("}") for t in bars[0].iter("text")
-                          if " status " in t.get("display")], ["music", "call"])
-        plain = "<features><feature name=\"shortcuts_tabs\"></feature></features>"
-        self.assertNotIn("status music", menu.build(plain, APPS))   # no bar we know: nothing is added
+    def test_the_tabs_and_what_is_in_them(self):
+        self.assertEqual([t.title for t in self.tabs], ["Game", "Settings", "Apps", "Record"])
+        settings = {row.label: row.controls for row in self.tabs[1].rows}
+        self.assertEqual(list(settings), ["Volume", "Mute", "Menu sounds", "Menu sound volume", "Lights", "Light brightness",
+                                          "Lights follow the game", "Power", "Plane mode", "Stuck emulator?", "Everything else"])
+        self.assertEqual(settings["Everything else"][0].do, "hotkeygen --send menu")      # Batocera's main menu
+        apps = [(row.label, [c.label for c in row.controls]) for row in self.tabs[2].rows]
+        self.assertEqual(apps, [("Apple Music", ["Open"]), ("Discord", ["Open"]), ("Game", ["Back to game"])])   # no Close, no Heroic
+        self.assertTrue(self.tabs[2].rows[0].controls[0].do.endswith(" detach open apple-music"))
+        self.assertEqual([t.title for t in guide.layout(APPS, lights=False)[0]], ["Game", "Settings", "Apps", "Record"])
+        self.assertNotIn("Lights", [row.label for row in guide.layout(APPS, lights=False)[0][1].rows])
+        volumes = [row.label for tab in self.tabs for row in tab.rows if "Volume" == row.label]
+        self.assertEqual(volumes, ["Volume"])                                              # the system volume, once
 
-    def test_nothing_in_the_menu_is_left_blank_or_fancy(self):
-        # Batocera refuses a whole menu over one empty label, and crashes on a label that is not
-        # plain ASCII when no language is set; either way the Guide button then does nothing.
-        for element in ET.fromstring(menu.build(BATOCERA_MENU, APPS)).iter():
-            for name in ("display", "action", "value"):
-                if name in element.attrib:
-                    self.assertTrue(element.get(name).strip(), ET.tostring(element, encoding="unicode")[:120])
-                    self.assertTrue(element.get(name).isascii(), element.get(name))
+    def test_each_busy_app_gets_a_bar_with_its_controls(self):
+        self.assertEqual([bar.label for bar in self.bars], ["Apple Music", "Discord", "Menu music"])
+        music, call, menu_music = self.bars
+        self.assertEqual([c.do.split()[-1] for c in menu_music.controls if c.kind == "button"], ["previous", "toggle", "next"])
+        self.assertEqual([c.label for c in music.controls if c.kind == "button"], ["<", "||", ">"])
+        self.assertEqual([c.kind for c in call.controls], ["text", "text", "switch"])
+        self.assertIn("status music", music.when)
+        self.assertIn("status call", call.when)
+
+    def test_moving_pressing_and_changing_values(self):
+        model = self.model
+        self.assertEqual(model.shown_tabs()[model.tab].title, "Settings")
+        self.assertEqual((model.press("right"), model.ran), ("ran", ["batocera-audio setSystemVolume +5"]))   # a value: left/right
+        model.press("down")
+        mute = model.current()
+        self.assertEqual((model.press("a"), model.ran, mute.value), ("ran", ["batocera-audio setSystemVolume mute"], "true"))
+        self.assertEqual((model.press("a"), model.ran), ("ran", ["batocera-audio setSystemVolume unmute"]))
+        model.press("up"); model.press("up")                                   # wraps to the last row
+        self.assertEqual(model.current().label, "Open full settings")
+        self.assertEqual((model.press("a"), model.ran), ("close", ["hotkeygen --send menu"]))
+        model.press("up")
+        self.assertEqual(model.current().label, "Stop it")
+        self.assertEqual((model.press("a"), model.ran), ("moved", []))         # asks first
+        self.assertEqual((model.press("a"), model.ran), ("ran", ["curl -s http://127.0.0.1:1234/emukill"]))
+        self.assertEqual(model.press("a"), "moved")                            # and asks again next time
+        self.assertEqual(model.press("rb"), "moved")
+        self.assertEqual((model.page().title, model.current().label), ("Apps", "Open"))
+        self.assertEqual(model.press("b"), "close")
+
+    def test_the_bars_are_reachable_only_while_they_show(self):
+        model = self.model
+        model.press("rb")                                                       # Apps: 3 rows
+        self.assertEqual(len(model.rows()), 3)
+        self.bars[0].shown = True                                               # music starts
+        self.assertEqual(len(model.rows()), 4)
+        for _ in range(3):
+            model.press("down")
+        self.assertEqual(model.current().label, "<")
+        model.press("right"); model.press("right"); model.press("right")        # stops at the last button
+        self.assertEqual((model.current().label, model.press("a"), model.ran[0].split()[-1]), (">", "ran", "Next"))
+        self.bars[0].shown = False                                              # music stops: the highlight falls back
+        self.assertIsNotNone(model.current())
+        self.assertEqual(len(model.rows()), 3)
+
+    def test_the_game_tab_comes_first_while_a_game_runs(self):
+        self.tabs[0].shown = True
+        self.model.open_on("Game")
+        self.assertEqual([c.label for c in self.model.controls()], ["Resume", "Emulator options", "Quit game"])
+        self.model.press("right"); self.model.press("right")
+        self.assertEqual(self.model.press("a"), "moved")                        # quitting asks first
+        self.assertEqual((self.model.press("a"), self.model.ran), ("close", ["hotkeygen --send exit"]))
+        hidden = [row.label for row in self.tabs[1].rows if row.when]
+        self.assertEqual(hidden, ["Everything else"])                           # full settings only from the menus
+
+    def test_every_label_is_plain(self):
+        for row in [r for t in self.tabs for r in t.rows] + self.bars:
+            self.assertTrue(row.label.isascii() and all(c.label.isascii() for c in row.controls), row.label)
 
 
 class StartMenuTests(unittest.TestCase):
@@ -91,18 +121,21 @@ class StartMenuTests(unittest.TestCase):
         self.assertEqual((features["emubox_web_block_ads"].get("submenu"), features["emubox_web_block_ads"].get("preset")), ("APPS", "switchon"))
         self.assertIn("omen_x", features)
 
-    def test_what_is_chosen_in_batoceras_menu_wins(self):
+    def test_the_later_change_wins_between_batoceras_menu_and_ours(self):
         with tempfile.TemporaryDirectory() as folder:
             mine, batocera = Path(folder) / "settings.conf", Path(folder) / "batocera.conf"
-            mine.write_text("ui.sound_volume=30\nweb.block_ads=off\n")
             batocera.write_text("audio.volume=45\nglobal.emubox_ui_sound_set=OG Xbox\nglobal.emubox_ui_sound_volume=80.000000\n"
                                 "global.emubox_ui_sound_back=0\nglobal.emubox_music_quiet_menu=auto\n")
             values = settings.read(mine, batocera)
             self.assertEqual((values["ui.sound_set"], values["ui.sound_volume"], values["ui.sound.back"]), ("OG Xbox", "80", "off"))
-            self.assertEqual((values["web.block_ads"], values["music.quiet_menu"], values["ui.sound.select"]), ("off", "on", "on"))
-            settings.write("ui.sound.back", "on", mine, batocera)      # a script's change reaches Batocera's line too
-            self.assertIn("global.emubox_ui_sound_back=1", batocera.read_text())
-            self.assertEqual(settings.read(mine, batocera)["ui.sound.back"], "on")
+            self.assertEqual((values["music.quiet_menu"], values["ui.sound.select"]), ("on", "on"))       # never chosen: defaults
+            settings.write("ui.sound_volume", "30", mine, batocera)            # changed in the Guide menu: ours is newer
+            self.assertEqual(settings.read(mine, batocera)["ui.sound_volume"], "30")
+            self.assertEqual(settings.read(mine, batocera)["ui.sound_set"], "OG Xbox")
+            batocera.write_text(batocera.read_text().replace("80.000000", "50.000000"))   # then changed in Batocera's menu
+            self.assertEqual(settings.read(mine, batocera)["ui.sound_volume"], "50")
+            settings.write("ui.sound_volume", "70", mine, batocera)
+            self.assertEqual(settings.read(mine, batocera)["ui.sound_volume"], "70")
 
     def test_a_change_in_batoceras_menu_is_noticed_and_passed_on(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -182,9 +215,11 @@ class OmenTests(unittest.TestCase):
         self.assertNotIn("auto-enabled", saved)                                  # not chosen: left at its default
         self.assertEqual(saved["zone-colours"], {"RAM/Stick 1": "#9B30FF"})
         self.assertEqual((saved["device-modes"]["RAM"], saved["device-speeds"]["RAM"], saved["lcd-fit"]), ("Rainbow", 100, "fit"))
-        self.omen.changed({"omen_colour_all": "Red", "omen_colour_ram_stick_1": "Purple"})
-        zones = self.saved()["zone-colours"]
-        self.assertEqual((zones["HP Omen 30L/Omen Logo"], zones["RAM/Stick 1"]), ("#FF1A1A", "#9B30FF"))   # one light keeps its own
+        self.omen.run(["set", "lights-brightness", "90"])                        # then changed in the Guide menu
+        self.omen.changed({"omen_lights_enabled": "0", "omen_lights_brightness": "40.000000"})   # Batocera's menu says nothing new
+        self.assertEqual(self.saved()["lights-brightness"], 90)
+        self.omen.changed({"omen_lights_brightness": "60"})                      # a new choice there wins again
+        self.assertEqual(self.saved()["lights-brightness"], 60)
 
 
 def stream(index, name, corked=False, mute=False, percent=100):
@@ -195,46 +230,70 @@ def stream(index, name, corked=False, mute=False, percent=100):
 class AudioTests(unittest.TestCase):
     ON = {"music.quiet_menu": "on", "call.lower_music": "on", "call.music_volume": "20"}
 
-    def test_the_menus_go_quiet_under_music_and_come_back(self):
-        state = {}
-        menus, song = stream(1, "EmulationStation"), stream(2, "Google Chrome")
-        self.assertEqual(audio.plan([menus], [], ["chrome"], self.ON, state), [])
-        self.assertEqual(audio.plan([menus, song], [], ["chrome"], self.ON, state), [["set-sink-input-mute", "1", "1"]])
-        menus["mute"] = True
-        self.assertEqual(audio.plan([menus, song], [], ["chrome"], self.ON, state), [])
-        song["corked"] = True   # paused
-        self.assertEqual(audio.plan([menus, song], [], ["chrome"], self.ON, state), [["set-sink-input-mute", "1", "0"]])
+    def test_the_menu_music_plays_in_the_menus_and_waits_for_yours(self):
+        wanted = audio.menu_music_wanted
+        self.assertTrue(wanted({}, in_menus=True, yours_playing=False, held=False))
+        self.assertFalse(wanted({}, in_menus=False, yours_playing=False, held=False))        # a game is running
+        self.assertFalse(wanted({}, in_menus=True, yours_playing=True, held=False))          # Apple Music is playing
+        self.assertTrue(wanted({"music.quiet_menu": "off"}, True, True, False))              # unless you want both
+        self.assertFalse(wanted({}, True, False, held=True))                                 # paused by hand
+        self.assertFalse(wanted({"music.menu": "off"}, True, False, False))
+        song = stream(2, "Google Chrome")
+        self.assertTrue(audio.music_sounding([stream(1, "EmulationStation"), song], ["chrome"]))
+        song["corked"] = True
+        self.assertFalse(audio.music_sounding([song], ["chrome"]))
 
-    def test_a_menu_someone_else_muted_is_left_muted(self):
-        state = {}
-        menus = stream(1, "EmulationStation", mute=True)
-        self.assertEqual(audio.plan([menus, stream(2, "Google Chrome")], [], ["chrome"], self.ON, state), [])
-        self.assertEqual(audio.plan([menus], [], ["chrome"], self.ON, state), [])
+    def test_the_menu_music_player_is_asked_and_answers(self):
+        import socket, threading
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "music.sock"
+            server = socket.socket(socket.AF_UNIX)
+            server.bind(str(path))
+            server.listen(4)
+            answers = {"pause": False, "media-title": "Bolt Action - Give Me.ogg"}
+
+            def serve():
+                for _ in range(2):
+                    link, _ = server.accept()
+                    asked = json.loads(link.makefile().readline())["command"]
+                    link.sendall(b'{"event":"idle"}\n' + json.dumps({"data": answers.get(asked[1]), "error": "success"}).encode() + b"\n")
+                    link.close()
+            threading.Thread(target=serve, daemon=True).start()
+            self.assertEqual(music.ask("get_property", "pause", sock=path), False)
+            self.assertEqual(music.title(path), "Bolt Action - Give Me")
+            self.assertIsNone(music.ask("get_property", "pause", sock=Path(folder) / "nobody.sock"))   # no player: no answer
+            self.assertEqual(music.line(Path(folder) / "nobody.sock"), "")
+        self.assertEqual((music.volume('<int name="MusicVolume" value="40" />'), music.volume("")), (40, 65))
+        with tempfile.TemporaryDirectory() as folder:
+            (Path(folder) / "a.ogg").write_text("x")
+            (Path(folder) / "notes.txt").write_text("x")
+            self.assertEqual(music.songs((str(Path(folder) / "empty"), folder)), [str(Path(folder) / "a.ogg")])
 
     def test_music_makes_way_for_a_call_and_returns_to_where_it_was(self):
         state = {}
         song, game, voice = stream(2, "Google Chrome", percent=80), stream(3, "retroarch"), stream(4, "Discord")
         mic = [stream(9, "Discord")]
-        self.assertEqual(audio.plan([song, game, voice], mic, ["chrome"], self.ON, state),
-                         [["set-sink-input-volume", "2", "20%"]])    # not the game, not the call itself
+        ours = stream(5, "EmuBox menu music", percent=65)
+        self.assertEqual(audio.plan([song, game, voice, ours], mic, ["chrome"], self.ON, state),
+                         [["set-sink-input-volume", "2", "20%"], ["set-sink-input-volume", "5", "20%"]])   # not the game, not the call
+        self.assertEqual(audio.plan([song, game, voice], mic, ["chrome"], self.ON, state), [])
         song["volume"]["front-left"]["value_percent"] = "20%"
         self.assertEqual(audio.plan([song, game, voice], mic, ["chrome"], self.ON, state), [])
         self.assertEqual(audio.plan([song, game], [], ["chrome"], self.ON, state), [["set-sink-input-volume", "2", "80%"]])
 
     def test_switched_off_means_hands_off(self):
         off = {"music.quiet_menu": "off", "call.lower_music": "off"}
-        streams = [stream(1, "EmulationStation"), stream(2, "Google Chrome")]
+        streams = [stream(1, "EmuBox menu music"), stream(2, "Google Chrome")]
         self.assertEqual(audio.plan(streams, [stream(9, "Discord")], ["chrome"], off, {}), [])
 
     def test_menu_sounds_follow_the_buttons_and_know_when_to_keep_quiet(self):
         self.assertEqual([menusounds.sound_for(code, False) for code in (304, 305, 315, 307)], ["select", "back", "menuopen", ""])
         self.assertEqual([menusounds.sound_for(code, True) for code in (304, 305)], ["back", "select"])
         self.assertEqual([menusounds.sound_for(code, True) for code in (28, 1, 57)], ["select", "back", "menuopen"])   # keyboard
-        self.assertTrue(menusounds.should_play("select", {}, in_menus=True, quiet=False))
-        self.assertFalse(menusounds.should_play("select", {}, in_menus=False, quiet=False))    # a game is running
-        self.assertFalse(menusounds.should_play("select", {}, in_menus=True, quiet=True))      # your music is playing
-        self.assertFalse(menusounds.should_play("back", {"ui.sound.back": "off"}, True, False))
-        self.assertTrue(menusounds.should_play("select", {"ui.sound.back": "off"}, True, False))   # each has its own switch
+        self.assertTrue(menusounds.should_play("select", {}, in_menus=True))
+        self.assertFalse(menusounds.should_play("select", {}, in_menus=False))                 # a game is running
+        self.assertFalse(menusounds.should_play("back", {"ui.sound.back": "off"}, True))
+        self.assertTrue(menusounds.should_play("select", {"ui.sound.back": "off"}, True))      # each has its own switch
 
     def test_moving_is_heard_from_the_dpad_the_stick_and_the_arrow_keys(self):
         move = menusounds.direction
@@ -297,15 +356,14 @@ class AudioTests(unittest.TestCase):
             self.assertTrue(menusounds.start_up_film("EmuBox", mine, splash, own))
             self.assertEqual((splash / "emubox.mp4").read_text(), "emubox film")
 
-    def test_settings_are_kept_only_when_they_differ(self):
+    def test_a_setting_written_is_the_setting_read(self):
         with tempfile.TemporaryDirectory() as folder:
-            file = Path(folder) / "sub" / "settings.conf"
-            self.assertTrue(settings.on("web.block_ads", file))
-            settings.write("web.block_ads", "off", file)
-            self.assertFalse(settings.on("web.block_ads", file))
-            self.assertEqual(file.read_text(), "web.block_ads=off\n")
-            settings.write("web.block_ads", "on", file)
-            self.assertEqual(file.read_text(), "")
+            file, none = Path(folder) / "sub" / "settings.conf", Path(folder) / "none.conf"
+            self.assertEqual(settings.read(file, none)["web.block_ads"], "on")
+            settings.write("web.block_ads", "off", file, none)
+            self.assertEqual(settings.read(file, none)["web.block_ads"], "off")
+            settings.write("web.block_ads", "on", file, none)
+            self.assertEqual(settings.read(file, none)["web.block_ads"], "on")
 
     def test_adverts_are_turned_into_rules(self):
         import webview

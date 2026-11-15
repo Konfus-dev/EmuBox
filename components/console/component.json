@@ -15,6 +15,10 @@
       "from": "files/services/emubox",
       "to": "system/services/emubox",
       "mode": "755"
+    },
+    {
+      "from": "files/hotkeygen/common_context.conf",
+      "to": "system/configs/hotkeygen/common_context.conf"
     }
   ],
   "services": [
@@ -24,7 +28,8 @@
     "system/console-apps",
     "system/services/console_apps",
     "roms/ports/Install Discord and Apple Music.sh",
-    "roms/ports/EmuBox Settings.sh"
+    "roms/ports/EmuBox Settings.sh",
+    "system/emubox/lib/menu.py"
   ],
   "retired_services": [
     "console_apps"
@@ -41,5 +46,8 @@
       "path": "system/configs/emulationstation/es_features_emubox.cfg",
       "contains": "written by EmuBox"
     }
-  ]
+  ],
+  "es_settings": {
+    "audio.bgmusic": false
+  }
 }

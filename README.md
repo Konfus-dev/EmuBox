@@ -94,17 +94,29 @@ song, LT/RT change the volume, Y opens the keyboard.
 
 - **MENU SOUNDS**: which sound set, the volume, and a switch each for moving (through lists and
   pop-up menus alike), choosing, going back and opening the menu.
-- **APPS**: the menus going quiet while your music plays (Batocera's menu music would otherwise
-  play over it), music dropping during a call and how far, and the ad blocker for web apps.
+- **APPS**: the menu music and whether it waits for your own, music dropping during a call and how
+  far, and the ad blocker for web apps.
 - **OMEN LIGHTS** (on a PC with them): on/off, brightness, following the game, a colour per light,
   effects and their speed, the cooler's screen, its picture and fit.
 
 (Batocera's main menu cannot take a new entry of its own, so they sit inside Game Settings.)
 
-**Guide** opens the quick menu, over the menus or a running game. Its **Apps** tab has each app
-(Open, Close, and Play for a music player), music controls, a microphone mute, the volume, and
-**Open the menu**: in a game that is the emulator's own menu, from the menus it is Batocera's main
-menu. A strip along the bottom says what is playing and whether you are in a call.
+**Guide** opens EmuBox's own quick menu, over the menus or a running game:
+
+- **Settings**: the system volume and mute, the menu sound set and its volume, the lights' basics,
+  power mode, plane mode, stopping a stuck emulator, and **Open full settings** (Batocera's main menu).
+- **Apps**: open an app, or go back to the game. **Record**: start and stop a recording.
+- **Game**, while one runs: resume, the emulator's own options, quit.
+- Along the bottom, a bar for each thing that is live, with its controls: a call (microphone
+  switch), your music app (previous, pause, next), or the menus' own music (the same three).
+  Under them, the processor load and how full the drive is; along the top, the time and the
+  network address.
+
+D-pad or stick moves, A presses, left/right changes a value, LB/RB change tab, B or Guide closes.
+
+The menus' background music is played by EmuBox (Batocera's own is switched off) so that it can
+be shown, skipped and paused. It plays in the menus only, and waits while a music app of yours
+is playing.
 
 ### Menu sounds
 
