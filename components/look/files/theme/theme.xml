@@ -163,16 +163,6 @@ art/logos and art/badges hold EmuBox's own for systems that theme does not know 
         <animation property="opacity" from="1" to="0.65" duration="3100" mode="easeinout" repeat="forever" autoReverse="true"/>
       </storyboard>
     </image>
-    <image name="ringsB" extra="static">
-      <path>${themePath}/art/rings_b.png</path>
-      <pos>0.27 0.485</pos>
-      <origin>0.5 0.5</origin>
-      <maxSize>0.560 0.950</maxSize>
-      <zIndex>4</zIndex>
-      <storyboard>
-        <animation property="rotation" from="0" to="30" duration="700" mode="easeoutcubic"/>
-      </storyboard>
-    </image>
     <image name="ringsA" extra="static">
       <path>${themePath}/art/rings_a.png</path>
       <pos>0.27 0.485</pos>
@@ -463,16 +453,6 @@ art/logos and art/badges hold EmuBox's own for systems that theme does not know 
       <storyboard>
         <animation property="scale" from="1.06" to="0.94" duration="4200" mode="easeinout" repeat="forever" autoReverse="true"/>
         <animation property="opacity" from="1" to="0.65" duration="3100" mode="easeinout" repeat="forever" autoReverse="true"/>
-      </storyboard>
-    </image>
-    <image name="ringsB" extra="static">
-      <path>${themePath}/art/rings_b.png</path>
-      <pos>0.25 0.54</pos>
-      <origin>0.5 0.5</origin>
-      <maxSize>0.488 0.817</maxSize>
-      <zIndex>4</zIndex>
-      <storyboard>
-        <animation property="rotation" from="0" to="30" duration="700" mode="easeoutcubic"/>
       </storyboard>
     </image>
     <image name="ringsA" extra="static">

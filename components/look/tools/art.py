@@ -136,19 +136,35 @@ def pod(im, cx, cy, r, s, bright, socket=True):
     hi = Image.new("L", im.size, 0); ImageDraw.Draw(hi).ellipse((cx - r * 0.72, cy - r * 0.82, cx - r * 0.05, cy - r * 0.42), fill=170)
     im.alpha_composite(with_alpha(Image.new("RGB", im.size, (255, 255, 255)), hi.filter(ImageFilter.GaussianBlur(2 * s))))
 
+def bar_poly(x0, y0, x1, y1, inset=0):
+    """The menu bar's outline, after the classic dashboard's: a raised tab along the left part of
+    the top, a step down to the rest of the top, cut corners at both ends. `inset` draws the same
+    shape that far inside (the thin inner line)."""
+    i = inset
+    x0, y0, x1, y1 = x0 + i, y0 + i, x1 - i, y1 - i
+    tab_end, drop, cut = x0 + (x1 - x0) * 0.30, 10, 12
+    return [(x0, y0 + cut), (x0 + cut, y0), (tab_end, y0), (tab_end + drop, y0 + drop), (x1 - cut, y0 + drop),
+            (x1, y0 + drop + cut), (x1, y1 - cut), (x1 - cut, y1), (x0 + cut + 4, y1), (x0, y1 - cut - 4)]
+
 def row(name, bright, w=806, h=119):
-    """One line of the console list: sphere, circuit-style connector, angular glass bar."""
+    """One line of the console list: the pod, a stepped connector, the tabbed glass bar."""
     s = 3; im = Image.new("RGBA", (w * s, h * s), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
     line = (215, 255, 150, 255) if bright else (120, 225, 65, 235); y = h / 2
-    for a, b in [((92, y), (112, y)), ((112, y), (124, y - 14)), ((124, y - 14), (142, y - 14)), ((112, y), (124, y + 14)), ((124, y + 14), (142, y + 14))]:
+    x0, y0, x1, y1 = 150, 24, w - 8, h - 24
+    pts = bar_poly(x0, y0, x1, y1)
+    # The connector: out from the top right of the pod, a step down, along into the bar's top-left corner.
+    path = [(80, y - 26), (98, y - 26), (110, y - 14), (128, y - 14), (136, y0 + 10)]
+    for a, b in zip(path, path[1:]):
         d.line((a[0] * s, a[1] * s, b[0] * s, b[1] * s), fill=line, width=2 * s)
-    for nx, ny in [(112, y), (124, y - 14), (124, y + 14)]:
-        d.ellipse(((nx - 3) * s, (ny - 3) * s, (nx + 3) * s, (ny + 3) * s), fill=line)
-    pts = cut_poly(142, 27, w - 8, h - 27, 20)
+    for nx, ny in (path[0], path[-1]):
+        d.ellipse(((nx - 3.5) * s, (ny - 3.5) * s, (nx + 3.5) * s, (ny + 3.5) * s), fill=line)
+    d.line((136 * s, (y0 + 10) * s, x0 * s, (y0 + 12) * s), fill=line, width=2 * s)
     if bright:
         glass((w, h), pts, (226, 250, 84), (150, 214, 28), 250, (245, 255, 185), (200, 255, 80), s, 3, 9, 1.9, im)
     else:
         glass((w, h), pts, (22, 110, 18), (6, 58, 6), 170, (120, 228, 66), (110, 240, 60), s, 2.5, 6, 0.9, im)
+    inner = [(px * s, py * s) for px, py in bar_poly(x0, y0, x1, y1, inset=6)]
+    ImageDraw.Draw(im).line(inner + [inner[0]], fill=(250, 255, 200, 150) if bright else (140, 235, 80, 110), width=s, joint="curve")
     pod(im, 50, y, 38, s, bright, socket=False)
     im.resize((w, h), Image.LANCZOS).save(f"{OUT}/{name}")
 row("row.png", False); row("row_selected.png", True)
