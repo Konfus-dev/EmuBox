@@ -51,7 +51,7 @@ TICK_S = 1 / 60           # pointer and scroll updates while a stick is pushed
 STICK_DEADZONE = 0.18
 POINTER_SPEED = 1100      # pixels per second with the stick fully over
 PLACE_MAX = 32767         # the range of the pointer placer's axes: the whole screen
-PLACER_SETTLE_S = 1.0     # a new input device is heard by the window manager only after a moment
+DEVICE_SETTLE_S = 1.0     # a new input device is heard by the window manager only after a moment
 SCROLL_SPEED = 14         # wheel notches per second with the stick fully over
 TRIGGER_PULLED = 0.5
 HOLD_B_S = 0.8            # B held this long leaves the app (hides it), wherever you are in it
@@ -130,6 +130,7 @@ class Pad:
             {e.EV_KEY: sorted(keys | set(MOUSE_BUTTONS.values())), e.EV_REL: [e.REL_X, e.REL_Y, e.REL_WHEEL]},
             name="EmuBox app controller",
         )
+        self.out_made = time.monotonic()
         # For apps steered with a pointer: an absolute pointer of our own (as a tablet is), which
         # puts the pointer in the middle of the screen when the app takes the controller. Hiding the
         # pointer (Batocera's shortcut) parks it in the bottom-right corner, behind the row of
@@ -140,7 +141,6 @@ class Pad:
             try:
                 self.placer = UInput({e.EV_KEY: [e.BTN_LEFT], e.EV_ABS: [(e.ABS_X, axis), (e.ABS_Y, axis)]},
                                      name="EmuBox pointer placer")
-                self.placer_made = time.monotonic()
             except (OSError, evdev.UInputError):
                 self.placer = None
 
@@ -373,6 +373,10 @@ class Pad:
         # a pretend keyboard of its own, which leaves Alt and Super held as far as the app can
         # tell: every key we sent after it was then ignored.
         chord = [e.KEY_LEFTALT, e.KEY_LEFTMETA, e.KEY_S if show else e.KEY_H]
+        # Opened from the Guide menu, the app can be in front the moment we start: our keyboard
+        # (and the placer) are then so new that the window manager does not hear them yet, and the
+        # shortcut was lost. Wait for them, once, at most a second.
+        time.sleep(max(0.0, self.out_made + DEVICE_SETTLE_S - time.monotonic()))
         try:
             for key in chord:
                 self.out.write(e.EV_KEY, key, 1)
@@ -387,10 +391,7 @@ class Pad:
             pass
 
     def _place_pointer(self, x: float, y: float) -> None:
-        """Put the pointer at this spot of the screen (0-1 across, 0-1 down). Straight after the
-        placer was made the window manager would not hear it yet (the app can be in front at
-        once): wait for it, once, at most a second."""
-        time.sleep(max(0.0, self.placer_made + PLACER_SETTLE_S - time.monotonic()))
+        """Put the pointer at this spot of the screen (0-1 across, 0-1 down)."""
         self.placer.write(e.EV_ABS, e.ABS_X, round(x * PLACE_MAX))
         self.placer.write(e.EV_ABS, e.ABS_Y, round(y * PLACE_MAX))
         self.placer.syn()

@@ -47,7 +47,7 @@ class GuideTests(unittest.TestCase):
         apps = [(row.label, [c.label for c in row.controls]) for row in self.tabs[2].rows]
         self.assertEqual(apps, [("Apps", []), ("Apple Music", ["Open"]), ("Discord", ["Open"]),      # no Close, no Heroic
                                 ("Return", []), ("Hide apps", ["Go back"])])
-        self.assertTrue(self.tabs[2].rows[1].controls[0].do.endswith(" detach open apple-music"))
+        self.assertTrue(self.tabs[2].rows[1].controls[0].do.endswith(" detach launch apple-music"))
         with_tools = guide.layout(APPS + [("terminal", {"name": "Terminal", "command": ["xterm"]})], lights=False)[0][2].rows
         self.assertEqual([row.label for row in with_tools], ["Apps", "Apple Music", "Discord", "Tools", "Terminal", "Return", "Hide apps"])
         self.assertFalse(with_tools[3].focusable)                                         # the highlight passes over a heading
@@ -151,7 +151,7 @@ class AppStoreTests(unittest.TestCase):
             self.assertEqual([g.findtext("name") for g in ET.parse(folder / "tiles/gamelist.xml").getroot()], ["Netflix"])
             self.assertFalse((folder / "tiles/YouTube.sh").exists())
         tabs, _ = guide.layout([("youtube", {"name": "YouTube", "web": "https://www.youtube.com"})], lights=False)
-        self.assertTrue(tabs[2].rows[1].controls[0].do.endswith(" detach open youtube"))
+        self.assertTrue(tabs[2].rows[1].controls[0].do.endswith(" detach launch youtube"))
         running = {row.label: [c.label for c in row.controls] for row in tabs[0].rows if row.label}   # and, once open, in Running
         self.assertEqual(running["YouTube"], ["Resume", "Hide", "Force close"])
 
@@ -699,7 +699,7 @@ class PointerInApps(unittest.TestCase):
             self.skipTest("python-evdev is not on this PC (it is on Batocera)")
         import pad
 
-        made = []
+        made, happened = [], []   # the devices made; everything sent or waited, in order
 
         class Recorder:   # a virtual device that only remembers what was sent through it
             def __init__(self, capabilities, name=""):
@@ -708,6 +708,7 @@ class PointerInApps(unittest.TestCase):
 
             def write(self, kind, code, value):
                 self.sent.append((kind, code, value))
+                happened.append(("sent", self.name))
 
             def syn(self):
                 pass
@@ -717,11 +718,13 @@ class PointerInApps(unittest.TestCase):
 
         music = json.loads((REPO / "apps/apple-music/app.json").read_text())
         with mock.patch.object(pad, "UInput", Recorder), mock.patch.object(evdev, "list_devices", return_value=[]), \
-                mock.patch.object(pad.time, "sleep") as slept:
+                mock.patch.object(pad.time, "sleep", side_effect=lambda s: happened.append(("waited", s))):
             app_pad = pad.Pad({"id": "apple-music", **music})
-            app_pad._show_pointer(True)
-        # A brand-new device is not heard at once: the placer waits for that, then places.
-        self.assertGreater(max(call.args[0] for call in slept.call_args_list), 0.5)
+            app_pad._show_pointer(True)   # straight away, as when the app is already in front
+        # Brand-new devices are not heard at once (opened from the Guide menu the shortcut was lost):
+        # the first thing done is waiting for them, then the shortcut and the placing.
+        self.assertEqual(happened[0][0], "waited")
+        self.assertGreater(happened[0][1], 0.5)
         out, placer = (next(d for d in made if d.name == name) for name in ("EmuBox app controller", "EmuBox pointer placer"))
         presses = [code for kind, code, value in out.sent if kind == e.EV_KEY and value == 1]
         self.assertEqual(presses, [e.KEY_LEFTALT, e.KEY_LEFTMETA, e.KEY_S])          # the window manager's "show pointer"
@@ -729,3 +732,20 @@ class PointerInApps(unittest.TestCase):
         self.assertEqual([(code, value) for kind, code, value in placer.sent if kind == e.EV_ABS],
                          [(e.ABS_X, middle), (e.ABS_Y, middle)])                    # and in the middle of the screen
         self.assertIn((e.ABS_X, mock.ANY), placer.capabilities[e.EV_ABS])
+
+
+class AppsOpenThroughTheMenu(unittest.TestCase):
+    """Regression: an app opened from the Guide menu left Batocera's menu thinking nothing ran; it
+    heard no controller and started its screensaver, game previews playing behind the app."""
+
+    def test_the_guides_open_goes_through_batoceras_menu(self):
+        import guide
+        tabs, _bars = guide.layout(APPS, lights=False)
+        apps = next(tab for tab in tabs if tab.title == "Apps")
+        opens = [control.do for row in apps.rows for control in row.controls if control.label == "Open"]
+        self.assertTrue(opens)
+        for command in opens:
+            self.assertIn(" detach launch ", command)
+        script = (REPO / "components/console/files/bin/emubox-app").read_text()
+        self.assertIn("NO GAME RUNNING", script)          # the menu is asked only when it is free
+        self.assertIn('http://127.0.0.1:1234/launch', script)

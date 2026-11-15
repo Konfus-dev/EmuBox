@@ -2,6 +2,8 @@
 # Open, hide and control EmuBox apps (Discord, Apple Music...) on Batocera.
 #
 #   emubox-app open <app> [--wait]   start it, or bring it back if it is running
+#   emubox-app launch <app>          open it through Batocera's menu when that is free (as its tile
+#                                    would), so the menu knows something is running
 #   emubox-app detach <command...>   run any of these in the background and return at once
 #                                    (the in-game menu stops a button's command after 3 seconds)
 #   emubox-app mic in-use|muted|mute|unmute   the microphone, for a quick mute during a call
@@ -109,6 +111,24 @@ start_pad() {
     [ -e "$pidfile" ] && kill -0 "$(cat "$pidfile")" 2>/dev/null && return
     setsid python3 "$ROOT/lib/pad.py" "$ROOT/apps/$1/app.json" >>"$LOG" 2>&1 &
     echo $! >"$pidfile"
+}
+
+# Opened like this, Batocera's menu does not know an app is running: it hears no controller (the
+# app's pad mapper has it), counts itself idle and starts its screensaver, game previews playing
+# behind the app. So when the menu is free and the app has a tile, the menu is asked to start the
+# tile (which runs "open <app> --wait"), as when the tile is chosen. Otherwise (a game is running,
+# the app is open already, or it has no tile) it is opened directly.
+launch_app() {
+    local app=$1 tile
+    if ! running "$app" && curl -s -m 2 http://127.0.0.1:1234/runningGame | grep -q "NO GAME RUNNING"; then
+        tile=$(find /userdata/roms/apps /userdata/roms/store /userdata/roms/ports -maxdepth 2 -name '*.sh' \
+                    -exec grep -lF -- "emubox-app open $app --wait" {} + 2>/dev/null | head -n1)
+        if [ -n "$tile" ] && curl -s -m 5 -X POST --data-binary "$tile" http://127.0.0.1:1234/launch >/dev/null; then
+            echo "$(date '+%F %T') launching $app through the menu ($tile)" >>"$LOG"
+            return 0
+        fi
+    fi
+    open_app "$app"
 }
 
 open_app() {
@@ -319,6 +339,7 @@ power)    power "$2" ;;
 music)    shift; exec python3 "$ROOT/lib/music.py" "$@" ;;
 await)    need_app "$2"; await "$2" ;;
 open)     need_app "$2"; open_app "$2" || exit 1; if [ "$3" = --wait ]; then wait_until_left "$2"; fi ;;
+launch)   need_app "$2"; launch_app "$2" ;;
 back)     [ -n "$2" ] && need_app "$2"; back "$2" ;;
 close)    need_app "$2"; close_app "$2" ;;
 install)  need_app "$2"; install_app "$2" ;;
@@ -329,5 +350,5 @@ media)    media "$2" ;;
 play)     need_app "$2"; play "$2" ;;
 pads)     pads ;;
 list)     list_apps ;;
-*)        sed -n '2,21s/^# \{0,1\}//p' "$0" >&2; exit 2 ;;
+*)        sed -n '2,23s/^# \{0,1\}//p' "$0" >&2; exit 2 ;;
 esac

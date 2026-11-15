@@ -248,7 +248,9 @@ def layout(found: list[tuple[str, dict]] | None = None, lights: bool | None = No
 
     listed = [(app_id, app) for app_id, app in found if app.get("menu", True)]
     def opening(app_id: str, app: dict) -> str:
-        return f"EMUBOX_NOTICE=no {a} detach open {app_id}"   # the menu says "Opening ..." itself, at once
+        # Through Batocera's menu when it is free, so it knows an app is running (no screensaver
+        # behind it); the menu says "Opening ..." itself, at once.
+        return f"EMUBOX_NOTICE=no {a} detach launch {app_id}"
 
     def open_button(words: str, app_id: str, app: dict) -> Control:
         return button(words, opening(app_id, app), close=True, busy=f"Opening {app['name']}", wait=f"{a} await {app_id}")
