@@ -1,0 +1,25 @@
+{
+  "title": "Tidy game names",
+  "question": "Show games by tidy names (\"Pokémon Emerald Version\", not \"Pokemon - Emerald Version (USA, Europe) [!]\")? Files are not renamed, and names you change yourself are kept.",
+  "default": true,
+  "order": 55,
+  "files": [
+    {
+      "from": "files/nicenames.py",
+      "to": "system/emubox/tools/nicenames.py",
+      "mode": "755"
+    },
+    {
+      "from": "files/extensions.json",
+      "to": "system/emubox/tools/extensions.json"
+    },
+    {
+      "from": "files/emubox_names",
+      "to": "system/services/emubox_names",
+      "mode": "755"
+    }
+  ],
+  "services": [
+    "emubox_names"
+  ]
+}

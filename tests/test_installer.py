@@ -26,7 +26,7 @@ from installer.target import Target  # noqa: E402
 
 os.environ["EMUBOX_DOWNLOAD_LATER"] = "1"   # the tests never fetch programs from Flathub
 os.environ["EMUBOX_SOUNDS"] = "none"        # nor pick up sound sets that happen to sit beside the repository
-COMPONENT_QUESTIONS = 11   # asked on a PC without the OMEN lights
+COMPONENT_QUESTIONS = 12   # asked on a PC without the OMEN lights
 
 
 def make_drive(root: Path) -> Target:
@@ -269,7 +269,7 @@ class ComponentTests(Drive):
              mock.patch.object(cli, "SOUNDS_BESIDE", Path(folder) / "nowhere"):
             make_file(Path(folder) / "mine" / "Arcade" / "scroll.wav")
             # look n, apple-music n, discord y, seven more n, bios n, games n, sounds y + folder, go ahead y
-            code, out = run(self.root, answers="n\nn\ny\n" + "n\n" * 8 + "n\nn\ny\n" + f"{folder}/mine\ny\n")
+            code, out = run(self.root, answers="n\nn\ny\n" + "n\n" * 9 + "n\nn\ny\n" + f"{folder}/mine\ny\n")
             self.assertEqual(code, 0, out)
             self.assertIn("scroll.wav", out)      # the names are explained when asked
             self.assertIn("Arcade", out)
@@ -308,7 +308,7 @@ class ComponentTests(Drive):
 
     def test_questions_are_asked_and_answered(self):
         # look n, apple-music n, discord y, seven more n, bios n, games n, go ahead y
-        code, out = run(self.root, answers="n\nn\ny\n" + "n\n" * 8 + "n\nn\ny\n")
+        code, out = run(self.root, answers="n\nn\ny\n" + "n\n" * 9 + "n\nn\ny\n")
         self.assertEqual(code, 0, out)
         self.assertTrue((self.root / "roms/apps/Discord.sh").exists())
         self.assertFalse((self.root / "themes/emubox").exists())
@@ -317,7 +317,7 @@ class ComponentTests(Drive):
 class TypedAnswerTests(Drive):
     def test_wifi_is_asked_for_and_written(self):
         # look, apple-music, discord, store, vault n; wifi y + name + password; four more n; bios n, games n; go ahead y
-        code, out = run(self.root, answers="n\nn\nn\nn\nn\ny\nHome Net\np@ss {word}\n" + "n\n" * 5 + "n\nn\ny\n")
+        code, out = run(self.root, answers="n\nn\nn\nn\nn\ny\nHome Net\np@ss {word}\n" + "n\n" * 6 + "n\nn\ny\n")
         self.assertEqual(code, 0, out)
         self.assertEqual(self.target.conf_get("wifi.ssid"), "Home Net")
         self.assertEqual(self.target.conf_get("wifi.key"), "p@ss {word}")
@@ -469,6 +469,76 @@ class DrivePicking(unittest.TestCase):
         with mock.patch("sys.stdin", io.StringIO("9\nx\n2\n")), mock.patch("sys.stdout", out):
             self.assertEqual(cli.Prompts().pick_one("Pick:", ["a", "b"], 0), 1)
         self.assertEqual(out.getvalue().count("Type a number from 1 to 2."), 2)
+
+
+class NiceNames(unittest.TestCase):
+    """Tidy game names: what the menus show, never the files."""
+
+    def setUp(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("nicenames", REPO / "components/names/files/nicenames.py")
+        self.nn = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.nn)
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        make_drive(self.root / "drive")
+        self.root = self.root / "drive"
+
+    def names(self, system: str) -> dict:
+        import xml.etree.ElementTree as ET
+        top = ET.parse(self.root / "roms" / system / "gamelist.xml").getroot()
+        return {g.findtext("path"): g.findtext("name") for g in top.findall("game")}
+
+    def test_titles(self):
+        for raw, nice in [("Pokemon - Emerald Version (USA, Europe)", "Pokémon Emerald Version"),
+                          ("Legend of Zelda, The - A Link to the Past (U) (V1.1) [!]", "The Legend of Zelda: A Link to the Past"),
+                          ("GS Vitro[1.2.1]", "GS Vitro"), ("Final Fantasy VII (USA) (Disc 2)", "Final Fantasy VII (Disc 2)"),
+                          ("super_mario_world", "Super Mario World"), ("Mario Kart 64 (USA) (Rev A)", "Mario Kart 64"),
+                          ("Castlevania - Symphony of the Night v1.1", "Castlevania: Symphony of the Night"),
+                          ("Apple Music", "Apple Music")]:
+            self.assertEqual(self.nn.tidy(raw), nice)
+
+    def test_names_are_written_but_files_stay(self):
+        make_file(self.root / "roms/gba/Pokemon - Emerald Version (USA, Europe).gba")
+        make_file(self.root / "roms/windows/GS Vitro[1.2.1].pc/Game.exe")
+        make_file(self.root / "roms/gba/images/x.png")
+        self.assertEqual(self.nn.run(self.root, say=lambda _: None), 2)
+        self.assertEqual(self.names("gba"), {"./Pokemon - Emerald Version (USA, Europe).gba": "Pokémon Emerald Version"})
+        self.assertEqual(self.names("windows"), {"./GS Vitro[1.2.1].pc": "GS Vitro"})
+        self.assertTrue((self.root / "roms/gba/Pokemon - Emerald Version (USA, Europe).gba").exists())
+        self.assertEqual(self.nn.run(self.root, say=lambda _: None), 0)    # nothing left to do
+
+    def test_your_own_names_are_kept(self):
+        make_file(self.root / "roms/snes/Super Metroid (USA).sfc")
+        make_file(self.root / "roms/snes/Chrono Trigger (USA).sfc")
+        self.nn.run(self.root, say=lambda _: None)
+        list_file = self.root / "roms/snes/gamelist.xml"   # renamed on Batocera itself
+        list_file.write_text(list_file.read_text().replace(">Super Metroid<", ">Metroid 3<"))
+        self.nn.set_name(self.root, "snes", "Chrono Trigger (USA).sfc", "chrono trigger!!")
+        self.assertEqual(self.nn.run(self.root, say=lambda _: None), 0)
+        self.assertEqual(self.names("snes"), {"./Super Metroid (USA).sfc": "Metroid 3",
+                                              "./Chrono Trigger (USA).sfc": "chrono trigger!!"})
+
+    def test_discs_behind_a_playlist_are_hidden(self):
+        make_file(self.root / "roms/gamecube/Tales (USA) (Disc 1).ciso")
+        make_file(self.root / "roms/gamecube/Tales (USA) (Disc 2).ciso")
+        (self.root / "roms/gamecube/Tales (USA).m3u").write_text("Tales (USA) (Disc 1).ciso\nTales (USA) (Disc 2).ciso\n")
+        self.nn.run(self.root, say=lambda _: None)
+        import xml.etree.ElementTree as ET
+        top = ET.parse(self.root / "roms/gamecube/gamelist.xml").getroot()
+        hidden = {g.findtext("path") for g in top.findall("game") if g.findtext("hidden") == "true"}
+        self.assertEqual(hidden, {"./Tales (USA) (Disc 1).ciso", "./Tales (USA) (Disc 2).ciso"})
+        self.assertEqual(self.names("gamecube")["./Tales (USA).m3u"], "Tales")
+        self.assertEqual(self.nn.run(self.root, say=lambda _: None), 0)
+
+    def test_clean_scraped_names_and_emubox_tiles_are_left_alone(self):
+        make_file(self.root / "roms/psx/Crash (USA).chd")
+        (self.root / "roms/psx/gamelist.xml").write_text(
+            '<gameList><game><path>./Crash (USA).chd</path><name>Crash Bandicoot</name></game></gameList>')
+        make_file(self.root / "roms/apps/Apple_Music.sh")
+        self.assertEqual(self.nn.run(self.root, say=lambda _: None), 0)
+        self.assertFalse((self.root / "roms/apps/gamelist.xml").exists())
 
 
 class SmallThings(unittest.TestCase):

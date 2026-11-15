@@ -9,6 +9,7 @@ Commands for looking after a Batocera drive from a Linux PC. `./install` links t
 | `batocera-add` | copy games and ROM-hack patches onto the drive, into the right folders |
 | `batocera-backup` | back up saves, screenshots and settings |
 | `batocera-wifi` | set the drive's Wi-Fi network |
+| `batocera-names` | tidy the names the menus show for games (`--dry-run` to look first), or give one game a name of your own: `--set SYSTEM FILE NAME`. Files are never renamed |
 | `batocera-vault` | set Vault's pages and install command on the drive |
 | `batocera-scraper`, `batocera-achievements` | set the ScreenScraper / RetroAchievements account |
 | `batocera-vm` | boot the drive in a window (QEMU), without restarting the PC |

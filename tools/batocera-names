@@ -1,0 +1,48 @@
+#!/usr/bin/env python3
+"""Tidy or set the names Batocera shows for games, from this PC.
+
+    batocera-names [--drive FOLDER]                        tidy every game's name
+    batocera-names [--drive FOLDER] --dry-run              show what would change
+    batocera-names [--drive FOLDER] --set SYSTEM FILE NAME give one game a name of your own
+
+Only the names in the game lists change, never the files. Names set with --set, or edited on
+Batocera itself (Edit this game's metadata), are not tidied again. The drive is found like the
+other batocera-* tools do (see batocera-drive).
+"""
+import importlib.util
+import subprocess
+import sys
+from pathlib import Path
+
+here = Path(__file__).resolve().parent
+spec = importlib.util.spec_from_file_location("nicenames", here.parent / "components" / "names" / "files" / "nicenames.py")
+nicenames = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(nicenames)
+
+args = sys.argv[1:]
+if args[:1] in (["-h"], ["--help"]):
+    sys.exit(__doc__)
+drive = ""
+if "--drive" in args:
+    i = args.index("--drive")
+    drive = args[i + 1]
+    del args[i:i + 2]
+found = subprocess.run([str(here / "batocera-drive"), *([drive] if drive else [])], capture_output=True, text=True)
+if found.returncode != 0:
+    sys.exit(found.stderr.strip() or found.stdout.strip())
+root = Path(found.stdout.strip())
+import os
+if not os.access(root / "system", os.W_OK) and os.geteuid() != 0:
+    # Batocera's system folder belongs to the administrator; ask once for the password.
+    os.execvp("pkexec", ["pkexec", sys.executable, str(Path(__file__).resolve()), "--drive", str(root), *args])
+if args[:1] == ["--set"]:
+    if len(args) != 4:
+        sys.exit("usage: batocera-names --set SYSTEM FILE NAME")
+    try:
+        path = nicenames.set_name(root, args[1], args[2], args[3])
+    except (OSError, ValueError) as problem:
+        sys.exit(str(problem))
+    print(f"roms/{args[1]}/{path[2:]} is now called {args[3]!r}")
+else:
+    count = nicenames.run(root, dry_run="--dry-run" in args)
+    print(f"{count} name{'s' if count != 1 else ''} {'would change' if '--dry-run' in args else 'tidied'}.")

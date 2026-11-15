@@ -1,0 +1,1792 @@
+{
+"3do": [
+".chd",
+".cue",
+".iso"
+],
+"3ds": [
+".3ds",
+".app",
+".axf",
+".cci",
+".cia",
+".cxi",
+".elf",
+".squashfs",
+".zcci",
+".zcia",
+".zcxi"
+],
+"_from": "Batocera 43.1 /usr/share/emulationstation/es_systems.cfg; on Batocera the live file is read instead",
+"abuse": [
+".game"
+],
+"adam": [
+".1dd",
+".7z",
+".bin",
+".col",
+".cqi",
+".cqm",
+".d77",
+".d88",
+".ddp",
+".dfi",
+".dsk",
+".hfe",
+".imd",
+".mfi",
+".mfm",
+".rom",
+".td0",
+".wav",
+".zip"
+],
+"advision": [
+".7z",
+".bin",
+".zip"
+],
+"amiga1200": [
+".adf",
+".adz",
+".dms",
+".dmz",
+".exe",
+".hdf",
+".ipf",
+".lha",
+".m3u",
+".raw",
+".scp",
+".uae",
+".zip"
+],
+"amiga500": [
+".adf",
+".adz",
+".dms",
+".dmz",
+".exe",
+".hdf",
+".ipf",
+".lha",
+".m3u",
+".raw",
+".scp",
+".uae",
+".zip"
+],
+"amigacd32": [
+".bin",
+".chd",
+".cue",
+".iso"
+],
+"amigacdtv": [
+".bin",
+".chd",
+".cue",
+".iso",
+".m3u"
+],
+"amstradcpc": [
+".7z",
+".cdt",
+".dsk",
+".m3u",
+".sna",
+".tap",
+".voc",
+".zip"
+],
+"apfm1000": [
+".7z",
+".bin",
+".zip"
+],
+"apple2": [
+".2mg",
+".7z",
+".chd",
+".dfi",
+".do",
+".dsk",
+".edd",
+".hdv",
+".mfi",
+".nib",
+".po",
+".rti",
+".wav",
+".woz",
+".zip"
+],
+"apple2gs": [
+".2mg",
+".do",
+".dsk",
+".nib",
+".po"
+],
+"arcadia": [
+".7z",
+".bin",
+".zip"
+],
+"archimedes": [
+".1dd",
+".360",
+".7z",
+".adf",
+".adl",
+".adm",
+".ads",
+".apd",
+".bbc",
+".chd",
+".cqi",
+".cqm",
+".d77",
+".d88",
+".dfi",
+".dsd",
+".dsk",
+".hfe",
+".ima",
+".imd",
+".img",
+".ipf",
+".jfd",
+".mfi",
+".mfm",
+".msa",
+".ssd",
+".st",
+".td0",
+".ufi",
+".zip"
+],
+"arduboy": [
+".7z",
+".hex",
+".zip"
+],
+"astrocade": [
+".7z",
+".bin",
+".zip"
+],
+"atari2600": [
+".7z",
+".a26",
+".bin",
+".zip"
+],
+"atari5200": [
+".7z",
+".a52",
+".atr",
+".atx",
+".bin",
+".car",
+".cas",
+".cdm",
+".rom",
+".xex",
+".xfd",
+".zip"
+],
+"atari7800": [
+".7z",
+".a78",
+".bin",
+".zip"
+],
+"atari800": [
+".7z",
+".a52",
+".atr",
+".atx",
+".bin",
+".car",
+".cas",
+".cdm",
+".m3u",
+".rom",
+".xex",
+".xfd",
+".zip"
+],
+"atarist": [
+".7z",
+".dim",
+".gemdos",
+".hd",
+".ipf",
+".m3u",
+".msa",
+".st",
+".stx",
+".zip"
+],
+"atom": [
+".1dd",
+".40t",
+".7z",
+".atm",
+".bin",
+".cqi",
+".cqm",
+".csw",
+".d77",
+".d88",
+".dfi",
+".dsk",
+".hfe",
+".imd",
+".mfi",
+".mfm",
+".rom",
+".tap",
+".td0",
+".uef",
+".wav",
+".zip"
+],
+"atomiswave": [
+".7z",
+".bin",
+".dat",
+".lst",
+".zip"
+],
+"bbcmicro": [
+".1dd",
+".360",
+".7z",
+".adf",
+".adl",
+".adm",
+".ads",
+".bbc",
+".bin",
+".cqi",
+".cqm",
+".d77",
+".d88",
+".dfi",
+".dsd",
+".dsk",
+".fsd",
+".hfe",
+".ima",
+".imd",
+".img",
+".ipf",
+".mfi",
+".mfm",
+".ssd",
+".tap",
+".td0",
+".ufi",
+".wav",
+".zip"
+],
+"beena": [
+".7z",
+".bin",
+".zip"
+],
+"bennugd": [
+".dat",
+".dcb"
+],
+"bk": [
+".7z",
+".bin",
+".bkd",
+".dsk",
+".img",
+".zip"
+],
+"bstone": [
+".bstone"
+],
+"c128": [
+".7z",
+".d64",
+".d81",
+".lnx",
+".m3u",
+".prg",
+".zip"
+],
+"c20": [
+".20",
+".40",
+".60",
+".7z",
+".a0",
+".b0",
+".crt",
+".d64",
+".d81",
+".m3u",
+".prg",
+".rom",
+".t64",
+".tap",
+".zip"
+],
+"c64": [
+".7z",
+".crt",
+".d64",
+".d71",
+".d81",
+".g64",
+".m3u",
+".nib",
+".prg",
+".t64",
+".tap",
+".zip"
+],
+"camplynx": [
+".7z",
+".ldf",
+".tap",
+".wav",
+".zip"
+],
+"cannonball": [
+".cannonball"
+],
+"cassettevision": [
+".bin777",
+".zip"
+],
+"catacomb": [
+".game"
+],
+"cave3rd": [
+".7z",
+".zip"
+],
+"cavestory": [
+".exe"
+],
+"cdi": [
+".cdr",
+".chd",
+".cue",
+".gdi",
+".iso",
+".nrg",
+".toc"
+],
+"cdogs": [
+".game"
+],
+"cgenie": [
+".7z",
+".cas",
+".wav",
+".zip"
+],
+"cgenius": [
+".cgenius"
+],
+"channelf": [
+".bin",
+".chf",
+".rom",
+".zip"
+],
+"chihiro": [
+".iso"
+],
+"coco": [
+".7z",
+".cas",
+".ccc",
+".dsk",
+".rom",
+".wav",
+".zip"
+],
+"colecovision": [
+".7z",
+".bin",
+".col",
+".rom",
+".zip"
+],
+"commanderx16": [
+".bas",
+".img",
+".prg"
+],
+"corsixth": [
+".game"
+],
+"cplus4": [
+".7z",
+".d64",
+".m3u",
+".prg",
+".tap",
+".zip"
+],
+"crvision": [
+".7z",
+".bin",
+".rom",
+".zip"
+],
+"ctvboy": [
+".7z",
+".bin",
+".zip"
+],
+"daphne": [
+".daphne",
+".squashfs"
+],
+"devilutionx": [
+".mpq"
+],
+"dice": [
+".dmy",
+".zip"
+],
+"doom3": [
+".d3"
+],
+"dos": [
+".cue",
+".dos",
+".dosz",
+".iso",
+".m3u",
+".pc",
+".squashfs",
+".zip"
+],
+"dragon64": [
+".7z",
+".bin",
+".cas",
+".ccc",
+".dmk",
+".dsk",
+".rom",
+".wav",
+".zip"
+],
+"dreamcast": [
+".cdi",
+".chd",
+".cue",
+".gdi",
+".m3u"
+],
+"dxx-rebirth": [
+".d1x",
+".d2x"
+],
+"easyrpg": [
+".easyrpg",
+".squashfs",
+".zip"
+],
+"ecwolf": [
+".ecwolf",
+".pk3",
+".squashfs"
+],
+"eduke32": [
+".eduke32"
+],
+"electron": [
+".1dd",
+".7z",
+".adf",
+".adl",
+".adm",
+".ads",
+".bbc",
+".bin",
+".cqi",
+".cqm",
+".csw",
+".d77",
+".d88",
+".dfi",
+".dsd",
+".dsk",
+".hfe",
+".imd",
+".img",
+".mfi",
+".mfm",
+".rom",
+".ssd",
+".td0",
+".uef",
+".wav",
+".zip"
+],
+"enterprise": [
+".128",
+".bas",
+".cas",
+".cdt",
+".com",
+".dsk",
+".dtf",
+".img",
+".tap",
+".trn",
+".tzx",
+".zip"
+],
+"etlegacy": [
+".etl"
+],
+"fallout1-ce": [
+".f1ce"
+],
+"fallout2-ce": [
+".f2ce"
+],
+"fbneo": [
+".7z",
+".zip"
+],
+"fds": [
+".7z",
+".fds",
+".zip"
+],
+"flash": [
+".swf"
+],
+"flatpak": [
+".flatpak"
+],
+"fm7": [
+".1dd",
+".7z",
+".cqi",
+".cqm",
+".d77",
+".d88",
+".dfi",
+".dsk",
+".hfe",
+".imd",
+".mfi",
+".mfm",
+".t77",
+".td0",
+".wav",
+".zip"
+],
+"fmtowns": [
+".1dd",
+".7z",
+".bin",
+".cdr",
+".chd",
+".cqi",
+".cqm",
+".cue",
+".d77",
+".d88",
+".dfi",
+".dsk",
+".gdi",
+".hfe",
+".imd",
+".iso",
+".m3u",
+".mfi",
+".mfm",
+".nrg",
+".td0",
+".toc",
+".xdf",
+".zip"
+],
+"fury": [
+".grp"
+],
+"gaelco": [
+".7z",
+".zip"
+],
+"gamate": [
+".7z",
+".bin",
+".zip"
+],
+"gameandwatch": [
+".7z",
+".mgw",
+".zip"
+],
+"gamecom": [
+".7z",
+".bin",
+".tgc",
+".zip"
+],
+"gamecube": [
+".ciso",
+".dol",
+".elf",
+".gcm",
+".gcz",
+".iso",
+".json",
+".m3u",
+".rvz",
+".wbfs"
+],
+"gamegear": [
+".7z",
+".bin",
+".gg",
+".zip"
+],
+"gamepock": [
+".7z",
+".bin",
+".zip"
+],
+"gb": [
+".7z",
+".gb",
+".zip"
+],
+"gb2players": [
+".7z",
+".gb",
+".gb2",
+".gbc2",
+".zip"
+],
+"gba": [
+".7z",
+".gba",
+".zip"
+],
+"gbc": [
+".7z",
+".gbc",
+".zip"
+],
+"gbc2players": [
+".7z",
+".gb2",
+".gbc",
+".gbc2",
+".zip"
+],
+"gmaster": [
+".7z",
+".bin",
+".zip"
+],
+"gp32": [
+".7z",
+".smc",
+".zip"
+],
+"gx4000": [
+".7z",
+".cpr",
+".dsk",
+".m3u",
+".zip"
+],
+"gzdoom": [
+".gzdoom",
+".iwad",
+".pwad",
+".wad"
+],
+"halflife": [
+".game"
+],
+"hcl": [
+".game"
+],
+"hikaru": [
+".7z",
+".zip"
+],
+"hurrican": [
+".game"
+],
+"ikemen": [
+".ikemen",
+".pc"
+],
+"imageviewer": [
+".avi",
+".bmp",
+".gif",
+".hdr",
+".jpeg",
+".jpg",
+".mkv",
+".mp4",
+".pdf",
+".pgm",
+".pic",
+".png",
+".ppm",
+".psd",
+".tga",
+".webm"
+],
+"intellivision": [
+".7z",
+".bin",
+".int",
+".rom",
+".zip"
+],
+"jaguar": [
+".7z",
+".abs",
+".cof",
+".j64",
+".jag",
+".rom",
+".zip"
+],
+"jaguarcd": [
+".bigpimg",
+".cdi",
+".cue"
+],
+"jazz2": [
+".game"
+],
+"jkdf2": [
+".jedi"
+],
+"jknight": [
+".jedi"
+],
+"laser310": [
+".7z",
+".cas",
+".vz",
+".wav",
+".zip"
+],
+"lcdgames": [
+".7z",
+".mgw",
+".zip"
+],
+"library": [
+".669",
+".avi",
+".bmp",
+".cbz",
+".far",
+".flac",
+".gif",
+".hdr",
+".it",
+".jpeg",
+".jpg",
+".mkv",
+".mod",
+".mp3",
+".mp4",
+".mtm",
+".ogg",
+".pdf",
+".pgm",
+".pic",
+".png",
+".ppm",
+".psd",
+".s3m",
+".stm",
+".tga",
+".wav",
+".webm",
+".xm"
+],
+"lindbergh": [
+".game"
+],
+"loopy": [
+".7z",
+".bin",
+".ic1",
+".zip"
+],
+"lowresnx": [
+".7z",
+".nx",
+".zip"
+],
+"lutro": [
+".7z",
+".lutro",
+".zip"
+],
+"lynx": [
+".7z",
+".bll",
+".lnx",
+".lyx",
+".o",
+".zip"
+],
+"macintosh": [
+".1dd",
+".2mg",
+".360",
+".7z",
+".cdr",
+".chd",
+".cqi",
+".cqm",
+".cue",
+".d77",
+".d88",
+".dc42",
+".dfi",
+".dsk",
+".gdi",
+".hd",
+".hdi",
+".hdv",
+".hfe",
+".ima",
+".imd",
+".img",
+".ipf",
+".iso",
+".mfi",
+".mfm",
+".nrg",
+".td0",
+".toc",
+".ufi",
+".woz",
+".zip"
+],
+"mame": [
+".7z",
+".zip"
+],
+"mastersystem": [
+".7z",
+".bin",
+".sms",
+".zip"
+],
+"mc10": [
+".7z",
+".bin",
+".cas",
+".rom",
+".wav",
+".zip"
+],
+"megacd": [
+".chd",
+".cue",
+".iso",
+".m3u"
+],
+"megadrive": [
+".7z",
+".bin",
+".gen",
+".md",
+".sg",
+".smd",
+".zip"
+],
+"megadrive-msu": [
+".7z",
+".md",
+".squashfs",
+".zip"
+],
+"megaduck": [
+".7z",
+".bin",
+".zip"
+],
+"model2": [
+".zip"
+],
+"model3": [
+".zip"
+],
+"mohaa": [
+".mohaa"
+],
+"moonlight": [
+".moonlight"
+],
+"mrboom": [
+".libretro"
+],
+"msx1": [
+".7z",
+".cas",
+".dsk",
+".m3u",
+".mx1",
+".ogv",
+".openmsx",
+".rom",
+".zip"
+],
+"msx2": [
+".7z",
+".cas",
+".dsk",
+".m3u",
+".mx2",
+".ogv",
+".openmsx",
+".rom",
+".zip"
+],
+"msx2+": [
+".7z",
+".cas",
+".dsk",
+".m3u",
+".mx2",
+".openmsx",
+".rom",
+".zip"
+],
+"msxturbor": [
+".7z",
+".dsk",
+".m3u",
+".mx2",
+".openmsx",
+".rom",
+".zip"
+],
+"mugen": [
+".pc"
+],
+"multivision": [
+".7z",
+".bin",
+".sg",
+".zip"
+],
+"mz2000": [
+".7z",
+".d88",
+".dsk",
+".m12",
+".mzf",
+".mzt",
+".wav",
+".zip"
+],
+"mz2500": [
+".1dd",
+".7z",
+".cqi",
+".cqm",
+".d77",
+".d88",
+".dfi",
+".dsk",
+".hfe",
+".imd",
+".mfi",
+".mfm",
+".td0",
+".zip"
+],
+"mz700": [
+".7z",
+".m12",
+".mzf",
+".mzt",
+".wav",
+".zip"
+],
+"mz800": [
+".7z",
+".m12",
+".mzf",
+".mzt",
+".wav",
+".zip"
+],
+"mz80k": [
+".7z",
+".m12",
+".mzf",
+".mzt",
+".wav",
+".zip"
+],
+"n64": [
+".7z",
+".n64",
+".v64",
+".z64",
+".zip"
+],
+"n64dd": [
+".7z",
+".n64",
+".ndd",
+".z64",
+".zip"
+],
+"namco22": [
+".7z",
+".zip"
+],
+"namco2x6": [
+".zip"
+],
+"naomi": [
+".7z",
+".bin",
+".dat",
+".lst",
+".zip"
+],
+"naomi2": [
+".7z",
+".zip"
+],
+"nds": [
+".7z",
+".bin",
+".nds",
+".zip"
+],
+"neogeo": [
+".7z",
+".zip"
+],
+"neogeocd": [
+".chd",
+".cue",
+".iso"
+],
+"nes": [
+".7z",
+".nes",
+".unf",
+".unif",
+".zip"
+],
+"ngp": [
+".7z",
+".ngp",
+".zip"
+],
+"ngpc": [
+".7z",
+".ngc",
+".zip"
+],
+"odcommander": [
+".odc"
+],
+"odyssey2": [
+".7z",
+".bin",
+".zip"
+],
+"openbor": [
+".pak"
+],
+"openjazz": [
+".game"
+],
+"oricatmos": [
+".dsk",
+".tap",
+".zip"
+],
+"pc60": [
+".1dd",
+".2hd",
+".7z",
+".bin",
+".cas",
+".cqi",
+".cqm",
+".d77",
+".d88",
+".dfi",
+".dsk",
+".fdi",
+".hdm",
+".imd",
+".mfi",
+".mfm",
+".p6",
+".td0",
+".xdf",
+".zip"
+],
+"pc80": [
+".1dd",
+".7z",
+".bin",
+".d77",
+".d88",
+".dsk",
+".n80",
+".zip"
+],
+"pc88": [
+".cmt",
+".d88",
+".m3u",
+".u88"
+],
+"pc98": [
+".2hd",
+".88d",
+".98d",
+".cmd",
+".d88",
+".d98",
+".dup",
+".fdd",
+".fdi",
+".hdd",
+".hdi",
+".hdm",
+".hdn",
+".m3u",
+".nhd",
+".tfd",
+".thd",
+".xdf",
+".zip"
+],
+"pcengine": [
+".7z",
+".bin",
+".pce",
+".zip"
+],
+"pcenginecd": [
+".ccd",
+".chd",
+".cue",
+".img",
+".iso",
+".pce"
+],
+"pcfx": [
+".7z",
+".ccd",
+".chd",
+".cue",
+".m3u",
+".toc",
+".zip"
+],
+"pcw": [
+".1dd",
+".7z",
+".86f",
+".cqi",
+".cqm",
+".d77",
+".d88",
+".dfi",
+".dsk",
+".imd",
+".mfi",
+".mfm",
+".td0",
+".zip"
+],
+"pdp1": [
+".7z",
+".drm",
+".rim",
+".tap",
+".zip"
+],
+"pet": [
+".7z",
+".a0",
+".b0",
+".crt",
+".d64",
+".d81",
+".m3u",
+".prg",
+".t64",
+".tap",
+".zip"
+],
+"pico": [
+".7z",
+".bin",
+".md",
+".zip"
+],
+"pico8": [
+".m3u",
+".p8",
+".png"
+],
+"pokemini": [
+".7z",
+".min",
+".zip"
+],
+"ports": [
+".sh",
+".squashfs"
+],
+"prboom": [
+".iwad",
+".pwad",
+".wad"
+],
+"ps2": [
+".bin",
+".chd",
+".cso",
+".dump",
+".gz",
+".img",
+".iso",
+".m3u",
+".mdf",
+".nrg"
+],
+"ps3": [
+".iso",
+".ps3",
+".psn",
+".squashfs"
+],
+"ps4": [
+".ps4"
+],
+"psp": [
+".chd",
+".cso",
+".iso",
+".pbp"
+],
+"psvita": [
+".psvita",
+".zip"
+],
+"psx": [
+".cbn",
+".ccd",
+".chd",
+".cue",
+".img",
+".iso",
+".m3u",
+".mdf",
+".pbp",
+".toc"
+],
+"pv1000": [
+".7z",
+".bin",
+".zip"
+],
+"pv2000": [
+".7z",
+".bin",
+".cas",
+".zip"
+],
+"pygame": [
+".pygame"
+],
+"pyxel": [
+".py",
+".pyxapp"
+],
+"quake": [
+".quake"
+],
+"quake2": [
+".7zip",
+".quake2",
+".zip"
+],
+"quake3": [
+".quake3"
+],
+"raze": [
+".raze"
+],
+"recordings": [
+".avi",
+".flac",
+".mkv",
+".mp3",
+".mp4",
+".ogg",
+".wav",
+".webm"
+],
+"reminiscence": [
+".rem"
+],
+"rott": [
+".rott"
+],
+"rtcw": [
+".rtcw"
+],
+"rx78": [
+".7z",
+".bin",
+".zip"
+],
+"samcoupe": [
+".cpm",
+".dsk",
+".mgt",
+".sad",
+".sbt",
+".sdf",
+".td0",
+".zip"
+],
+"satellaview": [
+".7z",
+".bs",
+".sfc",
+".smc",
+".squashfs",
+".zip"
+],
+"saturn": [
+".ccd",
+".chd",
+".cue",
+".iso",
+".m3u",
+".mds",
+".zip"
+],
+"sc3000": [
+".7z",
+".bin",
+".bit",
+".cas",
+".sg",
+".wav",
+".zip"
+],
+"scummvm": [
+".scummvm",
+".squashfs"
+],
+"scv": [
+".0",
+".bin",
+".zip"
+],
+"sdlpop": [
+".sdlpop"
+],
+"sega32x": [
+".32x",
+".7z",
+".bin",
+".chd",
+".md",
+".smd",
+".zip"
+],
+"segaai": [
+".7z",
+".bin",
+".cas",
+".flac",
+".wav",
+".zip"
+],
+"sg1000": [
+".7z",
+".bin",
+".sg",
+".zip"
+],
+"sgb": [
+".7z",
+".gb",
+".gbc",
+".zip"
+],
+"sgb-msu1": [
+".7z",
+".gb",
+".gbc",
+".squashfs",
+".zip"
+],
+"singe": [
+".daphne",
+".squashfs"
+],
+"snes": [
+".7z",
+".bsx",
+".dx2",
+".fig",
+".gd3",
+".gd7",
+".sfc",
+".smc",
+".swc",
+".zip"
+],
+"snes-msu1": [
+".sfc",
+".smc",
+".squashfs"
+],
+"socrates": [
+".7z",
+".bin",
+".zip"
+],
+"solarus": [
+".solarus",
+".zip"
+],
+"sonic-mania": [
+".sman"
+],
+"sonic3-air": [
+".s3air"
+],
+"sonicretro": [
+".scd",
+".son"
+],
+"spectravideo": [
+".7z",
+".cas",
+".zip"
+],
+"steam": [
+".steam"
+],
+"sufami": [
+".7z",
+".bs",
+".fig",
+".sfc",
+".smc",
+".st",
+".zip"
+],
+"superbroswar": [
+".game"
+],
+"supergrafx": [
+".7z",
+".ccd",
+".chd",
+".cue",
+".pce",
+".sgx",
+".zip"
+],
+"supervision": [
+".7z",
+".sv",
+".zip"
+],
+"supracan": [
+".7z",
+".bin",
+".zip"
+],
+"sv8000": [
+".7z",
+".bin",
+".zip"
+],
+"systemsp": [
+".7z",
+".bin",
+".dat",
+".lst",
+".zip"
+],
+"theforceengine": [
+".tfe"
+],
+"thextech": [
+".smbx",
+".squashfs"
+],
+"thomson": [
+".fd",
+".k7",
+".m5",
+".m7",
+".rom",
+".sap",
+".zip"
+],
+"ti99": [
+".7z",
+".rpk",
+".wav",
+".zip"
+],
+"tic80": [
+".tic"
+],
+"traider1": [
+".croft"
+],
+"traider2": [
+".croft"
+],
+"triforce": [
+".iso",
+".rvz"
+],
+"trs80": [
+".7z",
+".bas",
+".cas",
+".cmd",
+".dmk",
+".dsk",
+".wav",
+".zip"
+],
+"tutor": [
+".7z",
+".bin",
+".wav",
+".zip"
+],
+"tvc": [
+".cas",
+".dsk",
+".img",
+".tap",
+".zip"
+],
+"tvgames": [
+".7z",
+".zip"
+],
+"tyrian": [
+".game"
+],
+"uzebox": [
+".bin",
+".uze",
+".zip"
+],
+"vc4000": [
+".7z",
+".bin",
+".pgm",
+".rom",
+".tvc",
+".zip"
+],
+"vectrex": [
+".7z",
+".bin",
+".gam",
+".vec",
+".zip"
+],
+"vgmplay": [
+".7z",
+".vgm",
+".vgz",
+".zip"
+],
+"videopacplus": [
+".7z",
+".bin",
+".zip"
+],
+"vircon32": [
+".v32",
+".zip"
+],
+"virtualboy": [
+".7z",
+".vb",
+".zip"
+],
+"vis": [
+".cdr",
+".chd",
+".cue",
+".gdi",
+".iso",
+".nrg",
+".toc"
+],
+"vpinball": [
+".vpx"
+],
+"vsmile": [
+".7z",
+".bin",
+".u1",
+".u3",
+".zip"
+],
+"wasm4": [
+".wasm"
+],
+"wii": [
+".ciso",
+".dol",
+".elf",
+".gcm",
+".gcz",
+".iso",
+".json",
+".m3u",
+".rvz",
+".wad",
+".wbfs"
+],
+"wiiu": [
+".rpx",
+".squashfs",
+".wua",
+".wud",
+".wuhb",
+".wup",
+".wux"
+],
+"windows": [
+".exe",
+".pc",
+".wine",
+".wsquashfs",
+".wtgz"
+],
+"windows_installers": [
+".exe",
+".iso",
+".msi"
+],
+"wswan": [
+".7z",
+".ws",
+".zip"
+],
+"wswanc": [
+".7z",
+".wsc",
+".zip"
+],
+"x1": [
+".2d",
+".2hd",
+".7z",
+".88d",
+".cmd",
+".d88",
+".dup",
+".dx1",
+".hdm",
+".tfd",
+".xdf",
+".zip"
+],
+"x68000": [
+".2hd",
+".7z",
+".88d",
+".cmd",
+".d88",
+".dim",
+".dup",
+".hdf",
+".hdm",
+".img",
+".m3u",
+".xdf",
+".zip"
+],
+"xbox": [
+".iso",
+".squashfs"
+],
+"xbox360": [
+".iso",
+".xbox360",
+".xex",
+".zar"
+],
+"xegs": [
+".7z",
+".atr",
+".bin",
+".car",
+".dsk",
+".rom",
+".xfd",
+".zip"
+],
+"xrick": [
+".zip"
+],
+"zc210": [
+".qst"
+],
+"zx81": [
+".7z",
+".p",
+".tzx",
+".zip"
+],
+"zxspectrum": [
+".7z",
+".dsk",
+".rzx",
+".scl",
+".tap",
+".trd",
+".tzx",
+".z80",
+".zip"
+]
+}

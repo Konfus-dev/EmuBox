@@ -1,0 +1,15 @@
+#!/bin/bash
+# EmuBox: tidy the names of newly added games at every start (see system/emubox/tools/nicenames.py),
+# then have the menu re-read its game lists. Names you edited yourself are left alone.
+[ "$1" = "start" ] || exit 0
+(
+    python3 /userdata/system/emubox/tools/nicenames.py /userdata >> /userdata/system/logs/emubox.log 2>&1
+    if [ $? -eq 0 ]; then
+        for i in $(seq 60); do   # wait until the menu is up and idle
+            curl -s --connect-timeout 1 http://127.0.0.1:1234/isIdle | grep -q true && break
+            sleep 2
+        done
+        curl -s http://127.0.0.1:1234/reloadgames >/dev/null
+    fi
+) &
+exit 0

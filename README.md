@@ -39,6 +39,12 @@ there is; `./install --remove <name>` takes something off.
 
 ## What you get
 
+- **Tidy game names**: "Pokémon Emerald Version", not "Pokemon - Emerald Version (USA, Europe) [!]";
+  the discs of a multi-disc game show once. Only the names in the game lists change, never the files,
+  and new games are tidied at the next start. To rename a game yourself on Batocera: highlight it,
+  open its options and choose *Edit this game's metadata*; EmuBox will not change that name again.
+- **Your PC's other disks stay untouched**: Batocera only offers USB drives as extra games drives and
+  never mounts Windows, Linux or another Batocera drive; this keeps working through Batocera updates.
 - **The look**: the theme, a start-up film, glass-pane menus, and one row of indicators along the
   top (controllers, free space, clock, network).
 - **Apps**, a section of their own on the home screen: Discord and Apple Music, set up for the
