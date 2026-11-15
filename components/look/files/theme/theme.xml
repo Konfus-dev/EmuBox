@@ -163,41 +163,31 @@ art/logos and art/badges hold EmuBox's own for systems that theme does not know 
         <animation property="opacity" from="1" to="0.65" duration="3100" mode="easeinout" repeat="forever" autoReverse="true"/>
       </storyboard>
     </image>
-    <image name="ringsC" extra="static">
-      <path>${themePath}/art/rings_c.png</path>
-      <pos>0.27 0.485</pos>
-      <origin>0.5 0.5</origin>
-      <maxSize>0.490 0.820</maxSize>
-      <zIndex>4</zIndex>
-      <storyboard>
-        <animation property="rotation" from="0" to="180" duration="1600" mode="easeoutcubic"/>
-      </storyboard>
-    </image>
     <image name="ringsB" extra="static">
       <path>${themePath}/art/rings_b.png</path>
       <pos>0.27 0.485</pos>
       <origin>0.5 0.5</origin>
-      <maxSize>0.490 0.820</maxSize>
+      <maxSize>0.560 0.950</maxSize>
       <zIndex>4</zIndex>
       <storyboard>
-        <animation property="rotation" from="0" to="-180" duration="1300" mode="easeoutcubic"/>
+        <animation property="rotation" from="0" to="30" duration="700" mode="easeoutcubic"/>
       </storyboard>
     </image>
     <image name="ringsA" extra="static">
       <path>${themePath}/art/rings_a.png</path>
       <pos>0.27 0.485</pos>
       <origin>0.5 0.5</origin>
-      <maxSize>0.490 0.820</maxSize>
-      <zIndex>4</zIndex>
+      <maxSize>0.560 0.950</maxSize>
+      <zIndex>10</zIndex>
       <storyboard>
-        <animation property="rotation" from="0" to="120" duration="800" mode="easeoutcubic"/>
+        <animation property="scale" from="1.02" to="1" duration="500" mode="easeoutcubic"/>
       </storyboard>
     </image>
     <image name="plasmaOuter" extra="static">
       <path>${themePath}/art/plasma_outer.png</path>
       <pos>0.27 0.485</pos>
       <origin>0.5 0.5</origin>
-      <maxSize>0.460 0.780</maxSize>
+      <maxSize>0.340 0.580</maxSize>
       <zIndex>5</zIndex>
       <storyboard>
         <animation property="rotation" from="0" to="360" duration="31000" mode="linear" repeat="forever"/>
@@ -208,7 +198,7 @@ art/logos and art/badges hold EmuBox's own for systems that theme does not know 
       <path>${themePath}/art/plasma_mid.png</path>
       <pos>0.27 0.485</pos>
       <origin>0.5 0.5</origin>
-      <maxSize>0.460 0.780</maxSize>
+      <maxSize>0.340 0.580</maxSize>
       <zIndex>6</zIndex>
       <storyboard>
         <animation property="rotation" from="360" to="0" duration="19000" mode="linear" repeat="forever"/>
@@ -219,7 +209,7 @@ art/logos and art/badges hold EmuBox's own for systems that theme does not know 
       <path>${themePath}/art/plasma_core.png</path>
       <pos>0.27 0.485</pos>
       <origin>0.5 0.5</origin>
-      <maxSize>0.460 0.780</maxSize>
+      <maxSize>0.340 0.580</maxSize>
       <zIndex>7</zIndex>
       <storyboard>
         <animation property="rotation" from="0" to="360" duration="13000" mode="linear" repeat="forever"/>
@@ -230,7 +220,7 @@ art/logos and art/badges hold EmuBox's own for systems that theme does not know 
       <path>${themePath}/art/plasma_spot.png</path>
       <pos>0.27 0.485</pos>
       <origin>0.5 0.5</origin>
-      <maxSize>0.460 0.780</maxSize>
+      <maxSize>0.340 0.580</maxSize>
       <zIndex>8</zIndex>
       <storyboard>
         <animation property="rotation" from="360" to="0" duration="8000" mode="linear" repeat="forever"/>
@@ -241,15 +231,15 @@ art/logos and art/badges hold EmuBox's own for systems that theme does not know 
       <path>${themePath}/art/shell.png</path>
       <pos>0.27 0.485</pos>
       <origin>0.5 0.5</origin>
-      <maxSize>0.460 0.780</maxSize>
+      <maxSize>0.340 0.580</maxSize>
       <zIndex>9</zIndex>
     </image>
     <image name="plasmaFlash" extra="static">
       <path>${themePath}/art/plasma_flash.png</path>
       <pos>0.27 0.485</pos>
       <origin>0.5 0.5</origin>
-      <maxSize>0.460 0.780</maxSize>
-      <zIndex>10</zIndex>
+      <maxSize>0.340 0.580</maxSize>
+      <zIndex>11</zIndex>
       <storyboard>
         <animation property="opacity" from="0.9" to="0" duration="450" mode="easeout"/>
         <animation property="scale" from="0.7" to="1.12" duration="450" mode="easeout"/>
@@ -475,41 +465,31 @@ art/logos and art/badges hold EmuBox's own for systems that theme does not know 
         <animation property="opacity" from="1" to="0.65" duration="3100" mode="easeinout" repeat="forever" autoReverse="true"/>
       </storyboard>
     </image>
-    <image name="ringsC" extra="static">
-      <path>${themePath}/art/rings_c.png</path>
-      <pos>0.25 0.54</pos>
-      <origin>0.5 0.5</origin>
-      <maxSize>0.421 0.705</maxSize>
-      <zIndex>4</zIndex>
-      <storyboard>
-        <animation property="rotation" from="0" to="180" duration="1600" mode="easeoutcubic"/>
-      </storyboard>
-    </image>
     <image name="ringsB" extra="static">
       <path>${themePath}/art/rings_b.png</path>
       <pos>0.25 0.54</pos>
       <origin>0.5 0.5</origin>
-      <maxSize>0.421 0.705</maxSize>
+      <maxSize>0.488 0.817</maxSize>
       <zIndex>4</zIndex>
       <storyboard>
-        <animation property="rotation" from="0" to="-180" duration="1300" mode="easeoutcubic"/>
+        <animation property="rotation" from="0" to="30" duration="700" mode="easeoutcubic"/>
       </storyboard>
     </image>
     <image name="ringsA" extra="static">
       <path>${themePath}/art/rings_a.png</path>
       <pos>0.25 0.54</pos>
       <origin>0.5 0.5</origin>
-      <maxSize>0.421 0.705</maxSize>
-      <zIndex>4</zIndex>
+      <maxSize>0.488 0.817</maxSize>
+      <zIndex>10</zIndex>
       <storyboard>
-        <animation property="rotation" from="0" to="120" duration="800" mode="easeoutcubic"/>
+        <animation property="scale" from="1.02" to="1" duration="500" mode="easeoutcubic"/>
       </storyboard>
     </image>
     <image name="plasmaOuter" extra="static">
       <path>${themePath}/art/plasma_outer.png</path>
       <pos>0.25 0.54</pos>
       <origin>0.5 0.5</origin>
-      <maxSize>0.396 0.671</maxSize>
+      <maxSize>0.295 0.499</maxSize>
       <zIndex>5</zIndex>
       <storyboard>
         <animation property="rotation" from="0" to="360" duration="31000" mode="linear" repeat="forever"/>
@@ -520,7 +500,7 @@ art/logos and art/badges hold EmuBox's own for systems that theme does not know 
       <path>${themePath}/art/plasma_mid.png</path>
       <pos>0.25 0.54</pos>
       <origin>0.5 0.5</origin>
-      <maxSize>0.396 0.671</maxSize>
+      <maxSize>0.295 0.499</maxSize>
       <zIndex>6</zIndex>
       <storyboard>
         <animation property="rotation" from="360" to="0" duration="19000" mode="linear" repeat="forever"/>
@@ -531,7 +511,7 @@ art/logos and art/badges hold EmuBox's own for systems that theme does not know 
       <path>${themePath}/art/plasma_core.png</path>
       <pos>0.25 0.54</pos>
       <origin>0.5 0.5</origin>
-      <maxSize>0.396 0.671</maxSize>
+      <maxSize>0.295 0.499</maxSize>
       <zIndex>7</zIndex>
       <storyboard>
         <animation property="rotation" from="0" to="360" duration="13000" mode="linear" repeat="forever"/>
@@ -542,7 +522,7 @@ art/logos and art/badges hold EmuBox's own for systems that theme does not know 
       <path>${themePath}/art/plasma_spot.png</path>
       <pos>0.25 0.54</pos>
       <origin>0.5 0.5</origin>
-      <maxSize>0.396 0.671</maxSize>
+      <maxSize>0.295 0.499</maxSize>
       <zIndex>8</zIndex>
       <storyboard>
         <animation property="rotation" from="360" to="0" duration="8000" mode="linear" repeat="forever"/>
@@ -553,15 +533,15 @@ art/logos and art/badges hold EmuBox's own for systems that theme does not know 
       <path>${themePath}/art/shell.png</path>
       <pos>0.25 0.54</pos>
       <origin>0.5 0.5</origin>
-      <maxSize>0.396 0.671</maxSize>
+      <maxSize>0.295 0.499</maxSize>
       <zIndex>9</zIndex>
     </image>
     <image name="plasmaFlash" extra="static">
       <path>${themePath}/art/plasma_flash.png</path>
       <pos>0.25 0.54</pos>
       <origin>0.5 0.5</origin>
-      <maxSize>0.396 0.671</maxSize>
-      <zIndex>10</zIndex>
+      <maxSize>0.295 0.499</maxSize>
+      <zIndex>11</zIndex>
       <storyboard>
         <animation property="opacity" from="0.9" to="0" duration="450" mode="easeout"/>
         <animation property="scale" from="0.7" to="1.12" duration="450" mode="easeout"/>

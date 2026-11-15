@@ -25,7 +25,7 @@ ART = HERE.parent / "files" / "theme" / "art"
 OUT = HERE.parent / "files" / "theme" / "omen-lights"
 
 LCD = 480  # the screen is 480x480 (and round)
-BALL = 380  # diameter of the glass shell on the LCD
+BALL = 280  # diameter of the orb on the LCD (the claw round it reaches 1.64 times that)
 FPS = 10
 LOOP_S = 24
 JPEG_QUALITY = 86
@@ -34,18 +34,17 @@ MAX_BYTES = 60000  # the LCD's limit for one frame
 # name, size relative to the shell, turns per loop (+ = clockwise),
 # (scale from, scale to, seconds per pulse), (opacity from, to, seconds per pulse)
 LAYERS = [
-    ("plasma_glow", 1.333, 0, (1.06, 0.94, 8), (1.0, 0.65, 6)),
-    ("rings_c", 1.051, 0, None, None),
-    ("rings_b", 1.051, 0, None, None),
-    ("rings_a", 1.051, 0, None, None),
+    ("plasma_glow", 1.793, 0, (1.06, 0.94, 8), (1.0, 0.65, 6)),
+    ("rings_b", 1.638, 0, None, None),
     ("plasma_outer", 1.0, 1, (1.06, 0.94, 12), None),
     ("plasma_mid", 1.0, -1, (1.06, 0.93, 8), None),
     ("plasma_core", 1.0, 2, (1.05, 0.95, 6), None),
     ("plasma_spot", 1.0, -3, None, (1.0, 0.35, 4.8)),
     ("shell", 1.0, 0, None, None),
+    ("rings_a", 1.638, 0, None, None),          # the claw, in front of the orb's edge
 ]
 # The rings sit where theme.xml leaves them after its opening turn.
-RESTING_ANGLE = {"rings_c": 30, "rings_b": -45, "rings_a": 60}
+RESTING_ANGLE = {"rings_b": 30}
 
 
 def pulse(start: float, end: float, period: float, t: float) -> float:

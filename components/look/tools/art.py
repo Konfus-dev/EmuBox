@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generates every image used by the EmuBox theme.  Usage: python3 art.py <theme folder>
 All artwork and audio is original and procedural (no console maker's assets are used)."""
-import sys, math, random, os
+import sys, math, os
 from PIL import Image, ImageDraw, ImageFilter, ImageOps, ImageChops, ImageFont
 ROOT = sys.argv[1]; OUT = f"{ROOT}/art"; W, H = 1920, 1080
 os.makedirs(f"{OUT}/help", exist_ok=True); 
@@ -23,74 +23,8 @@ def glow_of(mask, color, blur, strength=1.0):
     g = Image.new("RGBA", mask.size, color + (0,))
     g.putalpha(mask.filter(ImageFilter.GaussianBlur(blur)).point(lambda v: min(255, int(v * strength)))); return g
 
-# ------------------------------------------------------------------ backgrounds
-def voronoi_cells(sites, box):
-    """The cell around each site (the area closer to it than to any other), as polygons: each
-    starts as the whole box and is cut by the line halfway to every nearby site."""
-    cells = []
-    for i, (x, y) in enumerate(sites):
-        poly = [(box[0], box[1]), (box[2], box[1]), (box[2], box[3]), (box[0], box[3])]
-        near = sorted((j for j in range(len(sites)) if j != i),
-                      key=lambda j: (sites[j][0] - x) ** 2 + (sites[j][1] - y) ** 2)
-        for j in near[:40]:
-            ox, oy = sites[j]; nx, ny = ox - x, oy - y; mx, my = (x + ox) / 2, (y + oy) / 2
-            keep = lambda p: (p[0] - mx) * nx + (p[1] - my) * ny <= 0      # noqa: E731  our side of the line
-            out = []
-            for k in range(len(poly)):
-                p, q = poly[k], poly[(k + 1) % len(poly)]
-                if keep(p):
-                    out.append(p)
-                if keep(p) != keep(q):
-                    dp = (p[0] - mx) * nx + (p[1] - my) * ny; dq = (q[0] - mx) * nx + (q[1] - my) * ny
-                    t = dp / (dp - dq); out.append((p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t))
-            poly = out
-            if len(poly) < 3:
-                break
-        cells.append(poly)
-    return cells
-
-def mesh_tunnel(size, center, alpha, seed=7):
-    """The inside of a huge wireframe sphere seen from its middle: irregular cells, small and dim
-    straight ahead, large and bright towards the edges of the screen."""
-    s = 2; w, h = size[0] * s, size[1] * s; cx, cy = center[0] * s, center[1] * s
-    rnd = random.Random(seed); focal = 0.34 * w; step = math.radians(7.5); sites = []
-    phi = math.radians(3)
-    while phi < math.radians(80):
-        count = max(5, round(2 * math.pi * math.sin(phi) / step))
-        turn = rnd.uniform(0, 6.283)
-        for k in range(count):
-            a = turn + k * 6.283185 / count + rnd.uniform(-0.35, 0.35) / count * 6.283
-            f = phi + rnd.uniform(-0.3, 0.3) * step
-            r = focal * math.tan(f)
-            sites.append((cx + r * math.cos(a), cy + r * math.sin(a) * 0.92))
-        phi += step
-    reach = math.hypot(max(cx, w - cx), max(cy, h - cy))
-    lines = Image.new("L", (w, h), 0); d = ImageDraw.Draw(lines)
-    for (x, y), poly in zip(sites, voronoi_cells(sites, (-200, -200, w + 200, h + 200))):
-        if len(poly) < 3:
-            continue
-        near = min(1.0, math.hypot(x - cx, y - cy) / reach)                    # 0 straight ahead, 1 at the edge
-        level = int(255 * (0.18 + 0.82 * near ** 1.3))
-        d.line(poly + [poly[0]], fill=level, width=max(3, int((2.2 + 4.5 * near) * s)), joint="curve")   # thick and even, like the classic wall
-    small = lines.resize(size, Image.LANCZOS)
-    layer = Image.new("RGBA", size, (0, 0, 0, 0))
-    layer.alpha_composite(glow_of(small, (70, 230, 40), 6, 1.4 * alpha / 255))
-    layer.alpha_composite(with_alpha(Image.new("RGB", size, (150, 255, 90)), small, alpha))
-    return layer
-
-def background(name, glow_center, inner, outer, radius, mesh_center, mesh_alpha):
-    bg = radial((W, H), glow_center, radius, inner, outer).convert("RGBA")
-    bg.alpha_composite(mesh_tunnel((W, H), mesh_center, mesh_alpha))
-    # the sweeping line that carries the button hints, bottom left
-    sweep = Image.new("RGBA", (W * 2, H * 2), (0, 0, 0, 0)); sd = ImageDraw.Draw(sweep)
-    sd.arc((-1500, 1150, 2300, 3400), 200, 318, fill=(150, 255, 90, 120), width=5)
-    sd.arc((-1500, 1186, 2300, 3436), 200, 300, fill=(150, 255, 90, 50), width=3)
-    bg.alpha_composite(sweep.resize((W, H), Image.LANCZOS))
-    bg.convert("RGB").save(f"{OUT}/{name}", quality=92)
-
-# Near-black, lit only by the orb and the mesh (behind the lists a little lighter, for reading).
-background("bg_system.jpg", (520, 470), (18, 70, 8), (1, 7, 1), 900, (960, 540), 205)
-background("bg_list.jpg", (960, 560), (14, 58, 8), (2, 14, 2), 1300, (960, 540), 120)
+# The menus' background (the tunnel of cells), the claw and the ring round the orb are 3D:
+# tools/blender/scene.py renders them into the same folder.
 
 # ------------------------------------------------------------------ plasma orb layers
 # A solid, glossy sphere in the manner of the classic dashboard's: lime at the rim, a creamy
@@ -166,32 +100,6 @@ def shell(size=900, rr=0.372):
     im.alpha_composite(with_alpha(Image.new("RGB", (n, n), (255, 255, 255)), dot.filter(ImageFilter.GaussianBlur(2 * s)), 230))
     im.resize((size, size), Image.LANCZOS).save(f"{OUT}/shell.png")
 shell()
-
-def ribbons(name, count, radius, thickness, sweep, tilt, alpha, size=1000, wire=False):
-    """Glassy ribbons swirling around the orb, `count` copies of one, evenly turned, so that turning
-    by one step (360 / count degrees, as the theme does on each move) looks just like the start.
-    The ribbon is a crescent: a flattened disc with a slightly shifted, smaller one taken out of it,
-    thickest on one side and tapering to points; `wire` draws only its edge."""
-    s = 2; n = size * s; c = n / 2; r = radius * n
-    outer = Image.new("L", (n, n), 0); ImageDraw.Draw(outer).ellipse((c - r, c - r * sweep, c + r, c + r * sweep), fill=255)
-    shift = thickness * n; ri = r * 0.985
-    inner = Image.new("L", (n, n), 0)
-    ImageDraw.Draw(inner).ellipse((c - ri, c - ri * sweep - shift, c + ri, c + ri * sweep - shift), fill=255)
-    body = ImageChops.subtract(outer, inner).rotate(tilt, resample=Image.BICUBIC, center=(c, c))
-    edge = body.filter(ImageFilter.FIND_EDGES).point(lambda v: 255 if v > 40 else 0).filter(ImageFilter.MaxFilter(3))
-    one = Image.new("RGBA", (n, n), (0, 0, 0, 0))
-    if not wire:
-        fill = radial((n, n), (c, c + r * 0.4), r * 1.3, (210, 255, 120), (20, 120, 14))
-        one.alpha_composite(with_alpha(fill, body.filter(ImageFilter.GaussianBlur(2 * s)), alpha))
-    one.alpha_composite(glow_of(edge, (140, 255, 80), 6 * s, 1.0))
-    one.alpha_composite(with_alpha(Image.new("RGB", (n, n), (215, 255, 160)), edge, min(255, alpha + 110)))
-    im = Image.new("RGBA", (n, n), (0, 0, 0, 0))
-    for k in range(count):
-        im.alpha_composite(one.rotate(k * 360 / count, resample=Image.BICUBIC, center=(c, c)))
-    im.resize((size, size), Image.LANCZOS).save(f"{OUT}/{name}")
-ribbons("rings_a.png", 3, 0.45, 0.075, 0.42, 20, 120)                          # turns 120 degrees per move
-ribbons("rings_b.png", 2, 0.49, 0.012, 0.26, 62, 22, wire=True)              # turns 180: a faint thin orbit
-ribbons("rings_c.png", 2, 0.47, 0.010, 0.20, -28, 40, wire=True)             # turns 180
 
 # ------------------------------------------------------------------ angular glass shapes
 def cut_poly(x0, y0, x1, y1, cut):
