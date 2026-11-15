@@ -45,6 +45,8 @@ def is_added(app: dict, apps: Path | None = None) -> bool:
 def app_json(app: dict, pads: dict) -> dict:
     """What goes in the app's app.json (see docs/extending.md)."""
     made = {"name": app["name"], "description": app.get("about", ""), "added": True}
+    if app.get("icon"):
+        made["icon"] = app["icon"]
     if app.get("web"):
         made["web"] = app["web"]
         return made
@@ -64,31 +66,10 @@ def tile_script(app: dict, root: Path = ROOT) -> str:
     return f"#!/bin/bash\n# {app['name']}, added from EmuBox's app list.\n{run}\n"
 
 
-def draw_tile(name: str, file: Path, font: Path = FONT) -> bool:
-    """The app's picture for the menus: its name on a green tile (as tools/dev/tile.py draws them)."""
-    try:
-        from PIL import Image, ImageDraw, ImageFilter, ImageFont
-        size, line = 512, 84
-        image = Image.new("RGB", (size, size), "#041a04")
-        glow = Image.new("RGB", (size, size), "black")
-        ImageDraw.Draw(glow).ellipse((96, 96, size - 96, size - 96), fill="#2f7d1e")
-        image = Image.blend(image, glow.filter(ImageFilter.GaussianBlur(70)), 0.75)
-        draw = ImageDraw.Draw(image)
-        draw.rounded_rectangle((14, 14, size - 14, size - 14), radius=28, outline="#c8f03c", width=5)
-        words = name.upper().split()
-        letters = 58
-        face = ImageFont.truetype(str(font), letters)
-        while letters > 24 and max(draw.textlength(w, font=face) for w in words) > size - 70:
-            letters -= 4
-            face = ImageFont.truetype(str(font), letters)
-        top = (size - line * len(words)) / 2
-        for i, word in enumerate(words):
-            draw.text(((size - draw.textlength(word, font=face)) / 2, top + line * i + 6), word, font=face, fill="#d8ff6a")
-        file.parent.mkdir(parents=True, exist_ok=True)
-        image.save(file)
-        return True
-    except Exception:   # noqa: BLE001  a tile without a picture still works
-        return False
+def draw_tile(app: dict, file: Path, font: Path = FONT) -> bool:
+    """The app's picture for the menus: an icon over its name (see tileart.py)."""
+    import tileart
+    return tileart.draw(app["name"], tileart.guess(app), file, font)
 
 
 def _games(tiles: Path) -> tuple[ET.ElementTree, ET.Element]:
@@ -109,7 +90,10 @@ def add(app: dict, pads: dict, apps: Path | None = None, tiles: Path = TILES, ro
     script = tiles / f"{app['name']}.sh"
     script.write_text(tile_script(app, root))
     script.chmod(0o755)
-    pictured = draw_tile(app["name"], tiles / "images" / f"{app['name']}.png", font)
+    pictured = draw_tile(app, tiles / "images" / f"{app['name']}.png", font)
+    if pictured and tiles == TILES:   # then its own icon, asked of its site or Flathub, without holding the screen up
+        subprocess.Popen([sys.executable, str(ROOT / "lib" / "tileicon.py"), "app", app["id"]],
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
     tree, games = _games(tiles)
     for old in [g for g in games.findall("game") if g.findtext("path") == f"./{script.name}"]:
         games.remove(old)

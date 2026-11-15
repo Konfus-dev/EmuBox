@@ -59,3 +59,5 @@ there is; `./install --remove <name>` takes something off.
 - [Vault](docs/vault.md) · [Adding your own apps and components](docs/extending.md) · [Helper commands for the PC](tools/README.md)
 
 EmuBox is not affiliated with Microsoft, Discord or Apple; it ships none of their artwork or software.
+A tile's icon is the app's own: taken from the program once it is on the drive, or asked of Flathub or
+the app's site when you install. Without a network the tiles keep EmuBox's own drawings.

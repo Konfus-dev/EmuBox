@@ -1,10 +1,10 @@
 #!/bin/bash
-# Show EmuBox's Guide menu, or hide it when it is showing. The Guide button runs this
+# Show EmuBox's Guide menu, or hide it when it is showing ("emubox-guide show": only ever show). The Guide button runs this
 # (system/configs/hotkeygen/common_context.conf), and so does an app's pad mapper.
 root=$(dirname "$(dirname "$(readlink -f "$0")")")
 pid=$(cat /var/run/emubox/guide.pid 2>/dev/null)
 if [ -n "$pid" ] && [ -e "/proc/$pid" ]; then
-    kill -USR1 "$pid"
+    if [ "$1" = show ]; then kill -USR2 "$pid"; else kill -USR1 "$pid"; fi
 else   # not running (it is started at boot): start it, showing
     [ -r /etc/profile.d/xdg.sh ] && . /etc/profile.d/xdg.sh
     export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}"

@@ -53,13 +53,15 @@
       "id": "youtube",
       "name": "YouTube",
       "about": "Videos, in EmuBox's built-in web view. D-pad moves between things on the page, A selects.",
-      "web": "https://www.youtube.com"
+      "web": "https://www.youtube.com",
+      "icon": "play"
     },
     {
       "id": "twitch",
       "name": "Twitch",
       "about": "Live streams, in EmuBox's built-in web view.",
-      "web": "https://www.twitch.tv"
+      "web": "https://www.twitch.tv",
+      "icon": "broadcast"
     },
     {
       "id": "netflix",
@@ -72,13 +74,14 @@
         "--no-first-run",
         "--no-default-browser-check",
         "--password-store=basic",
-        "--kiosk",
+        "--start-maximized",
         "--enable-spatial-navigation",
         "--force-dark-mode",
         "--app=https://www.netflix.com/"
       ],
       "window": "chrome-www.netflix.com",
-      "pad": "desktop"
+      "pad": "desktop",
+      "icon": "film"
     },
     {
       "id": "xbox-cloud",
@@ -96,7 +99,8 @@
         "--force-dark-mode",
         "--app=https://www.xbox.com/play"
       ],
-      "window": "chrome-www.xbox.com"
+      "window": "chrome-www.xbox.com",
+      "icon": "cloud"
     },
     {
       "id": "geforce-now",
@@ -114,7 +118,8 @@
         "--force-dark-mode",
         "--app=https://play.geforcenow.com/"
       ],
-      "window": "chrome-play.geforcenow.com"
+      "window": "chrome-play.geforcenow.com",
+      "icon": "cloud"
     },
     {
       "id": "moonlight",
@@ -122,7 +127,8 @@
       "about": "Stream games from your own gaming PC (Sunshine or GeForce Experience) on the home network.",
       "flatpak": "com.moonlight_stream.Moonlight",
       "args": [],
-      "window": "moonlight"
+      "window": "moonlight",
+      "icon": "moon"
     },
     {
       "id": "firefox",
@@ -131,7 +137,8 @@
       "flatpak": "org.mozilla.firefox",
       "args": [],
       "window": "firefox",
-      "pad": "desktop"
+      "pad": "desktop",
+      "icon": "globe"
     },
     {
       "id": "vlc",
@@ -141,7 +148,8 @@
       "args": [],
       "window": "vlc",
       "pad": "desktop",
-      "player": true
+      "player": true,
+      "icon": "film"
     }
   ]
 }

@@ -77,5 +77,22 @@
     "r3": "click",
     "left_stick": "scroll",
     "right_stick": "pointer"
-  }
+  },
+  "hints": {
+    "x": "Mute",
+    "y": "Search",
+    "lb": "",
+    "rb": "",
+    "lt": "Server up",
+    "rt": "Server down",
+    "start": "",
+    "select+a": "",
+    "select+up": "",
+    "select+down": "",
+    "select+x": "Deafen",
+    "r3": "",
+    "left_stick": "",
+    "b": "Back (hold: leave)"
+  },
+  "icon": "chat"
 }

@@ -21,6 +21,10 @@
       "to": "system/configs/hotkeygen/common_context.conf"
     },
     {
+      "from": "files/hotkeygen/default_mapping.conf",
+      "to": "system/configs/hotkeygen/default_mapping.conf"
+    },
+    {
       "from": "files/es_systems_apps.cfg",
       "to": "system/configs/emulationstation/es_systems_apps.cfg"
     }

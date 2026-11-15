@@ -43,6 +43,12 @@ Make a folder `apps/<id>/` with two files.
 - `voice`: `true` for a chat app. The Apps tab gets a microphone mute, and the strip along the
   bottom says when you are in a call.
 - `menu`: `false` keeps the app out of the Apps tab (for something opened rarely, from its own tile).
+- `web`: instead of `flatpak`, an address opened in EmuBox's own web view (nothing to download,
+  no `window` or `pad` needed).
+- `hints`: the row of button hints along the bottom is made from `pad`; say a button's words
+  yourself with `"hints": {"x": "Mute"}`, or hide one with `""`.
+- `hold_b`: `false` where B is held on purpose (Backspace in a terminal); elsewhere holding B
+  hides the app.
 - The program is fetched onto the drive when the installer runs (needs `flatpak` on the PC), so it
   is ready in Batocera. A component can ask the same for other Flathub programs with
   `"flatpaks": ["org.example.Thing"]`.
@@ -60,12 +66,18 @@ Make a folder `apps/<id>/` with two files.
   | `"menu"` | Batocera's in-game menu |
   | `"back"` | hide the app, return to the game |
   | `"close"` | quit the app |
+  | `"web-back"` | Back in a browser; on the page the app opened on, hide the app instead |
   | `{"media": "PlayPause"}` | also `Next`, `Previous`: controls whatever is playing |
   | `{"run": "command"}` | any shell command |
 
   Sticks (`left_stick`, `right_stick`) can be `"pointer"`, `"scroll"` or `"dpad"`.
 
-**`tile.png`**: the picture in the Ports menu. `python3 tools/dev/tile.py "MY APP" apps/my-app/tile.png` draws one.
+**`tile.png`**: the picture in the menus, an icon over the name.
+`python3 tools/dev/tile.py "My App" window apps/my-app/tile.png` draws one (`--icons` lists the
+drawings; `"icon": "music"` in `app.json` picks one, and `--all` redraws every tile). When the
+installer has a network the tile is redrawn around the app's own icon: the Flathub program's, or
+the site's for `"web"` and for a Chrome `--app=` address. `"icon_web": "https://..."` names a site
+to ask instead, and `"own_icon": false` keeps the drawing.
 
 That is all: `./install` now asks about it, adds it to Ports and to the Apps tab of the in-game menu.
 

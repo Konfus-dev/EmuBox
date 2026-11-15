@@ -9,7 +9,7 @@
     "--no-first-run",
     "--no-default-browser-check",
     "--password-store=basic",
-    "--kiosk",
+    "--start-maximized",
     "--enable-spatial-navigation",
     "--force-dark-mode",
     "--app=https://music.apple.com/"
@@ -17,19 +17,41 @@
   "window": "chrome-music.apple.com",
   "player": true,
   "pad": {
-    "up": ["KEY_UP"],
-    "down": ["KEY_DOWN"],
-    "left": ["KEY_LEFT"],
-    "right": ["KEY_RIGHT"],
-    "a": ["KEY_ENTER"],
-    "b": ["KEY_LEFTALT", "KEY_LEFT"],
-    "x": {"media": "PlayPause"},
+    "up": [
+      "KEY_UP"
+    ],
+    "down": [
+      "KEY_DOWN"
+    ],
+    "left": [
+      "KEY_LEFT"
+    ],
+    "right": [
+      "KEY_RIGHT"
+    ],
+    "a": [
+      "KEY_ENTER"
+    ],
+    "b": "web-back",
+    "x": {
+      "media": "PlayPause"
+    },
     "y": "osk",
-    "lb": {"media": "Previous"},
-    "rb": {"media": "Next"},
-    "lt": {"run": "batocera-audio setSystemVolume -5"},
-    "rt": {"run": "batocera-audio setSystemVolume +5"},
-    "start": {"media": "PlayPause"},
+    "lb": {
+      "media": "Previous"
+    },
+    "rb": {
+      "media": "Next"
+    },
+    "lt": {
+      "run": "batocera-audio setSystemVolume -5"
+    },
+    "rt": {
+      "run": "batocera-audio setSystemVolume +5"
+    },
+    "start": {
+      "media": "PlayPause"
+    },
     "select+a": "menu",
     "select+b": "back",
     "select+start": "close",
@@ -38,5 +60,12 @@
     "r3": "click",
     "left_stick": "scroll",
     "right_stick": "pointer"
-  }
+  },
+  "hints": {
+    "b": "Back (hold: leave)",
+    "select+a": "",
+    "r3": "",
+    "left_stick": ""
+  },
+  "icon": "music"
 }

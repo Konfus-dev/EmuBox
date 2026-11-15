@@ -39,6 +39,7 @@ from evdev import UInput, ecodes as e
 HERE = os.path.dirname(os.path.realpath(__file__))
 EMUBOX_APP = os.path.join(os.path.dirname(HERE), "bin", "emubox-app")
 OSK = os.path.join(HERE, "osk.py")
+HINTS = os.path.join(HERE, "hints.py")
 DEBUG = bool(os.environ.get("EMUBOX_DEBUG"))
 
 FOCUS_POLL_S = 0.4        # how often we ask the compositor who has the focus
@@ -50,6 +51,7 @@ STICK_DEADZONE = 0.18
 POINTER_SPEED = 1100      # pixels per second with the stick fully over
 SCROLL_SPEED = 14         # wheel notches per second with the stick fully over
 TRIGGER_PULLED = 0.5
+HOLD_B_S = 0.8            # B held this long leaves the app (hides it), wherever you are in it
 
 # xpad reports the X button as BTN_NORTH and Y as BTN_WEST; we follow the labels.
 BUTTONS = {
@@ -87,6 +89,14 @@ class App:
     def focused(self, app_id: str) -> bool:
         return wlrctl("find", f"app_id:{app_id}", "state:focused").returncode == 0
 
+    def title(self) -> str:
+        """What the window is showing now (a browser puts the page's name here)."""
+        for line in wlrctl("list").stdout.splitlines():
+            app_id, _, title = line.partition(": ")
+            if self.prefix and self.prefix.lower() in app_id.lower():
+                return title.strip()
+        return ""
+
 
 class Pad:
     def __init__(self, config: dict):
@@ -102,7 +112,14 @@ class Pad:
         self.sticks = {"left_stick": [0.0, 0.0], "right_stick": [0.0, 0.0]}
         self.stick_dirs: dict[str, str | None] = {}
         self.carry = {"x": 0.0, "y": 0.0, "wheel": 0.0}
+        self.config_file = config.get("file", "")
+        self.strip: subprocess.Popen | None = None        # the row of button hints under the app
+        self.in_front = False
+        self.home: str | None = None                      # the window's title on the page the app opened on
+        self.b_since: float | None = None                 # when B went down, until it has been acted on
+        self.hold_b = config.get("hold_b", True)          # false where B is held on purpose (Backspace in a terminal)
         keys = {e.ecodes[k] for action in self.map.values() if isinstance(action, list) for k in action}
+        keys.add(e.KEY_BACK)                              # "web-back": a browser's own Back key
         self.out = UInput(
             {e.EV_KEY: sorted(keys | set(MOUSE_BUTTONS.values())), e.EV_REL: [e.REL_X, e.REL_Y, e.REL_WHEEL]},
             name="EmuBox app controller",
@@ -173,6 +190,10 @@ class Pad:
     # --- what buttons do ----------------------------------------------------------
 
     def _button(self, name: str, pressed: bool) -> None:
+        if pressed and self.home is None:
+            self.home = self.app.title()   # the first press is on the page the app opened on
+        if name == "b" and self.hold_b:
+            self.b_since = time.monotonic() if pressed else None
         if pressed:
             if name != "select" and "select" in self.down and f"select+{name}" in self.map:
                 name_used = f"select+{name}"
@@ -192,11 +213,19 @@ class Pad:
             for key in (action if pressed else reversed(action)):
                 self.out.write(e.EV_KEY, e.ecodes[key], int(pressed))
             self.out.syn()
-        elif action in MOUSE_BUTTONS:
+        elif isinstance(action, str) and action in MOUSE_BUTTONS:
             self.out.write(e.EV_KEY, MOUSE_BUTTONS[action], int(pressed))
             self.out.syn()
         elif not pressed:
             return
+        elif action == "web-back":
+            # Back in a browser; on the page the app opened on there is nowhere to go back to, so leave.
+            if self.home and self.app.title() == self.home:
+                self._act("back", True)
+            else:
+                for value in (1, 0):
+                    self.out.write(e.EV_KEY, e.KEY_BACK, value)
+                    self.out.syn()
         elif isinstance(action, dict) and "media" in action:
             subprocess.Popen([EMUBOX_APP, "media", action["media"]], start_new_session=True)
         elif isinstance(action, dict):
@@ -206,7 +235,7 @@ class Pad:
             self.waiting_for = subprocess.Popen([sys.executable, OSK])
         elif action == "menu":
             self.hand_over()
-            subprocess.Popen([os.path.join(os.path.dirname(HERE), "bin", "emubox-guide")], start_new_session=True)
+            subprocess.Popen([os.path.join(os.path.dirname(HERE), "bin", "emubox-guide"), "show"], start_new_session=True)
         elif action in ("back", "close"):
             self.hand_over()
             subprocess.Popen([EMUBOX_APP, action, self.name], start_new_session=True)
@@ -288,11 +317,21 @@ class Pad:
         elif now - self.last_seen > (GONE_AFTER_S if self.seen else STARTUP_GRACE_S):
             return None
         self.seen = self.seen or bool(window)
+        self.in_front = bool(window) and self.app.focused(window)
         if self.waiting_for and self.waiting_for.poll() is not None:
             self.waiting_for = None
         if self.waiting_for or now < self.hands_off_until:
             return False
-        return bool(window) and self.app.focused(window)
+        return self.in_front
+
+    def _show_strip(self, show: bool) -> None:
+        """The hints stay up while the app is in front (also under the keyboard or the Guide
+        menu, so the app's window is not resized each time one of them opens)."""
+        if show and self.config_file and (self.strip is None or self.strip.poll() is not None):
+            self.strip = subprocess.Popen([sys.executable, HINTS, self.config_file], stderr=subprocess.DEVNULL)
+        elif not show and self.strip is not None:
+            self.strip.terminate()
+            self.strip = None
 
     def run(self) -> None:
         self.seen, self.last_seen = False, time.monotonic()
@@ -305,6 +344,10 @@ class Pad:
                     wanted = self._wanted()
                     if wanted is None:
                         return
+                    self._show_strip(self.in_front)
+                    if self.grabbed and self.b_since is not None and now - self.b_since >= HOLD_B_S:
+                        self.b_since = None
+                        self._act("back", True)
                     if wanted and not self.grabbed:
                         self.grab()  # fails quietly while someone else holds the pad
                     elif not wanted and self.grabbed:
@@ -327,6 +370,7 @@ class Pad:
                 last_tick = now
         finally:
             self.release()
+            self._show_strip(False)
             self.out.close()
 
 
@@ -337,6 +381,7 @@ def main() -> int:
     with open(sys.argv[1]) as f:
         config = json.load(f)
     config.setdefault("id", os.path.basename(os.path.dirname(os.path.realpath(sys.argv[1]))))
+    config["file"] = os.path.realpath(sys.argv[1])
     Pad(config).run()
     return 0
 

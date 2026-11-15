@@ -67,5 +67,19 @@
     "l3": "osk",
     "r3": "click",
     "right_stick": "pointer"
-  }
+  },
+  "hints": {
+    "a": "Enter",
+    "b": "Backspace",
+    "x": "Tab",
+    "y": "Ctrl+C",
+    "start": "Esc",
+    "lb": "",
+    "rb": "",
+    "r3": "",
+    "right_stick": ""
+  },
+  "hold_b": false,
+  "icon": "spark",
+  "icon_web": "https://claude.ai"
 }

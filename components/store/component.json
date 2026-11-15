@@ -27,7 +27,8 @@
       "image": "files/free-games.png",
       "genre": "Store",
       "description": "Batocera's catalogue of homebrew and freely distributable games, for many systems. Pick one and it downloads straight into your library.",
-      "folder": "Games"
+      "folder": "Games",
+      "icon": "gift"
     },
     {
       "system": "store",
@@ -36,7 +37,9 @@
       "image": "files/steam.png",
       "genre": "Store",
       "description": "Your Steam library and the Steam store. Downloads itself the first time you open it (needs internet, about 3 GB).",
-      "folder": "Games"
+      "folder": "Games",
+      "icon": "gamepad",
+      "icon_flatpak": "com.valvesoftware.Steam"
     },
     {
       "system": "store",
@@ -45,7 +48,9 @@
       "image": "files/heroic.png",
       "genre": "Store",
       "description": "Your Epic Games, GOG and Amazon libraries, through the Heroic launcher. Downloads itself the first time you open it (needs internet).",
-      "folder": "Games"
+      "folder": "Games",
+      "icon": "shield",
+      "icon_flatpak": "com.heroicgameslauncher.hgl"
     },
     {
       "system": "store",
@@ -54,7 +59,9 @@
       "image": "files/flathub.png",
       "genre": "Store",
       "description": "Apps from Flathub (and a few web ones) that EmuBox knows how to set up for the controller: video, cloud gaming, streaming from your own PC, a browser, a media player. Pick one and it joins the Apps section of the home screen.",
-      "folder": "Apps"
+      "folder": "Apps",
+      "icon": "package",
+      "icon_web": "https://flathub.org"
     }
   ],
   "replaces": [
@@ -65,5 +72,22 @@
     "roms/store/Heroic.sh",
     "roms/store/Flathub.sh"
   ],
-  "after": "Store is a new entry on the home screen."
+  "after": "Store is a new entry on the home screen.",
+  "es_settings": {
+    "store.FolderViewMode": "always"
+  },
+  "folders": {
+    "Games": {
+      "system": "store",
+      "image": "files/games.png",
+      "icon": "gamepad",
+      "description": "Places to get games: free games, Steam, Heroic, itch.io and your own Vault pages."
+    },
+    "Apps": {
+      "system": "store",
+      "image": "files/apps.png",
+      "icon": "apps",
+      "description": "Add apps to the Apps section: web apps, streaming, anything on Flathub."
+    }
+  }
 }

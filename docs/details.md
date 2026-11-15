@@ -53,7 +53,7 @@ things or update; it only copies what is missing.
 | --- | --- |
 | **Xbox-style look** | Theme for the menus, a start-up film (the orb waking, then the EmuBox name, with its own sound) that goes straight to the menus without Batocera's loading screen, the EmuBox name on the home screen and on an OMEN cooler's screen, matching colours for the in-game menu, fonts, sounds. One row along the top: a light per controller on the left; how full the drive is, the clock and the network on the right |
 | **Discord**, **Apple Music** | Open from **Apps** on the home screen, or over a running game from the in-game menu's **Apps** tab. The installer puts each one's program on the drive (with `flatpak` on the PC), so there is no waiting in Batocera; without that, or with `--download-later`, it downloads the first time you open it |
-| **Terminal**, **Files**, **Claude** | Come with any app, in **Apps**: a command line, Batocera's file manager opened on the drive, and Claude Code in a terminal (it downloads itself the first time and asks you to sign in; a keyboard helps) |
+| **Terminal**, **Files**, **Browser**, **Claude** | Come with any app, in **Apps**: a command line, Batocera's file manager opened on the drive, and Claude Code in a terminal (it downloads itself the first time and asks you to sign in; a keyboard helps) |
 | **ROM-hack patcher** | Drop a `.ips`/`.bps`/`.ups` file in `patches` and it is applied at boot |
 | **Play settings** | Auto-save, rewind on 8/16-bit systems, a light CRT shader, a tidier network share |
 | **Bluetooth controllers** | Offered when preparing a drive on a PC with paired controllers: copies the pairings so the same controller works in Linux and Batocera without re-pairing |
@@ -99,14 +99,21 @@ song, LT/RT change the volume, Y opens the keyboard.
 
 - **Settings**: the system volume and mute, the menu sound set and its volume, the lights' basics,
   power mode, plane mode, stopping a stuck emulator, and **Open full settings** (Batocera's main menu).
-- **Apps**: open an app, or go back to the game. **Record**: start and stop a recording.
-- **Game**, while one runs: resume, the emulator's own options, quit.
+- **Apps**: open an app or a tool, or hide the apps and go back. **Record**: start and stop a recording.
+- **Running**, while a game or an app from its tile runs: resume, quit, and the emulator's own
+  quick settings.
+- Each tab's rows sit under headings (Sound, OMEN Lighting, System; Apps, Tools).
 - Along the bottom, a bar for each thing that is live, with its controls: a call (microphone
   switch), your music app (previous, pause, next), or the menus' own music (the same three).
   Under them, the processor load and how full the drive is; along the top, the time and the
   network address.
 
 D-pad or stick moves, A presses, left/right changes a value, LB/RB change tab, B or Guide closes.
+
+Every app shows what the buttons do in a row along the bottom, and its window sits above that
+row. In any app Select+B hides it and Select+Start quits it; holding B hides it too (not in the
+terminal, where B is Backspace). In a browser-based app B goes back, and on the page the app
+opened on it leaves. Opening an app shows "Opening ..." until its window is there.
 
 The menus' background music is played by EmuBox (Batocera's own is switched off) so that it can
 be shown, skipped and paused. It plays in the menus only, and waits while a music app of yours
@@ -171,3 +178,5 @@ See [docs/extending.md](extending.md).
 
 Licence: GPL-3.0-or-later. Fonts: SIL Open Font Licence (see `components/look/files/fonts`).
 EmuBox is not affiliated with Microsoft, Discord or Apple; it ships none of their artwork or software.
+A tile's icon is the app's own: taken from the program once it is on the drive, or asked of Flathub or
+the app's site when you install. Without a network the tiles keep EmuBox's own drawings.

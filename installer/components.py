@@ -22,10 +22,14 @@ component.json:
     files          [{"from": path here, "to": path on the drive, "mode": "755"}]
     flatpaks       Flathub programs to put on the drive now, so Batocera need not download them
                    (an app's own program is added by itself); skipped with --download-later
+    folders        {"Games": {"system": "store", "image": "files/games.png", "icon": "gamepad",
+                   "description": "..."}}: the picture and words of a sub-section tiles sit in
     ports          menu entries: name, description, image, and either "script" (a file here)
                    or "command" (one line to run). They go in Ports unless "system" names
                    another system folder (for example "store"); "folder" puts one in a
-                   sub-section of that system (for example "Games").
+                   sub-section of that system (for example "Games"). "icon" names the
+                   drawing on its picture (tools/dev/tile.py --icons); "icon_flatpak" or "icon_web"
+                   say where the tile's own icon is to be found when the installer has a network.
     services       Batocera services to switch on
     batocera_conf  {"key": "value"} settings for batocera.conf
     es_settings    {"name": "value"} settings of the menu program
@@ -40,6 +44,8 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
+import sys
 from datetime import date
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -53,6 +59,7 @@ from .target import OLD_MANIFESTS, Target
 PORTS = "roms/ports"
 APPS_ON_DRIVE = "system/emubox/apps"
 OPEN_APP = "exec /userdata/system/emubox/bin/emubox-app open {id} --wait"
+OPEN_WEB = "exec python3 /userdata/system/emubox/lib/webview.py '{web}' --id {id}"   # a site in EmuBox's own web view
 
 
 @dataclass
@@ -120,10 +127,11 @@ def _app_spec(app_id: str, app: dict) -> dict:
         "ports": [{
             "system": "apps",
             "name": app["name"],
-            "command": OPEN_APP.format(id=app_id),
+            "command": OPEN_WEB.format(id=app_id, web=app["web"]) if app.get("web") else OPEN_APP.format(id=app_id),
             "image": "tile.png",
             "genre": "Apps",
             "description": app.get("description", ""),
+            "app": app, "app_id": app_id,          # where the tile's own icon is looked for
         }],
     }
 
@@ -241,6 +249,11 @@ def install(component: Component, env: Env) -> Record:
         record.files += target.copy(component.folder / item["from"], item["to"], mode)
     for port in spec.get("ports", []):
         _add_port(component, port, target, record)
+    for name, folder in spec.get("folders", {}).items():   # a sub-section of a system: its picture and words
+        system = f"roms/{folder.get('system', 'ports')}"
+        record.files.append(target.copy_file(component.folder / folder["image"], f"{system}/images/{name}.png"))
+        gamelist.set_entry(target.path(f"{system}/gamelist.xml"), name,
+                           {"name": name, "desc": folder.get("description", ""), "image": f"./images/{name}.png"}, tag="folder")
     typed = env.answers.get(component.id, {})
     for key, value in spec.get("batocera_conf", {}).items():
         target.conf_set(key, _fill(value, typed))
@@ -252,11 +265,39 @@ def install(component: Component, env: Env) -> Record:
         run(env)
     if spec.get("flatpaks") and env.downloads:
         flatpak.preinstall(target, spec["flatpaks"], env.say)
+    if env.downloads and not os.environ.get("EMUBOX_OFFLINE"):
+        _own_icons(component, target, record)
 
     for service in spec.get("services", []):
         target.enable_service(service)
         record.services.append(service)
     return record
+
+
+def _own_icons(component: Component, target: Target, record: Record) -> None:
+    """Each tile's picture redrawn around the app's own icon, where one is to be had: from the
+    program on the drive, or asked of Flathub or the app's site (see tileicon.py). Nothing is
+    kept in this repository; without a network the tiles keep their drawings."""
+    lib = str(component.folder.parents[1] / "components" / "console" / "files" / "lib")
+    if lib not in sys.path:
+        sys.path.insert(0, lib)
+    try:
+        import tileicon
+    except ImportError:
+        return
+    font = component.folder.parents[1] / "components" / "look" / "files" / "fonts" / "Michroma-Regular.ttf"
+    roots = [target.path("saves/flatpak/binaries")]
+    for port in component.spec.get("ports", []):
+        entry = port.get("app") or port
+        if not port.get("image") or not any(tileicon.sources(entry)):
+            continue
+        picture = target.path(f"roms/{port.get('system', 'ports')}/images/{port['name']}.png")
+        try:
+            done = tileicon.upgrade({**entry, "name": port["name"]}, picture, font, roots)
+        except Exception:   # noqa: BLE001  a tile keeps its drawing
+            done = False
+        if done and port.get("app_id"):   # so Batocera does not ask again
+            record.files.append(target.write_text(f"{APPS_ON_DRIVE}/{port['app_id']}/.icon", "the tile shows the app's own icon\n"))
 
 
 def remember(target: Target, component: Component, record: Record) -> None:

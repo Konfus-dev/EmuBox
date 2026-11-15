@@ -16,21 +16,21 @@ def _save(tree: ET.ElementTree, path: Path) -> None:
     tree.write(path, encoding="utf-8", xml_declaration=True)
 
 
-def _entry_for(root: ET.Element, game_path: str) -> ET.Element | None:
-    for game in root.findall("game"):
+def _entry_for(root: ET.Element, game_path: str, tag: str = "game") -> ET.Element | None:
+    for game in root.findall(tag):
         if game.findtext("path") == game_path:
             return game
     return None
 
 
-def set_entry(path: Path, file_name: str, fields: dict[str, str]) -> None:
-    """Add or replace the entry for one file in a game list."""
+def set_entry(path: Path, file_name: str, fields: dict[str, str], tag: str = "game") -> None:
+    """Add or replace the entry for one file in a game list (tag "folder": for a sub-folder)."""
     tree = _load(path)
     root = tree.getroot()
-    old = _entry_for(root, f"./{file_name}")
+    old = _entry_for(root, f"./{file_name}", tag)
     if old is not None:
         root.remove(old)
-    game = ET.SubElement(root, "game")
+    game = ET.SubElement(root, tag)
     ET.SubElement(game, "path").text = f"./{file_name}"
     for tag, text in fields.items():
         ET.SubElement(game, tag).text = text

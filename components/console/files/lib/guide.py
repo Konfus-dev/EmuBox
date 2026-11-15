@@ -41,6 +41,7 @@ APP = ROOT / "bin" / "emubox-app"
 PID = Path("/var/run/emubox/guide.pid")
 RUNNING_GAME = "curl -s -m 1 http://127.0.0.1:1234/runningGame"
 REFRESH_S = 1.5
+LET_GO_S = 2.0   # after a press changed the menu, a toggle within this long is that press being let go
 
 Getter = "str | Callable[[], str]"   # a shell command whose output is the value, or a function
 
@@ -178,16 +179,18 @@ def layout(found: list[tuple[str, dict]] | None = None, lights: bool | None = No
     app_rows = [heading("Apps")] + opens([entry for entry in listed if entry not in tools])
     if tools:
         app_rows += [heading("Tools")] + opens(tools)
-    app_rows += [heading("Game"), Row("Game", [button("Back to game", f"{a} back", close=True)])]
+    app_rows += [heading("Return"), Row("Hide apps", [button("Go back", f"{a} back", close=True)])]
 
+    # Whatever Batocera started: a game in an emulator, or an app opened from its tile.
     game = [
-        Row("Playing", [text(in_game)]),
-        Row("Game", [button("Resume", "true", close=True),
-                     button("Emulator options", "hotkeygen --send menu", close=True),
-                     button("Quit game", "hotkeygen --send exit", close=True, confirm=True)]),
+        Row("Now running", [text(in_game)]),
+        Row("", [button("Resume", "true", close=True),
+                 button("Quit", "hotkeygen --send exit", close=True, confirm=True)]),
+        heading("Emulator"),
+        Row("Quick settings", [button("Open the emulator's menu", "hotkeygen --send menu", close=True)]),
     ]
     record = [Row("Recording", [switch("batocera-record is_running | grep true", "batocera-record start", "batocera-record stop")])]
-    tabs = [Tab("Game", game, when=in_game), Tab("Settings", settings), Tab("Apps", app_rows), Tab("Record", record)]
+    tabs = [Tab("Running", game, when=in_game), Tab("Settings", settings), Tab("Apps", app_rows), Tab("Record", record)]
 
     # One bar for each app that is doing something, with what you would want to reach for.
     bars = []
@@ -427,6 +430,7 @@ def screen(show_now: bool) -> int:
             self.load = Load()
             self.pads = None
             self.showing = False
+            self.deaf_until = 0.0
             self.busy = False            # a reading of the values is under way
             self.read_once = False       # until then we do not know whether a game is running
             self.model.tabs[0].shown = False
@@ -471,6 +475,7 @@ def screen(show_now: bool) -> int:
             self.add(pane)
             self.connect("key-press-event", self._on_key)
             GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGUSR1, self._toggle)
+            GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGUSR2, self._asked_to_show)
             GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, self._quit)
             if show_now:
                 self._show()
@@ -478,7 +483,20 @@ def screen(show_now: bool) -> int:
         # --- showing and hiding ---------------------------------------------------------
 
         def _toggle(self) -> bool:
+            """The Guide button, from Batocera's hotkeys: it tells us when the button is let go.
+            When a press has just opened or closed the menu (an app's pad mapper asking for it, or
+            Guide pressed in the menu itself), this is that same press being let go: not a new one."""
+            if time.monotonic() < self.deaf_until:
+                self.deaf_until = 0.0
+                return True
             self._hide() if self.showing else self._show()
+            return True
+
+        def _asked_to_show(self) -> bool:
+            """An app's pad mapper, at the moment Guide is pressed."""
+            if not self.showing:
+                self._show()
+            self.deaf_until = time.monotonic() + LET_GO_S
             return True
 
         def _quit(self) -> bool:
@@ -489,7 +507,7 @@ def screen(show_now: bool) -> int:
         def _show(self) -> None:
             self.showing = True
             # Drawn at once with what was last read (reading runs a dozen commands); fresh values follow.
-            self.model.open_on("Game" if self.model.tabs[0].when and self.model.tabs[0].shown and self.read_once else "Settings")
+            self.model.open_on("Running" if self.model.tabs[0].when and self.model.tabs[0].shown and self.read_once else "Settings")
             self._draw()
             self._read_soon()
             self._footer()
@@ -646,7 +664,7 @@ def screen(show_now: bool) -> int:
                 if not self.read_once:   # first reading: now we know whether to start on the Game tab
                     self.read_once = True
                     if self.model.tabs[0].shown:
-                        self.model.open_on("Game")
+                        self.model.open_on("Running")
                 self.network.set_text(address or "No network")
                 if self.showing:
                     self._draw()
@@ -666,6 +684,8 @@ def screen(show_now: bool) -> int:
                     subprocess.Popen(["bash", "-c", command], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                      start_new_session=True)
             if result == "close":
+                if key == "guide":
+                    self.deaf_until = time.monotonic() + LET_GO_S
                 self._hide()
                 return
             self._draw()

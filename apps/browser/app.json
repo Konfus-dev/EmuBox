@@ -1,0 +1,8 @@
+{
+  "name": "Browser",
+  "comes_with": "console",
+  "description": "The web, in EmuBox's built-in web view: nothing to download. D-pad moves between links, A selects, B goes back, X opens the keyboard, Y goes home, the right stick is a pointer. Select+Start leaves.",
+  "web": "https://duckduckgo.com",
+  "icon": "globe",
+  "own_icon": false
+}

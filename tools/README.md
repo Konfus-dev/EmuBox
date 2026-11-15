@@ -19,6 +19,6 @@ Commands for looking after a Batocera drive from a Linux PC. `./install` links t
 | | |
 | --- | --- |
 | `fakepad.py` | a pretend controller that plays commands written to a pipe |
-| `tile.py` | draws an app's picture for the menus |
+| `tile.py` | draws a tile's picture for the menus: an icon over the name (`--all` redraws every one) |
 | `headless` | runs a command on a display nobody sees, so trying a screen does not pop a window up: `tools/dev/headless batocera-preview` |
 | `webcheck.py` | drives Vault and the web view from start to finish against a pretend shop: `tools/dev/headless python3 tools/dev/webcheck.py` |

@@ -2,6 +2,8 @@
 
     python3 -m unittest discover tests
 """
+import os
+os.environ["EMUBOX_OFFLINE"] = "1"   # no icons fetched from the network while testing
 import io
 import json
 import os
@@ -95,7 +97,7 @@ class ComponentTests(Drive):
     def test_apps_pull_in_the_console_tools(self):
         everything = components.discover(REPO)
         self.assertEqual(components.with_requirements(["discord"], everything),
-                         ["console", "discord", "claude", "files", "terminal"])   # the last three come with the console tools
+                         ["console", "discord", "browser", "claude", "files", "terminal"])   # the last four come with the console tools
 
     def test_install_everything_then_remove_an_app(self):
         code, out = run(self.root, "--yes", "--with", "look,discord,apple-music,rom-patcher,tweaks,store,vault")
@@ -113,8 +115,12 @@ class ComponentTests(Drive):
         entries = (self.root / "system/configs/emulationstation/es_features_emubox.cfg").read_text()
         self.assertIn('submenu="MENU SOUNDS"', entries)     # EmuBox's settings are in Batocera's menu from the first start
         self.assertEqual(self.target.conf_get("global.shaderset"), "zfast")
-        self.assertEqual((self.root / "roms/apps/gamelist.xml").read_text().count("<game>"), 5)   # two chosen, and Claude, Files and Terminal
+        self.assertEqual((self.root / "roms/apps/gamelist.xml").read_text().count("<game>"), 6)   # two chosen, and Browser, Claude, Files and Terminal
         self.assertEqual((self.root / "roms/store/gamelist.xml").read_text().count("<game>"), 6)
+        store = (self.root / "roms/store/gamelist.xml").read_text()                 # its two folders have pictures and words
+        self.assertEqual((store.count("<folder>"), "<path>./Games</path>" in store), (2, True))
+        self.assertTrue((self.root / "roms/store/images/Apps.png").is_file())
+        self.assertIn('name="store.FolderViewMode" value="always"', self.target.path("system/configs/emulationstation/es_settings.cfg").read_text())
 
         code, out = run(self.root, "--remove", "discord")
         self.assertEqual(code, 0, out)
@@ -290,7 +296,7 @@ class ComponentTests(Drive):
         before = sorted(p.relative_to(self.root).as_posix() for p in self.root.rglob("*"))
         run(self.root, "--yes", "--with", "discord")
         self.assertEqual(before, sorted(p.relative_to(self.root).as_posix() for p in self.root.rglob("*")))
-        self.assertEqual((self.root / "roms/apps/gamelist.xml").read_text().count("<game>"), 4)   # the one chosen, and Claude, Files and Terminal
+        self.assertEqual((self.root / "roms/apps/gamelist.xml").read_text().count("<game>"), 5)   # the one chosen, and Browser, Claude, Files and Terminal
 
     def test_lights_are_not_offered_without_the_hardware(self):
         code, out = run(self.root, "--yes", "--with", "omen-lights")
@@ -420,7 +426,11 @@ class SmallThings(unittest.TestCase):
     def test_app_files_are_complete(self):
         for path in (REPO / "apps").glob("*/app.json"):
             app = json.loads(path.read_text())
-            for key in ("name", "window", "pad", "description"):
+            self.assertIn("name", app, path)
+            self.assertIn("description", app, path)
+            if app.get("web"):       # a site in EmuBox's own web view, which has its own buttons
+                continue
+            for key in ("window", "pad"):
                 self.assertIn(key, app, f"{path}: {key}")
             # A Flathub program with its arguments, or a program Batocera already has.
             self.assertTrue(("flatpak" in app and "args" in app) != ("command" in app), path)

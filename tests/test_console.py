@@ -38,7 +38,7 @@ class GuideTests(unittest.TestCase):
         self.model.open_on("Settings")
 
     def test_the_tabs_and_what_is_in_them(self):
-        self.assertEqual([t.title for t in self.tabs], ["Game", "Settings", "Apps", "Record"])
+        self.assertEqual([t.title for t in self.tabs], ["Running", "Settings", "Apps", "Record"])
         settings = {row.label: row.controls for row in self.tabs[1].rows}
         self.assertEqual(list(settings), ["Sound", "Volume", "Mute", "Menu sounds", "Menu sound volume",
                                           "OMEN Lighting", "Lights", "Brightness", "Follow the game",
@@ -46,12 +46,12 @@ class GuideTests(unittest.TestCase):
         self.assertEqual(settings["Everything else"][0].do, "hotkeygen --send menu")      # Batocera's main menu
         apps = [(row.label, [c.label for c in row.controls]) for row in self.tabs[2].rows]
         self.assertEqual(apps, [("Apps", []), ("Apple Music", ["Open"]), ("Discord", ["Open"]),      # no Close, no Heroic
-                                ("Game", []), ("Game", ["Back to game"])])
+                                ("Return", []), ("Hide apps", ["Go back"])])
         self.assertTrue(self.tabs[2].rows[1].controls[0].do.endswith(" detach open apple-music"))
         with_tools = guide.layout(APPS + [("terminal", {"name": "Terminal", "command": ["xterm"]})], lights=False)[0][2].rows
-        self.assertEqual([row.label for row in with_tools], ["Apps", "Apple Music", "Discord", "Tools", "Terminal", "Game", "Game"])
+        self.assertEqual([row.label for row in with_tools], ["Apps", "Apple Music", "Discord", "Tools", "Terminal", "Return", "Hide apps"])
         self.assertFalse(with_tools[3].focusable)                                         # the highlight passes over a heading
-        self.assertEqual([t.title for t in guide.layout(APPS, lights=False)[0]], ["Game", "Settings", "Apps", "Record"])
+        self.assertEqual([t.title for t in guide.layout(APPS, lights=False)[0]], ["Running", "Settings", "Apps", "Record"])
         self.assertNotIn("OMEN Lighting", [row.label for row in guide.layout(APPS, lights=False)[0][1].rows])
         volumes = [row.label for tab in self.tabs for row in tab.rows if "Volume" == row.label]
         self.assertEqual(volumes, ["Volume"])                                              # the system volume, once
@@ -102,8 +102,8 @@ class GuideTests(unittest.TestCase):
 
     def test_the_game_tab_comes_first_while_a_game_runs(self):
         self.tabs[0].shown = True
-        self.model.open_on("Game")
-        self.assertEqual([c.label for c in self.model.controls()], ["Resume", "Emulator options", "Quit game"])
+        self.model.open_on("Running")
+        self.assertEqual([c.label for c in self.model.controls()], ["Resume", "Quit"])
         self.model.press("right"); self.model.press("right")
         self.assertEqual(self.model.press("a"), "moved")                        # quitting asks first
         self.assertEqual((self.model.press("a"), self.model.ran), ("close", ["hotkeygen --send exit"]))
@@ -151,6 +151,60 @@ class AppStoreTests(unittest.TestCase):
             self.assertFalse((folder / "tiles/YouTube.sh").exists())
         tabs, _ = guide.layout([("youtube", {"name": "YouTube", "web": "https://www.youtube.com"})], lights=False)
         self.assertIn("webview.py 'https://www.youtube.com' --id youtube", tabs[2].rows[1].controls[0].do)
+
+
+class HintsAndIconsTests(unittest.TestCase):
+    def test_every_app_gets_its_hints_from_its_own_buttons(self):
+        import hints
+        music_app = json.loads((REPO / "apps/apple-music/app.json").read_text())
+        shown = dict(hints.hints(music_app))
+        self.assertEqual((shown["dpad"], shown["a"], shown["x"], shown["rb"], shown["select+start"]),
+                         ("Move", "Select", "Play/Pause", "Next song", "Quit"))
+        self.assertNotIn("start", shown)                                   # the same as X: said once
+        self.assertEqual(hints.glyph("select+start"), "SELECT+START")
+        self.assertEqual(hints.hints({"pad": {"a": ["KEY_ENTER"]}, "hints": {"a": "Fire", "y": "Jump"}}), [("a", "Fire"), ("y", "Jump")])
+        self.assertEqual(hints.hints({"name": "A game launcher"}), [])   # takes the controller itself: no strip
+        for file in (REPO / "apps").glob("*/app.json"):                    # nothing the window manager keeps for itself
+            for action in (json.loads(file.read_text()).get("pad") or {}).values():
+                self.assertNotIn(action, (["KEY_LEFTALT", "KEY_LEFT"], ["KEY_LEFTALT", "KEY_RIGHT"]), file)
+
+    def test_a_tiles_own_icon_comes_from_the_program_or_its_site(self):
+        import io
+        import tileicon
+        from PIL import Image
+
+        def png(size: int) -> bytes:
+            data = io.BytesIO()
+            Image.new("RGBA", (size, size), "red").save(data, "PNG")
+            return data.getvalue()
+
+        self.assertEqual(tileicon.sources({"flatpak": "com.google.Chrome", "args": ["--app=https://music.example/"]}),
+                         ("", "https://music.example/"))               # a site in Chrome is the site, not Chrome
+        self.assertEqual(tileicon.sources({"flatpak": "com.example.App"}), ("com.example.App", ""))
+        page = '<link rel="icon" href="/small.png" sizes="16x16"><link rel="apple-touch-icon" href="big.png">'
+        self.assertEqual(tileicon.links(page, "https://music.example/x/"), ["https://music.example/x/big.png", "https://music.example/small.png"])
+        asked = []
+
+        def fetch(url, limit=0):
+            asked.append(url)
+            if url == "https://music.example/":
+                return page.encode()
+            if url.endswith("big.png"):
+                return png(180)
+            raise OSError("nothing there")
+
+        self.assertEqual(tileicon.site_icon("https://music.example/", fetch).size, (180, 180))
+        self.assertIsNone(tileicon.site_icon("https://other.example/", fetch))     # no icon: the tile keeps its drawing
+        with tempfile.TemporaryDirectory() as folder:
+            icons = Path(folder) / "exports/share/icons/hicolor/128x128/apps"
+            icons.mkdir(parents=True)
+            (icons / "com.example.App.png").write_bytes(png(128))
+            self.assertEqual(tileicon.flatpak_icon("com.example.App", [Path(folder)]).size, (128, 128))
+            font = REPO / "components/look/files/fonts/Michroma-Regular.ttf"
+            out = Path(folder) / "tile.png"
+            self.assertTrue(tileicon.upgrade({"name": "Example", "flatpak": "com.example.App"}, out, font, [Path(folder)], fetch))
+            self.assertEqual(Image.open(out).size, (512, 512))
+            self.assertFalse(tileicon.upgrade({"name": "Plain", "command": ["xterm"]}, Path(folder) / "none.png", font, [Path(folder)], fetch))
 
 
 class StartMenuTests(unittest.TestCase):

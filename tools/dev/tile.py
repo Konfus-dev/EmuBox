@@ -1,35 +1,49 @@
 #!/usr/bin/env python3
-"""Draw the picture an app shows in the Ports menu: its name on a green tile.
+"""Draw the picture a tile shows in the menus: an icon over its name, on a green tile.
 
-    python3 tools/dev/tile.py "APPLE MUSIC" apps/apple-music/tile.png
+    python3 tools/dev/tile.py "Apple Music" music apps/apple-music/tile.png
+    python3 tools/dev/tile.py --all          every app's and store tile's picture, from their settings
+    python3 tools/dev/tile.py --icons        the names of the icons
 
-Each word goes on its own line. Needs Pillow. Plain text only, no company logos.
+The drawing itself is components/console/files/lib/tileart.py (Batocera uses it too, for
+apps added from the app list). Icons are plain line drawings, never a company's logo.
+Needs Pillow.
 """
+import json
 import sys
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+REPO = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO / "components/console/files/lib"))
+import tileart  # noqa: E402
 
-FONT = Path(__file__).resolve().parents[2] / "components/look/files/fonts/Michroma-Regular.ttf"
-SIZE, LINE = 512, 84
+FONT = REPO / "components/look/files/fonts/Michroma-Regular.ttf"
 
 
-def tile(lines: list[str]) -> Image.Image:
-    image = Image.new("RGB", (SIZE, SIZE), "#041a04")
-    glow = Image.new("RGB", (SIZE, SIZE), "black")
-    ImageDraw.Draw(glow).ellipse((96, 96, SIZE - 96, SIZE - 96), fill="#2f7d1e")
-    image = Image.blend(image, glow.filter(ImageFilter.GaussianBlur(70)), 0.75)
-    draw = ImageDraw.Draw(image)
-    draw.rounded_rectangle((14, 14, SIZE - 14, SIZE - 14), radius=28, outline="#c8f03c", width=5)
-    font = ImageFont.truetype(str(FONT), 58)
-    top = (SIZE - LINE * len(lines)) / 2
-    for i, line in enumerate(lines):
-        width = draw.textlength(line, font=font)
-        draw.text(((SIZE - width) / 2, top + LINE * i + 6), line, font=font, fill="#d8ff6a")
-    return image
+def everything() -> list[tuple[str, str, Path]]:
+    """(name, icon, file) for each app in apps/ and each tile a component puts in a menu."""
+    found = []
+    for file in sorted(REPO.glob("apps/*/app.json")):
+        app = json.loads(file.read_text())
+        found.append((app["name"], tileart.guess(app), file.parent / "tile.png"))
+    for file in sorted(REPO.glob("components/*/component.json")):
+        spec = json.loads(file.read_text())
+        for port in spec.get("ports", []):
+            if port.get("image"):
+                found.append((port["name"], port.get("icon", "window"), file.parent / port["image"]))
+        for name, folder in spec.get("folders", {}).items():
+            found.append((name, folder.get("icon", "folder"), file.parent / folder["image"]))
+    return found
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
+    if sys.argv[1:] == ["--icons"]:
+        print(" ".join(tileart.ICONS))
+    elif sys.argv[1:] == ["--all"]:
+        for name, icon, file in everything():
+            tileart.tile(name, icon, FONT).save(file)
+            print(f"{file.relative_to(REPO)}: {icon}")
+    elif len(sys.argv) == 4:
+        tileart.tile(sys.argv[1], sys.argv[2], FONT).save(sys.argv[3])
+    else:
         sys.exit(__doc__)
-    tile(sys.argv[1].split()).save(sys.argv[2])
