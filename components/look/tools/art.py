@@ -66,17 +66,12 @@ def mesh_tunnel(size, center, alpha, seed=7):
         phi += step
     reach = math.hypot(max(cx, w - cx), max(cy, h - cy))
     lines = Image.new("L", (w, h), 0); d = ImageDraw.Draw(lines)
-    dots = Image.new("L", (w, h), 0); dd = ImageDraw.Draw(dots)
     for (x, y), poly in zip(sites, voronoi_cells(sites, (-200, -200, w + 200, h + 200))):
         if len(poly) < 3:
             continue
         near = min(1.0, math.hypot(x - cx, y - cy) / reach)                    # 0 straight ahead, 1 at the edge
         level = int(255 * (0.18 + 0.82 * near ** 1.3))
-        d.line(poly + [poly[0]], fill=level, width=max(2, int((1.2 + 3.2 * near) * s)), joint="curve")
-        for px, py in poly:                                                     # a bead where cells meet
-            rr = (1.6 + 3.0 * near) * s
-            dd.ellipse((px - rr, py - rr, px + rr, py + rr), fill=level)
-    lines = ImageChops.lighter(lines, dots)
+        d.line(poly + [poly[0]], fill=level, width=max(3, int((2.2 + 4.5 * near) * s)), joint="curve")   # thick and even, like the classic wall
     small = lines.resize(size, Image.LANCZOS)
     layer = Image.new("RGBA", size, (0, 0, 0, 0))
     layer.alpha_composite(glow_of(small, (70, 230, 40), 6, 1.4 * alpha / 255))
@@ -98,39 +93,77 @@ background("bg_system.jpg", (520, 470), (18, 70, 8), (1, 7, 1), 900, (960, 540),
 background("bg_list.jpg", (960, 560), (14, 58, 8), (2, 14, 2), 1300, (960, 540), 120)
 
 # ------------------------------------------------------------------ plasma orb layers
-def blob(name, size, base, lumps, seed, inner, outer, alpha, blur):
-    s = 2; n = size * s; c = n / 2; rnd = random.Random(seed)
-    terms = [(k, rnd.uniform(0.02, lumps) / (1 + 0.35 * k), rnd.uniform(0, 6.283)) for k in range(2, 7)]
-    pts = []
-    for i in range(720):
-        t = i / 720 * 6.283185; r = base * n * (1 + sum(a * math.sin(k * t + ph) for k, a, ph in terms))
-        pts.append((c + r * math.cos(t), c + r * math.sin(t)))
-    m = Image.new("L", (n, n), 0); ImageDraw.Draw(m).polygon(pts, fill=255)
-    body = with_alpha(radial((n, n), (c, c), base * n * 1.25, inner, outer), m.filter(ImageFilter.GaussianBlur(blur * s)), alpha)
-    body.resize((size, size), Image.LANCZOS).save(f"{OUT}/{name}")
-blob("plasma_outer.png", 900, 0.300, 0.15, 11, (120, 230, 30), (30, 140, 10), 170, 16)
-blob("plasma_mid.png",   900, 0.265, 0.19, 23, (200, 250, 70), (90, 200, 10), 200, 10)
-blob("plasma_core.png",  900, 0.215, 0.14, 37, (238, 255, 130), (165, 230, 34), 255, 7)
-blob("plasma_spot.png",  900, 0.110, 0.30, 51, (252, 255, 195), (218, 250, 100), 150, 14)
+# A solid, glossy sphere in the manner of the classic dashboard's: lime at the rim, a creamy
+# yellow heart, soft edges, lit from the top left. The theme turns most of these layers all the
+# time, so those are drawn the same all the way round; the light and shade, which must stay
+# put, are all in shell.png, which does not turn.
+def sphere(name, size, radius, stops, alpha, soft):
+    """A disc whose colour runs through `stops` (fraction of the radius, colour) from the middle out."""
+    s = 2; n = size * s; c = n / 2; r = radius * n
+    dist = radial((n, n), (c, c), r, (0, 0, 0), (255, 255, 255)).convert("L")
+    ramp = []
+    for v in range(256):
+        f = v / 255
+        for (f0, c0), (f1, c1) in zip(stops, stops[1:]):
+            if f0 <= f <= f1:
+                k = (f - f0) / (f1 - f0 or 1); ramp.append(tuple(int(a + (b - a) * k) for a, b in zip(c0, c1))); break
+        else:
+            ramp.append(stops[-1][1])
+    colour = Image.merge("RGB", [dist.point([ramp[v][i] for v in range(256)]) for i in range(3)])
+    disc = Image.new("L", (n, n), 0); ImageDraw.Draw(disc).ellipse((c - r, c - r, c + r, c + r), fill=255)
+    edge = disc.filter(ImageFilter.GaussianBlur(soft * s))
+    with_alpha(colour, edge, alpha).resize((size, size), Image.LANCZOS).save(f"{OUT}/{name}")
+
+def swirl(name, size, radius, arms, alpha):
+    """Faint bevelled strokes curling inside the sphere (light on one side of each, shade on the
+    other), evenly spaced: the theme turns this layer slowly, so the sphere seems to move."""
+    s = 2; n = size * s; c = n / 2; r = radius * n
+    light = Image.new("L", (n, n), 0); dark = Image.new("L", (n, n), 0)
+    for k in range(arms):
+        base = k * 2 * math.pi / arms
+        pts = []
+        for i in range(60):
+            t = i / 59
+            a = base + t * 2.2; rr = r * (0.18 + 0.68 * t)
+            pts.append((c + rr * math.cos(a), c + rr * math.sin(a)))
+        ImageDraw.Draw(light).line(pts, fill=255, width=int(7 * s), joint="curve")
+        ImageDraw.Draw(dark).line([(x + 5 * s, y + 5 * s) for x, y in pts], fill=255, width=int(9 * s), joint="curve")
+    disc = Image.new("L", (n, n), 0); ImageDraw.Draw(disc).ellipse((c - r * 0.92, c - r * 0.92, c + r * 0.92, c + r * 0.92), fill=255)
+    disc = disc.filter(ImageFilter.GaussianBlur(20 * s))
+    im = Image.new("RGBA", (n, n), (0, 0, 0, 0))
+    im.alpha_composite(with_alpha(Image.new("RGB", (n, n), (30, 90, 10)), ImageChops.multiply(dark.filter(ImageFilter.GaussianBlur(4 * s)), disc), alpha))
+    im.alpha_composite(with_alpha(Image.new("RGB", (n, n), (240, 250, 190)), ImageChops.multiply(light.filter(ImageFilter.GaussianBlur(3 * s)), disc), alpha))
+    im.resize((size, size), Image.LANCZOS).save(f"{OUT}/{name}")
+
+sphere("plasma_outer.png", 900, 0.372, [(0.0, (150, 200, 40)), (0.70, (110, 175, 25)), (0.92, (60, 140, 18)), (1.0, (40, 110, 14))], 255, 9)
+swirl("plasma_mid.png", 900, 0.372, 3, 115)
+sphere("plasma_core.png", 900, 0.32, [(0.0, (236, 236, 160)), (0.45, (214, 218, 90)), (1.0, (170, 196, 34))], 235, 55)
+sphere("plasma_spot.png", 900, 0.12, [(0.0, (250, 252, 215)), (1.0, (225, 232, 140))], 120, 40)
 
 g = radial((1000, 1000), (500, 500), 500, (255, 255, 255), (0, 0, 0)).convert("L")
-with_alpha(Image.new("RGB", (1000, 1000), (130, 255, 40)), g.point(lambda v: int((v / 255) ** 1.6 * 210))).save(f"{OUT}/plasma_glow.png")
+with_alpha(Image.new("RGB", (1000, 1000), (110, 220, 40)), g.point(lambda v: int((v / 255) ** 2.2 * 150))).save(f"{OUT}/plasma_glow.png")
 g = radial((900, 900), (450, 450), 900 * 0.36, (255, 255, 255), (0, 0, 0)).convert("L")
 with_alpha(Image.new("RGB", (900, 900), (245, 255, 190)), g.point(lambda v: int((v / 255) ** 0.8 * 255))).save(f"{OUT}/plasma_flash.png")
 
 def shell(size=900, rr=0.372):
-    """Glass ball around the plasma: darker towards the rim, bright edge, soft highlights."""
+    """The light on the sphere, which stays put while the layers under it turn: greener and in
+    shade towards the top left, a creamy warmth low on the right, a pale halo all round the
+    edge, and a soft white gleam at the top left."""
     s = 2; n = size * s; c = n / 2; r = rr * n
     disc = Image.new("L", (n, n), 0); ImageDraw.Draw(disc).ellipse((c - r, c - r, c + r, c + r), fill=255)
-    limb = radial((n, n), (c, c), r, (0, 0, 0), (255, 255, 255)).convert("L").point(lambda v: int((v / 255) ** 3.2 * 215))
-    im = with_alpha(Image.new("RGB", (n, n), (8, 78, 8)), ImageChops.multiply(limb, disc))
-    edge = Image.new("L", (n, n), 0); ImageDraw.Draw(edge).ellipse((c - r, c - r, c + r, c + r), outline=255, width=4 * s)
-    im.alpha_composite(glow_of(edge, (150, 255, 90), 7 * s, 1.6)); im.alpha_composite(with_alpha(Image.new("RGB", (n, n), (200, 255, 150)), edge, 230))
-    hi = Image.new("L", (n, n), 0); hd = ImageDraw.Draw(hi)
-    hd.ellipse((c - r * 0.74, c - r * 0.86, c - r * 0.02, c - r * 0.38), fill=150)          # top-left highlight
-    hd.ellipse((c - r * 0.80, c - r * 0.70, c + r * 0.10, c - r * 0.20), fill=0)
-    hd.arc((c - r * 0.9, c - r * 0.9, c + r * 0.9, c + r * 0.9), 30, 75, fill=110, width=10 * s)   # bounce light, lower right
-    im.alpha_composite(with_alpha(Image.new("RGB", (n, n), (240, 255, 220)), hi.filter(ImageFilter.GaussianBlur(9 * s))))
+    disc = disc.filter(ImageFilter.GaussianBlur(4 * s))
+    im = Image.new("RGBA", (n, n), (0, 0, 0, 0))
+    shade = radial((n, n), (c - r * 0.75, c - r * 0.8), r * 1.6, (255, 255, 255), (0, 0, 0)).convert("L")
+    im.alpha_composite(with_alpha(Image.new("RGB", (n, n), (20, 120, 30)), ImageChops.multiply(shade.point(lambda v: int(v * 0.55)), disc)))
+    warm = radial((n, n), (c + r * 0.35, c + r * 0.45), r * 0.9, (255, 255, 255), (0, 0, 0)).convert("L")
+    im.alpha_composite(with_alpha(Image.new("RGB", (n, n), (225, 228, 110)), ImageChops.multiply(warm.point(lambda v: int(v * 0.5)), disc)))
+    ring = Image.new("L", (n, n), 0); ImageDraw.Draw(ring).ellipse((c - r, c - r, c + r, c + r), outline=255, width=int(14 * s))
+    im.alpha_composite(with_alpha(Image.new("RGB", (n, n), (225, 245, 210)), ring.filter(ImageFilter.GaussianBlur(10 * s)), 150))
+    gleam = Image.new("L", (n, n), 0); gd = ImageDraw.Draw(gleam)
+    gd.ellipse((c - r * 0.66, c - r * 0.74, c - r * 0.30, c - r * 0.48), fill=200)
+    im.alpha_composite(with_alpha(Image.new("RGB", (n, n), (255, 255, 250)), gleam.filter(ImageFilter.GaussianBlur(12 * s))))
+    dot = Image.new("L", (n, n), 0); ImageDraw.Draw(dot).ellipse((c - r * 0.58, c - r * 0.60, c - r * 0.50, c - r * 0.52), fill=255)
+    im.alpha_composite(with_alpha(Image.new("RGB", (n, n), (255, 255, 255)), dot.filter(ImageFilter.GaussianBlur(2 * s)), 230))
     im.resize((size, size), Image.LANCZOS).save(f"{OUT}/shell.png")
 shell()
 
@@ -157,7 +190,7 @@ def ribbons(name, count, radius, thickness, sweep, tilt, alpha, size=1000, wire=
         im.alpha_composite(one.rotate(k * 360 / count, resample=Image.BICUBIC, center=(c, c)))
     im.resize((size, size), Image.LANCZOS).save(f"{OUT}/{name}")
 ribbons("rings_a.png", 3, 0.45, 0.075, 0.42, 20, 120)                          # turns 120 degrees per move
-ribbons("rings_b.png", 2, 0.49, 0.012, 0.26, 62, 55, wire=True)              # turns 180: two thin orbits
+ribbons("rings_b.png", 2, 0.49, 0.012, 0.26, 62, 22, wire=True)              # turns 180: a faint thin orbit
 ribbons("rings_c.png", 2, 0.47, 0.010, 0.20, -28, 40, wire=True)             # turns 180
 
 # ------------------------------------------------------------------ angular glass shapes
