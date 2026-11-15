@@ -12,6 +12,7 @@
 #   emubox-app running <app>         exit status 0 if it is running
 #   emubox-app play <app>            play/pause; opens the app first when it is not running
 #   emubox-app media PlayPause|Next|Previous|title|playing
+#   emubox-app status music|call     a line for the in-game menu's status strip (empty when idle)
 #   emubox-app setting [is|get|set <name> [value]]   EmuBox's switches (see lib/settings.py)
 #   emubox-app pads                  note the connected controllers in the log (for troubleshooting)
 #   emubox-app list                  the apps that are set up
@@ -118,7 +119,6 @@ open_app() {
     fi
     wlrctl toplevel focus "app_id:$w"
     start_pad "$app"
-    start_watch "$app"
 }
 
 # Used when the app is started like a game from the menu: come back when the
@@ -194,53 +194,16 @@ media() {
     esac
 }
 
-# The in-game menu decides which rows and buttons it has once, when it starts. The "Now
-# Playing" row exists only while there is a song, and the Play button only while nothing is
-# coming out, so when either changes the menu is started afresh, hidden, exactly as it was
-# running (never while it is on screen).
-MENU_PID=/var/run/batocera-controlcenter.pid
-# On screen? The menu holds the controllers open only while it is showing.
-menu_visible() {
-    local menu; menu=$(cat "$MENU_PID" 2>/dev/null)
-    [ -n "$menu" ] && ls -l "/proc/$menu/fd" 2>/dev/null | grep -q '/dev/input/event'
-}
-restart_menu() {
-    local menu
-    menu=$(cat "$MENU_PID" 2>/dev/null)
-    [ -n "$menu" ] && kill "$menu" 2>/dev/null
-    sleep 1
-    rm -f "$MENU_PID"
-    batocera-controlcenter hidden >/dev/null 2>&1   # Batocera's own launcher: right screen, right size
-    echo "$(date '+%F %T') in-game menu restarted (music ${1:-stopped})" >>"$LOG"
-}
-# Runs beside a music player for as long as it is open.
-watch_player() {
-    local app=$1 now last gone=0
-    while [ "$gone" -lt 3 ]; do
-        sleep 3
-        if running "$app"; then gone=0; else gone=$((gone + 1)); fi
-        now=
-        if [ "$gone" -eq 0 ]; then   # "song" while there is one, "song sounding" while it is not paused
-            [ -n "$(media title)" ] && now=song
-            [ -n "$(media sounding)" ] && now="$now sounding"
-        fi
-        last=$(cat "$RUN/menu.playing" 2>/dev/null)
-        if [ "$now" != "$last" ] && ! menu_visible; then
-            echo "$now" >"$RUN/menu.playing"
-            restart_menu "$now"
-        fi
-    done
-    while [ -s "$RUN/menu.playing" ]; do   # the player has gone: take the row away once the menu is out of sight
-        if menu_visible; then sleep 3; else : >"$RUN/menu.playing"; restart_menu; fi
-    done
-    rm -f "$RUN/$app.watch.pid"
-}
-start_watch() {
-    [ "$(conf "$1" '.player // false')" = true ] || return 0
-    local pidfile="$RUN/$1.watch.pid"
-    [ -e "$pidfile" ] && kill -0 "$(cat "$pidfile")" 2>/dev/null && return
-    setsid "$0" watch "$1" </dev/null >/dev/null 2>&1 &
-    echo $! >"$pidfile"
+# One line for the in-game menu's status strip: nothing when there is nothing to say.
+status() {
+    case $1 in
+    music) local title; title=$(media title)
+           [ -n "$title" ] && { [ -n "$(media sounding)" ] && echo "Now playing: $title" || echo "Paused: $title"; } ;;
+    call)  if pactl list short source-outputs 2>/dev/null | grep -q .; then
+               pactl get-source-mute @DEFAULT_SOURCE@ 2>/dev/null | grep -q yes && echo "In a call - microphone muted" || echo "In a call"
+           fi ;;
+    *) echo "emubox-app status music|call" >&2; exit 2 ;;
+    esac
 }
 
 # The menu's quick Play: carry on with the paused song; with no song yet, open the app
@@ -272,7 +235,7 @@ case $1 in
 detach)   shift; setsid "$0" "$@" </dev/null >/dev/null 2>&1 & ;;
 mic)      mic "$2" ;;
 setting)  shift; exec python3 "$ROOT/lib/settings.py" "$@" ;;
-watch)    need_app "$2"; watch_player "$2" ;;
+status)   status "$2" ;;
 open)     need_app "$2"; open_app "$2" || exit 1; if [ "$3" = --wait ]; then wait_until_left "$2"; fi ;;
 back)     [ -n "$2" ] && need_app "$2"; back "$2" ;;
 close)    need_app "$2"; close_app "$2" ;;
@@ -284,5 +247,5 @@ media)    media "$2" ;;
 play)     need_app "$2"; play "$2" ;;
 pads)     pads ;;
 list)     list_apps ;;
-*)        sed -n '2,18s/^# \{0,1\}//p' "$0" >&2; exit 2 ;;
+*)        sed -n '2,19s/^# \{0,1\}//p' "$0" >&2; exit 2 ;;
 esac

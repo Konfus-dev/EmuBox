@@ -2,6 +2,8 @@
 """Draws the start-up film: the theme's plasma orb waking, then the EmuBox name in front of it.
 
     python3 splash.py [output.mp4]      (default: ../files/splash/emubox.mp4)
+    python3 splash.py --sound my.wav output.mp4      the same film with a sound of your own
+                                        (16-bit WAV; cut or padded to the film's length)
 
 Batocera plays an .mp4 found in /userdata/splash while it starts. Everything in the film is
 made here: the pictures are the theme's own orb artwork (from art.py) and the sound is
@@ -120,13 +122,43 @@ def sound(folder: Path) -> None:
     sounds.save(folder, "boot", s, room=0.55, size=1.35, gain=0.9)
 
 
+def own_sound(source: Path, folder: Path) -> None:
+    """Someone's own WAV as the film's sound: stereo, 44.1 kHz, the film's length, faded out at the end."""
+    import array
+    import wave
+    with wave.open(str(source), "rb") as wav:
+        channels, rate, width = wav.getnchannels(), wav.getframerate(), wav.getsampwidth()
+        data = array.array("h")
+        data.frombytes(wav.readframes(wav.getnframes()))
+    if width != 2:
+        raise SystemExit(f"{source}: only 16-bit WAV files can be used")
+    left, right = (data[0::2], data[1::2]) if channels == 2 else (data, data)
+    total = int(SECONDS * sounds.RATE)
+    out = array.array("h", bytes(4 * total))
+    fade = int(0.4 * sounds.RATE)
+    for i in range(min(total, int(len(left) * sounds.RATE / rate))):
+        at = i * rate / sounds.RATE                       # plain linear resampling: fine for a jingle
+        j, part = int(at), at - int(at)
+        k = min(j + 1, len(left) - 1)
+        level = min(1.0, (total - i) / fade)
+        out[2 * i] = int((left[j] * (1 - part) + left[k] * part) * level)
+        out[2 * i + 1] = int((right[j] * (1 - part) + right[k] * part) * level)
+    with wave.open(str(folder / "boot.wav"), "wb") as wav:
+        wav.setnchannels(2), wav.setsampwidth(2), wav.setframerate(sounds.RATE)
+        wav.writeframes(out.tobytes())
+
+
 def main() -> int:
-    out = Path(sys.argv[1]) if len(sys.argv) > 1 else HERE.parent / "files" / "splash" / "emubox.mp4"
+    args = sys.argv[1:]
+    given = None
+    if args[:1] == ["--sound"] and len(args) >= 2:
+        given, args = Path(args[1]), args[2:]
+    out = Path(args[0]) if args else HERE.parent / "files" / "splash" / "emubox.mp4"
     out.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as temp:
         folder = Path(temp)
         count = frames(folder)
-        sound(folder)
+        own_sound(given, folder) if given else sound(folder)
         subprocess.run([
             "gst-launch-1.0", "-q", "mp4mux", "name=film", "faststart=true", "!", "filesink", f"location={out}",
             "multifilesrc", f"location={folder}/f%04d.png", "index=0", f"stop-index={count - 1}",

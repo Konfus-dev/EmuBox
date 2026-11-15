@@ -87,24 +87,33 @@ Each app adds its own on top (see its `app.json`): in Discord, X mutes, Y search
 through items, LT/RT switch servers; in Apple Music, X or Start plays and pauses, LB/RB change
 song, LT/RT change the volume, Y opens the keyboard.
 
-In the in-game menu's **Apps** tab each app has one row: Open and Close. A music player also has
-a quick Play while nothing is playing (it carries on with the paused song, or opens the app when
-there is none), and while it has a song a second row under it:
-`Now Playing: Song by Artist  <  ||  >`. A
-**Call** tab appears while an app is using the microphone, with a switch that mutes it, whichever
-window is in front.
+### Two menus, two jobs
 
-The Apps tab also has **Menu sounds**: which sound set, the volume, and a switch each for moving
-through a list, choosing, going back and opening the menu. EmuBox's own set is synthesised; a
-folder of your own WAV files in `system/configs/emubox/sounds/<Name>/` (any of `scroll.wav`,
-`select.wav`, `back.wav`, `menuopen.wav`) is listed as another set. Keep such sets in a folder
-named `Sounds` beside this repository (one sub-folder per set) and the installer copies them to
-the drive each time; they are yours and stay out of the repository.
+**Start** opens Batocera's main menu, where every setting lives. EmuBox's own are under
+**Game Settings**, in an EMUBOX block:
 
-The Apps tab ends with the settings: the menus going quiet while your music plays (Batocera's menu
-music would otherwise play over it), music dropping to a fifth during a call, the ad blocker for
-web apps, and, on a PC with them, everything about the OMEN lights (on/off, brightness, following
-the game, a colour per light, effects, the cooler's screen and its picture).
+- **MENU SOUNDS**: which sound set, the volume, and a switch each for moving (through lists and
+  pop-up menus alike), choosing, going back and opening the menu.
+- **APPS**: the menus going quiet while your music plays (Batocera's menu music would otherwise
+  play over it), music dropping during a call and how far, and the ad blocker for web apps.
+- **OMEN LIGHTS** (on a PC with them): on/off, brightness, following the game, a colour per light,
+  effects and their speed, the cooler's screen, its picture and fit.
+
+(Batocera's main menu cannot take a new entry of its own, so they sit inside Game Settings.)
+
+**Guide** opens the quick menu, over the menus or a running game. Its **Apps** tab has each app
+(Open, Close, and Play for a music player), music controls, a microphone mute, the volume, and
+**Open the menu**: in a game that is the emulator's own menu, from the menus it is Batocera's main
+menu. A strip along the bottom says what is playing and whether you are in a call.
+
+### Menu sounds
+
+EmuBox's own set is synthesised and is what you get unless you bring your own: the installer asks
+for a folder of sound sets (or take `--sounds FOLDER`), one sub-folder per set, named as it should
+be listed. What a file does is told by its name: `scroll.wav`, `select.wav`, `back.wav`,
+`menuopen.wav`, and `boot.wav` for the start-up film's sound (the installer makes that set's film
+from it; it needs GStreamer). A sound a set lacks is taken from EmuBox's. Such sets are yours and
+stay out of the repository.
 
 ## Your BIOS files and games
 

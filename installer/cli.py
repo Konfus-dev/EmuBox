@@ -47,6 +47,8 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--games", metavar="WHERE", help="games library: a folder or a repository address")
     p.add_argument("--bios-systems", metavar="IDS", help="only these systems' BIOS files, comma-separated")
     p.add_argument("--game-systems", dest="games_systems", metavar="IDS", help="only these systems' games, comma-separated")
+    p.add_argument("--sounds", metavar="FOLDER",
+                   help="menu sounds of your own: a folder with one sub-folder per sound set")
     p.add_argument("--download-later", action="store_true",
                    help="do not fetch the apps' programs onto the drive now; each downloads when first opened")
     p.add_argument("--list", action="store_true", help="show what can be installed and what is installed")
@@ -235,22 +237,103 @@ def summary(chosen: list[Component], libraries: list[tuple[str, Library, Selecti
 
 # --- the commands -------------------------------------------------------------------------
 
-SOUND_KINDS = ("scroll.wav", "select.wav", "back.wav", "menuopen.wav")
+# A sound set is a folder; what each file in it is for is told by its name alone.
+SOUND_FILES = {
+    "scroll.wav": "moving through a list or a menu",
+    "select.wav": "choosing",
+    "back.wav": "going back",
+    "menuopen.wav": "opening the main menu",
+    "boot.wav": "the start-up film's sound (made into boot.mp4 here, with GStreamer)",
+    "boot.mp4": "a ready-made start-up film, used as it is",
+}
+FILM_TOOL = REPO / "components" / "look" / "tools" / "splash.py"
+SOUNDS_BESIDE = REPO.parent / "Sounds"   # offered as the folder when it exists
 
 
-def copy_sound_sets(target: Target, folder: Path) -> list[str]:
-    """Your own menu-sound sets, kept in a "Sounds" folder beside this repository (never in it):
-    each sub-folder holding one of the sounds goes to the drive, where the menus offer it by name."""
-    if not folder.is_dir() or not target.path("system/emubox/lib/menusounds.py").exists():
+def ask_sounds(args, target: Target, ask: Prompts) -> Path | None:
+    """The folder of your own menu-sound sets, or None for EmuBox's own (synthesised) sounds only.
+    One sub-folder per set, named as it should be listed; files named as in SOUND_FILES."""
+    remembered = target.manifest().get("sources", {}).get("sounds", "")
+    beside = SOUNDS_BESIDE
+    usual = remembered if remembered and expand(remembered).is_dir() else str(beside) if beside.is_dir() else ""
+    where = args.sounds or os.environ.get("EMUBOX_SOUNDS", "")
+    if where == "none":
+        return None
+    if not where:
+        if args.yes:
+            where = usual
+        elif ask.yes_no("Add menu sounds of your own (a folder of sound sets)? Without, EmuBox's own are used", bool(usual)):
+            ask.say("  One sub-folder per set, named as it should be listed. In each, any of:")
+            for name, what in SOUND_FILES.items():
+                ask.say(f"    {name:<13}{what}")
+            where = ask.text("  Where is the folder?", usual)
+    if not where:
+        return None
+    folder = expand(where)
+    if not folder.is_dir():
+        raise Stop(f"No such folder: {folder}")
+    manifest = target.manifest()
+    manifest.setdefault("sources", {})["sounds"] = str(folder)
+    target.save_manifest(manifest)
+    return folder
+
+
+def film_for(sound: Path, out: Path) -> bool:
+    """The start-up film with this sound, made with the look's own tool. False when that is not possible here."""
+    if not shutil.which("gst-launch-1.0") or not FILM_TOOL.is_file():
+        return False
+    try:
+        return subprocess.run([sys.executable, str(FILM_TOOL), "--sound", str(sound), str(out)],
+                              capture_output=True, timeout=600, check=False).returncode == 0 and out.is_file()
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
+def copy_sound_sets(target: Target, folder: Path | None, say=lambda text: None, make_film=film_for) -> list[str]:
+    """Copy your sound sets to the drive, where the menus offer each by its folder's name."""
+    if not folder or not folder.is_dir() or not target.path("system/emubox/lib/menusounds.py").exists():
         return []
     copied = []
     for one in sorted(p for p in folder.iterdir() if p.is_dir()):
-        sounds = [one / kind for kind in SOUND_KINDS if (one / kind).is_file()]
+        sounds = [one / name for name in SOUND_FILES if (one / name).is_file()]
+        if not sounds:
+            continue
+        there = f"system/configs/emubox/sounds/{one.name}"
         for sound in sounds:
-            target.copy_file(sound, f"system/configs/emubox/sounds/{one.name}/{sound.name}")
-        if sounds:
-            copied.append(one.name)
+            if sound.name != "boot.wav":
+                target.copy_file(sound, f"{there}/{sound.name}")
+        jingle, film = one / "boot.wav", target.path(f"{there}/boot.mp4")
+        if jingle.is_file() and not (one / "boot.mp4").is_file():
+            if not film.is_file() or film.stat().st_mtime < jingle.stat().st_mtime:   # not made yet, or the sound changed
+                say(f"  Making the start-up film for {one.name}...")
+                with tempfile.TemporaryDirectory() as temp:
+                    made = Path(temp) / "boot.mp4"
+                    if make_film(jingle, made):
+                        target.copy_file(made, f"{there}/boot.mp4")
+                    else:
+                        say(f"  It could not be made here (it needs GStreamer); {one.name} keeps EmuBox's own film.")
+        copied.append(one.name)
     return copied
+
+
+def write_start_menu(target: Target) -> bool:
+    """EmuBox's entries for Batocera's Start menu (Game Settings), written from the tools now on
+    the drive so they are there at the first start; on Batocera the service keeps them current."""
+    lib = target.path("system/emubox/lib")
+    if not (lib / "startmenu.py").is_file():
+        return False
+    sys.path.insert(0, str(lib))
+    try:
+        for name in ("settings", "menusounds", "startmenu"):
+            sys.modules.pop(name, None)
+        import startmenu
+        return startmenu.write(target.root) or True
+    except Exception:   # noqa: BLE001  the service will write them at the next start
+        return False
+    finally:
+        sys.path.remove(str(lib))
+        for name in ("settings", "menusounds", "startmenu"):
+            sys.modules.pop(name, None)
 
 
 def run_install(args, target: Target, ask: Prompts) -> None:
@@ -267,6 +350,7 @@ def run_install(args, target: Target, ask: Prompts) -> None:
             picked = ask_library(kind, title, args, target, downloads, ask)
             if picked:
                 libraries.append((title, *picked))
+        sounds = ask_sounds(args, target, ask)
         summary(chosen, libraries, target, ask)
         if not ask.yes_no("Go ahead?", True):
             raise Stop("Nothing was changed.")
@@ -282,9 +366,11 @@ def run_install(args, target: Target, ask: Prompts) -> None:
             for component in chosen:
                 ask.say(f"Installing {component.title}...")
                 components.remember(target, component, components.install(component, env))
-        copied = copy_sound_sets(target, REPO.parent / "Sounds")
-        if copied:
-            ask.say(f"Copying your sound sets ({', '.join(copied)})...")
+        if sounds:
+            ask.say("Copying your sound sets...")
+            copied = copy_sound_sets(target, sounds, ask.say)
+            ask.say(f"  {', '.join(copied)}" if copied else f"  No sound sets found in {sounds}.")
+        write_start_menu(target)
         for title, library_, selection in libraries:
             ask.say(f"Copying {title}...")
             library.install(library_, selection, target, ask.say)

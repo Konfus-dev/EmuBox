@@ -19,9 +19,12 @@
   ],
   "files": [
     {
-      "from": "files/menu_omen.py",
-      "to": "system/emubox/lib/menu_omen.py"
+      "from": "files/startmenu_omen.py",
+      "to": "system/emubox/lib/startmenu_omen.py"
     }
   ],
-  "after": "The lights' settings are in the in-game menu (Guide button) > Apps, under OMEN lights. Pictures for the cooler's screen go in system/configs/omen-lights/pictures."
+  "after": "The lights' settings are in Batocera's menu: Start > Game Settings > OMEN LIGHTS. Pictures for the cooler's screen go in system/configs/omen-lights/pictures.",
+  "replaces": [
+    "system/emubox/lib/menu_omen.py"
+  ]
 }

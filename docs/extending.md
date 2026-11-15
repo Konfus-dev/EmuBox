@@ -34,11 +34,10 @@ Make a folder `apps/<id>/` with two files.
 
 - `flatpak`: the app's id on [Flathub](https://flathub.org). It is downloaded the first time the app is opened.
 - `args`: extra arguments. Browser-based apps need `--no-sandbox` on Batocera.
-- `player`: `true` for a music or video player. Its row in the Apps tab gets a quick Play while
-  nothing is playing, and while it has a song a row appears under it:
-  `Now Playing: Song by Artist  <  ||  >`.
-- `voice`: `true` for a chat app. While it is using the microphone (a call), the in-game menu
-  gains a **Call** tab with a switch that mutes the microphone.
+- `player`: `true` for a music or video player. Its row in the Guide menu's Apps tab gets a Play
+  button, the tab gets music controls, and the strip along the bottom says what is playing.
+- `voice`: `true` for a chat app. The Apps tab gets a microphone mute, and the strip along the
+  bottom says when you are in a call.
 - `menu`: `false` keeps the app out of the Apps tab (for something opened rarely, from its own tile).
 - The program is fetched onto the drive when the installer runs (needs `flatpak` on the PC), so it
   is ready in Batocera. A component can ask the same for other Flathub programs with

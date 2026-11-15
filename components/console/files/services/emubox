@@ -13,6 +13,7 @@ case "$1" in
         # The menu program reads its layout once, when it starts; if it is
         # already running and the layout changed, start it afresh (hidden).
         python3 "$root/lib/space.py" --theme 2>/dev/null   # the "how full is the drive" indicator in the menus
+        python3 "$root/lib/startmenu.py" 2>/dev/null       # EmuBox's settings in Start > Game Settings
         # Menus go quiet under your music, music makes way for a call (lib/audio.py).
         mkdir -p /var/run/emubox
         if ! kill -0 "$(cat /var/run/emubox/audio.pid 2>/dev/null)" 2>/dev/null; then
@@ -47,5 +48,6 @@ case "$1" in
         # and its menu may start before we do at the next boot.
         for app in $("$root/bin/emubox-app" list); do "$root/bin/emubox-app" close "$app"; done
         python3 "$root/lib/space.py" --theme 2>/dev/null   # so the indicator is right at the next start
+        python3 "$root/lib/startmenu.py" 2>/dev/null       # and new sound sets are offered
         ;;
 esac

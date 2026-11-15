@@ -137,13 +137,16 @@ def look(words: list[str], state: dict) -> list[list[str]]:
 
 
 def main(argv: list[str]) -> int:
+    import startmenu
     words, state = player_words(), {}
+    menu = startmenu.Watch()   # a setting chosen in Batocera's menu: pass it on (lights, sound set)
     if "--once" in argv:
         for command in look(words, state):
             print("pactl", *command)
         return 0
     try:
         while True:
+            menu.look()
             look(words, state)
             time.sleep(EVERY_S)
     except KeyboardInterrupt:

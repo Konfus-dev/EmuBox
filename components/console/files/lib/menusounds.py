@@ -5,6 +5,7 @@
     menusounds.py sets         list the sound sets
     menusounds.py set <name>   use a set
     menusounds.py set-now      print the set in use
+    menusounds.py next|previous      step to the next or the previous set (round and round)
     menusounds.py volume <+/-n|n>    change or set the volume (0..100)
     menusounds.py on|off <scroll|select|back|menuopen>    one sound's switch
     menusounds.py apply        redraw the scroll sound the menus play (after a change)
@@ -15,14 +16,18 @@ on screen, plays the sounds for the buttons that select, go back and open the
 main menu.
 
 A sound set is a folder with any of scroll.wav, select.wav, back.wav and
-menuopen.wav. "EmuBox" is the active theme's own (art/sounds in its folder).
+menuopen.wav, and optionally boot.mp4: the start-up film with that set's
+sound (made on a PC with the look's tools/splash.py --sound), used from the
+next start while the set is chosen. "EmuBox" is the active theme's own (art/sounds in its folder).
 Your own sets go in /userdata/system/configs/emubox/sounds/<Name>/ and show up
 by that name; a sound a set lacks is taken from EmuBox. Each sound has its own
 on/off switch and they share one volume, all in the in-game menu's Apps tab.
 
-The scroll sound is played by the menu program from a file in the theme
-(art/sounds/scroll-now.wav), which `apply` rewrites: so a change to it is
-heard after the menus restart, the others at once.
+Moving makes its sound here too, for the d-pad, the left stick and the arrow
+keys, so it is heard in the pop-up menus as well as in the lists (the menu
+program itself only sounds in lists). To keep lists from sounding twice, the
+menu program's own copy (art/sounds/scroll-now.wav in the theme) is kept silent.
+Every change, to the set, the volume or a switch, is heard at once.
 
 Silent whenever something else has the controller or the screen: during a
 game, inside an app, the in-game menu or the on-screen keyboard, and while
@@ -48,10 +53,14 @@ os.environ.setdefault("XDG_RUNTIME_DIR", "/var/run")
 ES_SETTINGS = Path("/userdata/system/configs/emulationstation/es_settings.cfg")
 THEMES = (Path("/userdata/themes"), Path("/usr/share/emulationstation/themes"))
 MINE = Path("/userdata/system/configs/emubox/sounds")
+SPLASH = Path("/userdata/splash")                           # where Batocera looks for a start-up film
+OWN_FILM = Path("/userdata/system/emubox/splash/emubox.mp4")   # EmuBox's own, kept to go back to
 QUIET_FLAG = Path("/var/run/emubox/menus-quiet")   # kept by audio.py while your music plays
 RUNNING_GAME = "http://127.0.0.1:1234/runningGame"
 SOUTH, EAST, START = 304, 305, 315                 # BTN_SOUTH, BTN_EAST, BTN_START
 ENTER, ESCAPE, SPACE = 28, 1, 57                   # a keyboard's keys for the same three things
+DIRECTION_KEYS = (544, 545, 546, 547, 103, 108, 105, 106)   # d-pad buttons, then the arrow keys
+HOLD_S, REPEAT_S = 0.45, 0.11                      # a held direction: the wait, then the pace
 KINDS = ("scroll", "select", "back", "menuopen")
 BUILT_IN = "EmuBox"
 RESCAN_S, LOOK_S = 5.0, 1.0
@@ -110,6 +119,14 @@ def sets(text: str, mine: Path = MINE, themes=THEMES) -> dict[str, Path]:
     return found
 
 
+def neighbour(chosen: str, names: list[str], forward: bool) -> str:
+    """The set after (or before) the chosen one, going round; the built-in one when there is no list."""
+    if not names:
+        return BUILT_IN
+    at = names.index(chosen) if chosen in names else 0
+    return names[(at + (1 if forward else -1)) % len(names)]
+
+
 def sounds_of(chosen: str, all_sets: dict[str, Path]) -> dict[str, Path]:
     """The file for each kind of sound: from the chosen set, else from the built-in one."""
     files: dict[str, Path] = {}
@@ -155,7 +172,7 @@ def scaled(source: Path, target: Path, percent: int) -> bool:
 
 
 def apply(text: str | None = None, mine: Path = MINE, themes=THEMES, switches: dict[str, str] | None = None) -> bool:
-    """Redraw the scroll sound the menu program plays, from the set, the volume and its switch."""
+    """Silence the scroll sound the menu program would play itself (see below)."""
     text = es_text() if text is None else text
     switches = settings.read() if switches is None else switches
     folder = theme_folder(text, themes)
@@ -164,8 +181,30 @@ def apply(text: str | None = None, mine: Path = MINE, themes=THEMES, switches: d
     source = sounds_of(switches.get("ui.sound_set", BUILT_IN), sets(text, mine, themes)).get("scroll")
     if not source:
         return False
-    on = switches.get("ui.sound.scroll", "on").lower() in settings.ON
-    return scaled(source, folder / "scroll-now.wav", volume(switches) if on else 0)
+    # We play the moving sound ourselves, everywhere (lists and pop-up menus alike), so the
+    # menu program's copy is kept silent: otherwise lists would sound twice.
+    start_up_film(switches.get("ui.sound_set", BUILT_IN), mine)
+    return scaled(source, folder / "scroll-now.wav", 0)
+
+
+def start_up_film(chosen: str, mine: Path = MINE, splash: Path = SPLASH, own: Path = OWN_FILM) -> bool:
+    """A set may bring its own start-up film (boot.mp4: the same pictures with that set's sound).
+    Put the chosen set's in place for the next start, or EmuBox's own back. True when it changed."""
+    wanted = mine / chosen / "boot.mp4"
+    if not wanted.is_file():
+        wanted = own
+    target = splash / "emubox.mp4"
+    try:
+        if not wanted.is_file() or not target.is_file():
+            return False   # no film of ours on this drive: nothing to swap
+        if wanted.stat().st_size == target.stat().st_size and wanted.read_bytes() == target.read_bytes():
+            return False
+        fresh = target.with_suffix(".new")
+        fresh.write_bytes(wanted.read_bytes())
+        os.replace(fresh, target)
+        return True
+    except OSError:
+        return False
 
 
 def game_running() -> bool | None:
@@ -180,6 +219,18 @@ def game_running() -> bool | None:
     except ValueError:
         return False
     return bool(isinstance(game, dict) and (game.get("path") or game.get("name")))
+
+
+def direction(kind: int, code: int, value: int, centre: float = 0.0, span: float = 1.0) -> tuple[str, bool] | None:
+    """A d-pad, stick or arrow-key event as (what moved, is it held now); None for anything else.
+    `kind` is the event type (1 = key, 3 = axis); sticks need their centre and half-range."""
+    if kind == 1 and code in DIRECTION_KEYS and value in (0, 1):
+        return f"key{code}", value == 1
+    if kind == 3 and code in (16, 17):                    # the d-pad as a "hat"
+        return f"hat{code}", value != 0
+    if kind == 3 and code in (0, 1):                      # left stick, pushed well over
+        return f"stick{code}", abs((value - centre) / (span or 1)) > 0.6
+    return None
 
 
 def listen() -> int:
@@ -197,7 +248,24 @@ def listen() -> int:
     files: dict[str, Path] = {}
     inverted, in_menus = False, False
     next_scan = next_look = 0.0
-    playing: subprocess.Popen | None = None
+    playing: dict[str, subprocess.Popen] = {}   # one voice for moving, one for the rest
+    held: dict[str, float] = {}                 # a direction being held -> when it next ticks
+
+    def play(kind: str) -> None:
+        switches = settings.read()
+        if kind not in files or not should_play(kind, switches, in_menus, QUIET_FLAG.exists()):
+            return
+        voice = "scroll" if kind == "scroll" else "button"
+        before = playing.get(voice)
+        if before and before.poll() is None:
+            before.kill()   # a fresh press cuts the last sound short rather than piling up
+        try:
+            playing[voice] = subprocess.Popen(
+                ["paplay", f"--volume={int(65536 * volume(switches) / 100)}", str(files[kind])],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except OSError:
+            pass
+
     while True:
         now = time.monotonic()
         if now >= next_scan:
@@ -222,7 +290,12 @@ def listen() -> int:
         if now >= next_look:
             next_look = now + LOOK_S
             in_menus = game_running() is False
-        for key, _ in selector.select(timeout=LOOK_S):
+        for name, due in list(held.items()):   # a held direction keeps ticking, as the menus keep moving
+            if now >= due:
+                play("scroll")
+                held[name] = now + REPEAT_S
+        wait = min([LOOK_S] + [max(0.0, due - time.monotonic()) for due in held.values()])
+        for key, _ in selector.select(timeout=wait):
             device = key.fileobj
             try:
                 events = list(device.read())
@@ -231,21 +304,24 @@ def listen() -> int:
             except OSError:   # unplugged
                 selector.unregister(device)
                 pads.pop(device.path, None)
+                for name in [n for n in held if n.startswith(device.path)]:
+                    del held[name]
                 continue
             for event in events:
-                if event.type != evdev.ecodes.EV_KEY or event.value != 1:
-                    continue
-                kind = sound_for(event.code, inverted)
-                switches = settings.read()
-                if kind in files and should_play(kind, switches, in_menus, QUIET_FLAG.exists()):
-                    if playing and playing.poll() is None:
-                        playing.kill()   # a fresh press cuts the last sound short rather than piling up
-                    try:
-                        playing = subprocess.Popen(
-                            ["paplay", f"--volume={int(65536 * volume(switches) / 100)}", str(files[kind])],
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                    except OSError:
-                        return 1
+                centre = span = 0.0
+                if event.type == 3 and event.code in (0, 1):
+                    info = device.absinfo(event.code)
+                    centre, span = (info.max + info.min) / 2, (info.max - info.min) / 2
+                moved = direction(event.type, event.code, event.value, centre, span)
+                if moved:
+                    name, down = f"{device.path}:{moved[0]}", moved[1]
+                    if down and name not in held:
+                        play("scroll")
+                        held[name] = time.monotonic() + HOLD_S
+                    elif not down:
+                        held.pop(name, None)
+                elif event.type == evdev.ecodes.EV_KEY and event.value == 1:
+                    play(sound_for(event.code, inverted))
     return 0
 
 
@@ -258,6 +334,9 @@ def main(argv: list[str]) -> int:
     elif action == "set-now":
         chosen = settings.get("ui.sound_set")
         print(chosen if chosen in sets(es_text()) else BUILT_IN)
+    elif action in ("next", "previous"):
+        settings.write("ui.sound_set", neighbour(settings.get("ui.sound_set"), list(sets(es_text())), action == "next"))
+        apply()
     elif action == "set" and rest:
         settings.write("ui.sound_set", rest[0])
         apply()

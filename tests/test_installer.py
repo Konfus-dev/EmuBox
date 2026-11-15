@@ -22,6 +22,7 @@ from installer.target import Target  # noqa: E402
 
 
 os.environ["EMUBOX_DOWNLOAD_LATER"] = "1"   # the tests never fetch programs from Flathub
+os.environ["EMUBOX_SOUNDS"] = "none"        # nor pick up sound sets that happen to sit beside the repository
 COMPONENT_QUESTIONS = 10   # asked on a PC without the OMEN lights
 
 
@@ -107,6 +108,8 @@ class ComponentTests(Drive):
             self.assertTrue((self.root / path).is_file(), path)
         self.assertIn("emubox-app open discord --wait", (self.root / "roms/ports/Discord.sh").read_text())
         self.assertEqual(self.target.services(), ["old_one", "emubox", "rom_patcher", "tidy_folders"])
+        entries = (self.root / "system/configs/emulationstation/es_features_emubox.cfg").read_text()
+        self.assertIn('submenu="MENU SOUNDS"', entries)     # EmuBox's settings are in Batocera's menu from the first start
         self.assertEqual(self.target.conf_get("global.shaderset"), "zfast")
         self.assertEqual((self.root / "roms/ports/gamelist.xml").read_text().count("<game>"), 2)
         self.assertEqual((self.root / "roms/store/gamelist.xml").read_text().count("<game>"), 5)
@@ -191,16 +194,44 @@ class ComponentTests(Drive):
         with mock.patch.object(flatpak.shutil, "which", return_value=None):
             self.assertEqual(flatpak.preinstall(self.target, ["com.example.Other"], said.append, run), [])
 
-    def test_your_own_sound_sets_are_copied_from_beside_the_repository(self):
+    def test_your_own_sound_sets_are_copied_and_named_files_decide_what_does_what(self):
         with tempfile.TemporaryDirectory() as folder:
             mine = Path(folder) / "Sounds"
             make_file(mine / "My Set" / "select.wav")
+            make_file(mine / "My Set" / "boot.wav")
             make_file(mine / "My Set" / "notes.txt")
             (mine / "Empty").mkdir()
-            self.assertEqual(cli.copy_sound_sets(self.target, mine), [])   # nothing there to play them yet
+            films = []
+
+            def make_film(sound, out):
+                films.append(sound.name)
+                out.write_text("film")
+                return True
+            self.assertEqual(cli.copy_sound_sets(self.target, mine, make_film=make_film), [])   # nothing there to play them yet
             make_file(self.root / "system/emubox/lib/menusounds.py")
-            self.assertEqual(cli.copy_sound_sets(self.target, mine), ["My Set"])
-            self.assertEqual([p.name for p in (self.root / "system/configs/emubox/sounds/My Set").iterdir()], ["select.wav"])
+            self.assertEqual(cli.copy_sound_sets(self.target, mine, make_film=make_film), ["My Set"])
+            on_drive = self.root / "system/configs/emubox/sounds/My Set"
+            self.assertEqual(sorted(p.name for p in on_drive.iterdir()), ["boot.mp4", "select.wav"])   # the film is made from boot.wav
+            cli.copy_sound_sets(self.target, mine, make_film=make_film)
+            self.assertEqual(films, ["boot.wav"])                         # and not made again while the sound is unchanged
+            said = []
+            (on_drive / "boot.mp4").unlink()
+            cli.copy_sound_sets(self.target, mine, said.append, make_film=lambda sound, out: False)
+            self.assertIn("keeps EmuBox's own film", said[-1])
+
+    def test_the_installer_asks_for_your_sounds_and_remembers_the_folder(self):
+        with tempfile.TemporaryDirectory() as folder, mock.patch.dict("os.environ", {"EMUBOX_SOUNDS": ""}), \
+             mock.patch.object(cli, "SOUNDS_BESIDE", Path(folder) / "nowhere"):
+            make_file(Path(folder) / "mine" / "Arcade" / "scroll.wav")
+            # look n, apple-music n, discord y, seven more n, bios n, games n, sounds y + folder, go ahead y
+            code, out = run(self.root, answers="n\nn\ny\n" + "n\n" * 7 + "n\nn\ny\n" + f"{folder}/mine\ny\n")
+            self.assertEqual(code, 0, out)
+            self.assertIn("scroll.wav", out)      # the names are explained when asked
+            self.assertIn("Arcade", out)
+            self.assertTrue((self.root / "system/configs/emubox/sounds/Arcade/scroll.wav").is_file())
+            self.assertEqual(self.target.manifest()["sources"]["sounds"], f"{folder}/mine")
+            code, out = run(self.root, "--yes", "--with", "discord")      # next time it is used without asking
+            self.assertIn("Arcade", out)
 
     def test_installing_twice_changes_nothing_more(self):
         run(self.root, "--yes", "--with", "discord")

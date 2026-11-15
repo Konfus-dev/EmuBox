@@ -19,6 +19,10 @@
     {
       "from": "files/splash",
       "to": "splash"
+    },
+    {
+      "from": "files/splash/emubox.mp4",
+      "to": "system/emubox/splash/emubox.mp4"
     }
   ],
   "es_settings": {

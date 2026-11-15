@@ -23,7 +23,8 @@
   "replaces": [
     "system/console-apps",
     "system/services/console_apps",
-    "roms/ports/Install Discord and Apple Music.sh"
+    "roms/ports/Install Discord and Apple Music.sh",
+    "roms/ports/EmuBox Settings.sh"
   ],
   "retired_services": [
     "console_apps"
@@ -35,6 +36,10 @@
     {
       "path": "system/configs/controlcenter/controlcenter.xml",
       "contains": "<!-- emubox apps -->"
+    },
+    {
+      "path": "system/configs/emulationstation/es_features_emubox.cfg",
+      "contains": "written by EmuBox"
     }
   ]
 }
