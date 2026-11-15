@@ -5,7 +5,7 @@ Commands for looking after a Batocera drive from a Linux PC. `./install` links t
 
 | Tool | Does |
 | --- | --- |
-| `batocera-drive` | prints where Batocera's data is (a USB stick, an internal disk, or the folder you name with `--drive` or `BATOCERA_DRIVE`); the others find the drive with it |
+| `batocera-drive` | prints where Batocera's data is (a USB stick, an internal disk, or the folder you name with `--drive` or `BATOCERA_DRIVE`); the others find the drive with it. `--list` shows every Batocera drive, `--main N` sets the one used when there are several |
 | `batocera-add` | copy games and ROM-hack patches onto the drive, into the right folders |
 | `batocera-backup` | back up saves, screenshots and settings |
 | `batocera-wifi` | set the drive's Wi-Fi network |

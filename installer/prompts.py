@@ -79,6 +79,22 @@ class Prompts:
                 self.say(f"  {problem}")
 
 
+    def pick_one(self, heading: str, options: list[str], default: int = 0) -> int:
+        """Pick exactly one option. Returns its position; Enter takes the default."""
+        if self.assume_defaults or len(options) < 2:
+            return default
+        self.say(heading)
+        for number, option in enumerate(options, 1):
+            self.say(f"  {number:>2}) {option}")
+        while True:
+            answer = self._read(f"Which one? [{default + 1}]: ")
+            if not answer:
+                return default
+            if answer.isdigit() and 1 <= int(answer) <= len(options):
+                return int(answer) - 1
+            self.say(f"  Type a number from 1 to {len(options)}.")
+
+
 def parse_numbers(text: str, count: int) -> list[int]:
     """'1,3-5' -> [0, 2, 3, 4]. Raises ValueError with a message for the person typing."""
     picked: set[int] = set()

@@ -32,7 +32,9 @@ EmuBox-*/install
 ```
 
 The installer finds the drive, asks what you want, shows a summary and asks once more before
-changing anything. Run it again any time to add things or update. `./install --list` shows what
+changing anything. When the PC has more than one Batocera drive (a USB stick and Batocera on the
+PC's own disk, say) it lists them all and asks which; Enter takes the main one, set with
+`tools/batocera-drive --main NUMBER` (see `tools/batocera-drive --list`). Run it again any time to add things or update. `./install --list` shows what
 there is; `./install --remove <name>` takes something off.
 
 ## What you get

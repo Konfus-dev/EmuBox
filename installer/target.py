@@ -11,13 +11,110 @@ import os
 import re
 import shutil
 import subprocess
+from dataclasses import dataclass
 from pathlib import Path
 from xml.sax.saxutils import quoteattr
 
 LIVE_ROOT = Path("/userdata")
+# The drive to use when there is more than one: the filesystem id of its SHARE partition.
+# Set with `batocera-drive --main`. One line; a '#' starts a comment.
+MAIN_DRIVE_FILE = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "emubox" / "main-drive"
 MOUNT_PARENTS = ("/run/media", "/media", "/mnt")
 MANIFEST = "system/emubox/installed.json"
 OLD_MANIFESTS = ["system/retrobox/installed.json"]   # from when the project was called RetroBox
+
+
+@dataclass
+class Drive:
+    """A Batocera data partition this PC can see, or a plain folder that holds Batocera's data."""
+    path: Path | None          # where it is mounted; None while it is not
+    device: str = ""           # /dev/nvme0n1p7; empty for a folder that is not a partition
+    uuid: str = ""
+    size: str = ""
+    removable: bool = False
+
+    @property
+    def internal(self) -> bool:
+        return bool(self.device) and not self.removable
+
+    def describe(self, main: bool = False) -> str:
+        if not self.device:
+            words = f"Folder {self.path}"
+        else:
+            kind = "USB / removable drive" if self.removable else "This PC's own disk"
+            words = f"{kind} ({Path(self.device).name}, {self.size})"
+            words += f", at {self.path}" if self.path else ", not opened yet"
+        return words + ("  <- main" if main else "")
+
+    def mount(self) -> Path:
+        """Open the partition (the desktop's way, so it may ask for a password) and return the folder."""
+        if self.path:
+            return self.path
+        subprocess.run(["udisksctl", "mount", "--block-device", self.device], capture_output=True, text=True)
+        for found in partitions():
+            if found["path"] == self.device and found["mounts"]:
+                self.path = Path(found["mounts"][0])
+                return self.path
+        raise OSError(f"Could not open {self.device}.")
+
+
+def partitions() -> list[dict]:
+    """Every partition lsblk knows: path, uuid, label, fstype, size, removable, mount points."""
+    try:
+        listed = json.loads(subprocess.run(
+            ["lsblk", "-J", "-o", "PATH,UUID,LABEL,FSTYPE,SIZE,RM,MOUNTPOINTS"],
+            capture_output=True, text=True).stdout)
+    except (OSError, ValueError):
+        return []
+    found, queue = [], [(device, False) for device in listed.get("blockdevices", [])]
+    while queue:
+        device, parent_removable = queue.pop()
+        removable = bool(device.get("rm")) or parent_removable
+        found.append({"path": device.get("path") or "", "uuid": device.get("uuid") or "",
+                      "label": device.get("label") or "", "fstype": device.get("fstype") or "",
+                      "size": device.get("size") or "", "removable": removable,
+                      "mounts": [m for m in device.get("mountpoints") or [] if m]})
+        queue += [(child, removable) for child in device.get("children", [])]
+    return found
+
+
+def main_drive() -> str:
+    """The filesystem id set as the main drive, or ''."""
+    try:
+        text = MAIN_DRIVE_FILE.read_text()
+    except OSError:
+        return ""
+    return next((line.split("#")[0].strip() for line in text.splitlines() if line.split("#")[0].strip()), "")
+
+
+def set_main_drive(uuid: str) -> None:
+    if not uuid:
+        MAIN_DRIVE_FILE.unlink(missing_ok=True)
+        return
+    MAIN_DRIVE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    MAIN_DRIVE_FILE.write_text(f"{uuid}  # filesystem id of the Batocera drive EmuBox uses first\n")
+
+
+def drives() -> list[Drive]:
+    """Batocera drives this PC can see, the main one first, then this PC's own disks, then the rest.
+
+    Mounted folders that hold Batocera's data count, and so do partitions labelled SHARE
+    that are not mounted yet (an internal disk is not opened on its own)."""
+    parts = partitions()
+    found: list[Drive] = []
+    for part in parts:
+        mounted = next((Path(m) for m in part["mounts"] if Target.looks_right(Path(m))), None)
+        if mounted or (part["label"] == "SHARE" and not part["mounts"] and part["fstype"].startswith("ext")):
+            found.append(Drive(mounted, part["path"], part["uuid"], part["size"], part["removable"]))
+    known = {d.path for d in found if d.path}
+    for parent in MOUNT_PARENTS:   # folders lsblk does not know (a network share, say)
+        for pattern in ("*", "*/*"):
+            for folder in sorted(Path(parent).glob(pattern)):
+                if Target.looks_right(folder) and folder.resolve() not in {k.resolve() for k in known}:
+                    found.append(Drive(folder))
+                    known.add(folder)
+    main = main_drive()
+    return sorted(found, key=lambda d: (d.uuid != main or not main, not d.internal, d.device, str(d.path)))
 
 
 class Target:

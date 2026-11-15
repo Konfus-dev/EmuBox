@@ -20,6 +20,7 @@ from installer import cli, components  # noqa: E402
 from installer.fetch import without_secrets  # noqa: E402
 from installer.library import Library  # noqa: E402
 from installer.prompts import parse_numbers  # noqa: E402
+from installer import target as target_module  # noqa: E402
 from installer.target import Target  # noqa: E402
 
 
@@ -411,6 +412,63 @@ class LibraryTests(Drive):
         self.assertEqual(code, 1)
         self.assertIn("free", out)
         self.assertFalse((self.root / "roms/psx/Racer.chd").exists())
+
+
+class DrivePicking(unittest.TestCase):
+    """Which Batocera drive the installer uses when the PC has more than one."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        base = Path(self.tmp.name)
+        self.stick, self.disk = make_drive(base / "stick").root, make_drive(base / "disk").root
+        self.main_file = base / "config" / "main-drive"
+        self.found = lambda: [
+            target_module.Drive(self.disk, "/dev/nvme0n1p7", "disk-id", "90G", False),
+            target_module.Drive(self.stick, "/dev/sda2", "stick-id", "20G", True),
+        ]
+
+    def pick(self, answers: str = "", main: str = "", yes: bool = False) -> tuple[Path, str]:
+        if main:
+            self.main_file.parent.mkdir(parents=True, exist_ok=True)
+            self.main_file.write_text(f"{main}  # comment\n")
+        out = io.StringIO()
+        args = cli.parser().parse_args(["--yes"] if yes else [])
+        with mock.patch("sys.stdin", io.StringIO(answers)), mock.patch("sys.stdout", out), \
+                mock.patch.object(target_module, "MAIN_DRIVE_FILE", self.main_file), \
+                mock.patch.object(cli, "target_drives", side_effect=self.found), \
+                mock.patch.object(cli, "LIVE_ROOT", Path(self.tmp.name) / "no-userdata"):
+            target = cli.find_target(args, cli.Prompts(assume_defaults=yes))
+        return target.root, out.getvalue()
+
+    def test_every_drive_is_offered_and_enter_takes_the_main_one(self):
+        root, said = self.pick("\n", main="stick-id")
+        self.assertEqual(root, self.stick.resolve())
+        self.assertIn("This PC's own disk (nvme0n1p7, 90G)", said)
+        self.assertIn("USB / removable drive (sda2, 20G), at", said)
+        self.assertIn("<- main", said)
+
+    def test_a_number_picks_another_drive(self):
+        root, _ = self.pick("2\n", main="disk-id")
+        self.assertEqual(root, self.stick.resolve())
+
+    def test_without_questions_the_main_drive_is_used(self):
+        root, _ = self.pick(main="stick-id", yes=True)
+        self.assertEqual(root, self.stick.resolve())
+
+    def test_main_drive_file_round_trip(self):
+        with mock.patch.object(target_module, "MAIN_DRIVE_FILE", self.main_file):
+            self.assertEqual(target_module.main_drive(), "")
+            target_module.set_main_drive("abc")
+            self.assertEqual(target_module.main_drive(), "abc")
+            target_module.set_main_drive("")
+            self.assertEqual(target_module.main_drive(), "")
+
+    def test_choose_one_retries_until_a_number_fits(self):
+        out = io.StringIO()
+        with mock.patch("sys.stdin", io.StringIO("9\nx\n2\n")), mock.patch("sys.stdout", out):
+            self.assertEqual(cli.Prompts().pick_one("Pick:", ["a", "b"], 0), 1)
+        self.assertEqual(out.getvalue().count("Type a number from 1 to 2."), 2)
 
 
 class SmallThings(unittest.TestCase):

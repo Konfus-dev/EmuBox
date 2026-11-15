@@ -1,69 +1,91 @@
 #!/usr/bin/env python3
 """Print the Batocera data folder (the one holding `system` and `roms`), wherever it is.
 
-    batocera-drive [folder]
+    batocera-drive [folder]          where Batocera's data is
+    batocera-drive --list            every Batocera drive this PC can see
+    batocera-drive --main [WHICH]    show the main drive, or make WHICH the main one:
+                                     a number from --list, a folder, a partition
+                                     (/dev/nvme0n1p7), or "none"
 
 Looked for in this order: the folder given; $BATOCERA_DRIVE; /userdata when this is
-Batocera itself; any mounted disk, USB or internal, that holds Batocera's data; a
-partition labelled SHARE that is not mounted yet (it is mounted for you). The other
-batocera-* tools find the drive with this, so they work the same for a USB stick, an
-internal disk, or a folder you name.
+Batocera itself; the main drive (opened for you if it is not, which may ask for your
+password); the only Batocera drive there is. With more than one and no main drive set,
+it asks you to name one. The other batocera-* tools and the EmuBox installer find the
+drive the same way, so they work alike for a USB stick, an internal disk, or a folder.
 """
-import json
 import os
-import subprocess
 import sys
 from pathlib import Path
 
-
-def looks_right(folder: Path) -> bool:
-    return (folder / "system" / "batocera.conf").is_file() and (folder / "roms").is_dir()
-
-
-def partitions() -> list[dict]:
-    try:
-        listed = json.loads(subprocess.run(["lsblk", "-J", "-o", "PATH,LABEL,MOUNTPOINTS"], capture_output=True, text=True).stdout)
-    except (OSError, ValueError):
-        return []
-    found, queue = [], listed.get("blockdevices", [])
-    while queue:
-        device = queue.pop()
-        found.append(device)
-        queue += device.get("children", [])
-    return found
-
-
-def mounted() -> list[Path]:
-    places = [Path(m) for p in partitions() for m in p.get("mountpoints") or [] if m]
-    for parent in ("/run/media", "/media", "/mnt"):   # and folders lsblk does not know (a network share, say)
-        for pattern in ("*", "*/*"):
-            places += sorted(Path(parent).glob(pattern))
-    return list(dict.fromkeys(p for p in places if looks_right(p)))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from installer.target import Target, drives, main_drive, set_main_drive  # noqa: E402
 
 
 def find(named: str = "") -> Path:
     named = named or os.environ.get("BATOCERA_DRIVE", "")
     if named:
         folder = Path(named).expanduser()
-        if not looks_right(folder):
+        if not Target.looks_right(folder):
             sys.exit(f"{folder} is not a Batocera data folder (it should hold 'system' and 'roms').")
         return folder
-    if looks_right(Path("/userdata")):
+    if Target.looks_right(Path("/userdata")):
         return Path("/userdata")
-    found = mounted()
-    if not found:
-        for part in partitions():
-            if part.get("label") == "SHARE" and not any(part.get("mountpoints") or []):
-                subprocess.run(["udisksctl", "mount", "-b", part["path"]], capture_output=True)
-        found = mounted()
-    if not found:
+    found, main = drives(), main_drive()
+    if main:
+        picked = next((d for d in found if d.uuid == main), None)
+        if picked is None:
+            sys.exit(f"The main Batocera drive ({main}) is not connected. "
+                     "Name another: --drive /path (or BATOCERA_DRIVE=/path), or change it with batocera-drive --main.")
+    elif len(found) == 1:
+        picked = found[0]
+    elif not found:
         sys.exit("Can't find Batocera's data. Plug the drive in, or name the folder: --drive /path (or BATOCERA_DRIVE=/path).")
-    if len(found) > 1:
-        sys.exit("More than one Batocera drive here:\n  " + "\n  ".join(map(str, found)) + "\nName one: --drive /path (or BATOCERA_DRIVE=/path).")
-    return found[0]
+    else:
+        sys.exit("More than one Batocera drive here:\n" + listing(found) +
+                 "\nName one: --drive /path (or BATOCERA_DRIVE=/path), or pick a main one: batocera-drive --main NUMBER.")
+    try:
+        folder = picked.mount()
+    except OSError as problem:
+        sys.exit(str(problem))
+    if not Target.looks_right(folder):
+        sys.exit(f"{folder} does not hold Batocera's data.")
+    return folder
+
+
+def listing(found) -> str:
+    main = main_drive()
+    return "\n".join(f"  {n}) {d.describe(main=bool(main) and d.uuid == main)}" for n, d in enumerate(found, 1))
+
+
+def choose_main(which: str) -> None:
+    found = drives()
+    if which == "none":
+        set_main_drive("")
+        print("No main drive any more.")
+        return
+    if which.isdigit() and 1 <= int(which) <= len(found):
+        picked = found[int(which) - 1]
+    else:
+        wanted = Path(which).expanduser()
+        picked = next((d for d in found if d.device == which or (d.path and d.path.resolve() == wanted.resolve())), None)
+    if picked is None or not picked.uuid:
+        sys.exit(f"'{which}' is not one of these Batocera drives:\n{listing(found)}")
+    set_main_drive(picked.uuid)
+    print(f"Main drive: {picked.describe()}")
 
 
 if __name__ == "__main__":
-    if sys.argv[1:2] in (["-h"], ["--help"]):
+    args = sys.argv[1:]
+    if args[:1] in (["-h"], ["--help"]):
         sys.exit(__doc__)
-    print(find(sys.argv[1] if len(sys.argv) > 1 else ""))
+    if args[:1] == ["--list"]:
+        print(listing(drives()) or "No Batocera drive found.")
+    elif args[:1] == ["--main"]:
+        if len(args) > 1:
+            choose_main(args[1])
+        else:
+            main = main_drive()
+            picked = next((d for d in drives() if d.uuid == main), None) if main else None
+            print(picked.describe() if picked else f"{main} (not connected)" if main else "No main drive set.")
+    else:
+        print(find(args[0] if args else ""))

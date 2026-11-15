@@ -24,7 +24,8 @@ from .fetch import FetchError, fetch, is_url, without_secrets
 from .host import Host, expand
 from .library import Library, Selection
 from .prompts import NoAnswer, Prompts
-from .target import Target
+from .target import LIVE_ROOT, Target, main_drive
+from .target import drives as target_drives
 
 REPO = Path(__file__).resolve().parent.parent
 MENU_SERVICE = "/etc/init.d/S31emulationstation"
@@ -115,15 +116,22 @@ def find_target(args, ask: Prompts) -> Target:
         if not Target.looks_right(root):
             raise Stop(f"{root} is not a Batocera data folder (it should contain 'system' and 'roms').")
         return Target(root)
-    found = Target.find()
-    if len(found) == 1:
-        ask.say(f"Batocera found at {found[0]}")
-        return Target(found[0])
+    if Target.looks_right(LIVE_ROOT):
+        return Target(LIVE_ROOT)
+    found = target_drives()
     if found:
-        picked = ask.choose("More than one Batocera drive is connected:", [str(p) for p in found])
-        if len(picked) != 1:
-            raise Stop("Pick one drive, or name it with --target.")
-        return Target(found[picked[0]])
+        main = main_drive()
+        default = next((i for i, d in enumerate(found) if main and d.uuid == main), 0)
+        picked = found[ask.pick_one("Batocera drives on this PC:",
+                                    [d.describe(main=bool(main) and d.uuid == main) for d in found], default)]
+        try:
+            root = picked.mount()
+        except OSError as problem:
+            raise Stop(f"{problem} Open it in the file manager, or name the folder with --target.")
+        if not Target.looks_right(root):
+            raise Stop(f"{root} does not hold Batocera's data (no 'system' and 'roms' folders).")
+        ask.say(f"Using {picked.describe()}")
+        return Target(root)
     ask.say("No Batocera drive found. Plug it in and open it in the file manager, or type where it is.")
     root = expand(ask.text("Batocera data folder (the one containing 'system' and 'roms')"))
     if not Target.looks_right(root):
