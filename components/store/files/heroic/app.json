@@ -2,6 +2,10 @@
   "name": "Heroic",
   "description": "Your Epic Games, GOG and Amazon libraries.",
   "flatpak": "com.heroicgameslauncher.hgl",
-  "args": ["--no-sandbox", "--fullscreen"],
-  "window": "heroic"
+  "args": [
+    "--no-sandbox",
+    "--fullscreen"
+  ],
+  "window": "heroic",
+  "menu": false
 }

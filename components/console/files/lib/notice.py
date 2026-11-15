@@ -54,7 +54,7 @@ def tidy(line: str) -> str:
 
 class Notice(Gtk.Window):
     def __init__(self, title: str, command: list[str]):
-        super().__init__(title="RetroBox")
+        super().__init__(title="EmuBox")
         GtkLayerShell.init_for_window(self)
         GtkLayerShell.set_layer(self, GtkLayerShell.Layer.OVERLAY)
         GtkLayerShell.set_keyboard_interactivity(self, False)
@@ -103,7 +103,8 @@ class Notice(Gtk.Window):
         line = source.readline()
         if line:
             if tidy(line):
-                self.status.set_text(tidy(line))
+                self.last = tidy(line)
+                self.status.set_text(self.last)
             return True
         self._finish(self.process.wait())
         return False
@@ -117,8 +118,10 @@ class Notice(Gtk.Window):
         if status == CANCELLED:
             self.status.set_text("Cancelled.")
         elif status != 0:
-            self.status.set_text("That did not work. Check the internet connection and try again.")
-        GLib.timeout_add(LINGER_MS if status else 900, Gtk.main_quit)
+            said = getattr(self, "last", "")
+            self.status.set_text(f"That did not work: {said}" if said and "ready" not in said
+                                 else "That did not work. Check the internet connection and try again.")
+        GLib.timeout_add(LINGER_MS * 2 if status not in (0, CANCELLED) else LINGER_MS if status else 900, Gtk.main_quit)
 
     def cancel(self) -> None:
         if self.result is None:

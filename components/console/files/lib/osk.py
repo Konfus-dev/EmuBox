@@ -33,8 +33,8 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gdk, GLib, Gtk, GtkLayerShell  # noqa: E402
 
-PIDFILE = "/var/run/retrobox-osk.pid"
-DEBUG = bool(os.environ.get("RETROBOX_DEBUG"))  # log every controller action
+PIDFILE = "/var/run/emubox-osk.pid"
+DEBUG = bool(os.environ.get("EMUBOX_DEBUG"))  # log every controller action
 
 # --- the keys -------------------------------------------------------------------
 LETTERS = [
@@ -84,7 +84,7 @@ def send(*args: str) -> None:
 
 class Keyboard(Gtk.Window):
     def __init__(self):
-        super().__init__(title="RetroBox Keyboard")
+        super().__init__(title="EmuBox Keyboard")
         GtkLayerShell.init_for_window(self)
         GtkLayerShell.set_layer(self, GtkLayerShell.Layer.OVERLAY)
         GtkLayerShell.set_keyboard_interactivity(self, False)  # never steal the app's focus

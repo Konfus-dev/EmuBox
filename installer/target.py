@@ -1,7 +1,7 @@
 """The Batocera data folder we install into, and the few files of it we edit.
 
 Inside Batocera it is /userdata; from another PC it is wherever the drive's
-SHARE partition is mounted. Everything RetroBox installs lives here, which
+SHARE partition is mounted. Everything EmuBox installs lives here, which
 is the part Batocera's own updates leave alone.
 """
 from __future__ import annotations
@@ -16,7 +16,8 @@ from xml.sax.saxutils import quoteattr
 
 LIVE_ROOT = Path("/userdata")
 MOUNT_PARENTS = ("/run/media", "/media", "/mnt")
-MANIFEST = "system/retrobox/installed.json"
+MANIFEST = "system/emubox/installed.json"
+OLD_MANIFESTS = ["system/retrobox/installed.json"]   # from when the project was called RetroBox
 
 
 class Target:

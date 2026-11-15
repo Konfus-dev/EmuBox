@@ -19,6 +19,8 @@ component.json:
                    Use an answer as {user} in batocera_conf and es_settings values.
                    Answers are used once and never stored by the installer.
     files          [{"from": path here, "to": path on the drive, "mode": "755"}]
+    flatpaks       Flathub programs to put on the drive now, so Batocera need not download them
+                   (an app's own program is added by itself); skipped with --download-later
     ports          menu entries: name, description, image, and either "script" (a file here)
                    or "command" (one line to run). They go in Ports unless "system" names
                    another system folder (for example "store").
@@ -42,13 +44,13 @@ from pathlib import Path
 from types import ModuleType
 from typing import Callable
 
-from . import gamelist
+from . import flatpak, gamelist
 from .host import Host
-from .target import Target
+from .target import OLD_MANIFESTS, Target
 
 PORTS = "roms/ports"
-APPS_ON_DRIVE = "system/retrobox/apps"
-OPEN_APP = "exec /userdata/system/retrobox/bin/retrobox-app open {id} --wait"
+APPS_ON_DRIVE = "system/emubox/apps"
+OPEN_APP = "exec /userdata/system/emubox/bin/emubox-app open {id} --wait"
 
 
 @dataclass
@@ -89,6 +91,7 @@ class Env:
     component: Component | None = None
     say: Callable[[str], None] = print
     answers: dict[str, dict[str, str]] = field(default_factory=dict)   # component id -> what was typed for "ask"
+    downloads: bool = True                     # fetch apps' programs onto the drive now
 
 
 @dataclass
@@ -108,6 +111,7 @@ def _app_spec(app_id: str, app: dict) -> dict:
         "order": app.get("order", 20),
         "requires": ["console"],
         "files": [{"from": ".", "to": f"{APPS_ON_DRIVE}/{app_id}"}],
+        "flatpaks": [app["flatpak"]] if app.get("flatpak") else [],
         "ports": [{
             "name": app["name"],
             "command": OPEN_APP.format(id=app_id),
@@ -122,7 +126,7 @@ def _hooks(folder: Path, component_id: str) -> ModuleType | None:
     path = folder / "component.py"
     if not path.is_file():
         return None
-    spec = importlib.util.spec_from_file_location(f"retrobox_component_{component_id.replace('-', '_')}", path)
+    spec = importlib.util.spec_from_file_location(f"emubox_component_{component_id.replace('-', '_')}", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -174,10 +178,10 @@ def _add_port(component: Component, port: dict, target: Target, record: Record) 
     if "script" in port:
         record.files.append(target.copy_file(component.folder / port["script"], f"{folder}/{name}.sh", 0o755))
     else:
-        text = f"#!/bin/bash\n# {name}, installed by RetroBox.\n{port['command']}\n"
+        text = f"#!/bin/bash\n# {name}, installed by EmuBox.\n{port['command']}\n"
         record.files.append(target.write_text(f"{folder}/{name}.sh", text, 0o755))
     fields = {"name": name, "desc": port.get("description", ""), "genre": port.get("genre", ""),
-              "developer": "RetroBox", "players": "1", "releasedate": f"{date.today().year}0101T000000"}
+              "developer": "EmuBox", "players": "1", "releasedate": f"{date.today().year}0101T000000"}
     if port.get("image"):
         record.files.append(target.copy_file(component.folder / port["image"], f"{folder}/images/{name}.png"))
         fields["image"] = f"./images/{name}.png"
@@ -220,6 +224,8 @@ def install(component: Component, env: Env) -> Record:
     run = getattr(component.hooks, "install", None)
     if run:
         run(env)
+    if spec.get("flatpaks") and env.downloads:
+        flatpak.preinstall(target, spec["flatpaks"], env.say)
 
     for service in spec.get("services", []):
         target.enable_service(service)
@@ -245,6 +251,37 @@ def uninstall(component_id: str, target: Target) -> bool:
     entry = manifest["components"].pop(component_id, None)
     if entry is None:
         return False
+    _take_off(entry, target)
+    target.save_manifest(manifest)
+    return True
+
+
+def retire_old_names(target: Target) -> list[str]:
+    """Take off an installation made when the project had another name (RetroBox), so the
+    drive does not end up with both. Gives the titles of what was installed; where the
+    BIOS and games libraries are is carried over. Batocera's own files and yours stay."""
+    titles = []
+    for old in OLD_MANIFESTS:
+        path = target.path(old)
+        if not path.is_file():
+            continue
+        try:
+            before = json.loads(path.read_text())
+        except ValueError:
+            before = {}
+        for component_id, entry in before.get("components", {}).items():
+            _take_off(entry, target)
+            titles.append(entry.get("title", component_id))
+        target.remove(str(Path(old).parent))   # the old folder, with its record
+        if before.get("sources"):
+            manifest = target.manifest()
+            manifest["sources"] = {**before["sources"], **manifest.get("sources", {})}
+            target.save_manifest(manifest)
+    return titles
+
+
+def _take_off(entry: dict, target: Target) -> None:
+    """Remove what one component's record says it put on the drive."""
     for service in entry.get("services", []):
         target.disable_service(service)
     for name in entry.get("ports", []):
@@ -260,5 +297,3 @@ def uninstall(component_id: str, target: Target) -> bool:
         while len(folder.relative_to(target.root).parts) >= 2 and folder.is_dir() and not any(folder.iterdir()):
             folder.rmdir()
             folder = folder.parent
-    target.save_manifest(manifest)
-    return True

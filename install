@@ -1,4 +1,4 @@
 #!/bin/bash
-# RetroBox installer. Run it with no arguments and it asks what you want.
+# EmuBox installer. Run it with no arguments and it asks what you want.
 #   ./install --help   for the options
 cd "$(dirname "$(readlink -f "$0")")" && exec python3 -m installer "$@"

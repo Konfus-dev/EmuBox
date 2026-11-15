@@ -1,23 +1,27 @@
 #!/bin/bash
-# Open, hide and control RetroBox apps (Discord, Apple Music...) on Batocera.
+# Open, hide and control EmuBox apps (Discord, Apple Music...) on Batocera.
 #
-#   retrobox-app open <app> [--wait]   start it, or bring it back if it is running
-#   retrobox-app back [<app>]          hide it and return to the game (it keeps running)
-#   retrobox-app close <app>           quit it
-#   retrobox-app install <app>         download it (needs internet); "open" does this when needed
-#   retrobox-app fetch <name> <flatpak id>   download any Flathub program behind the same notice
-#   retrobox-app running <app>         exit status 0 if it is running
-#   retrobox-app play <app>            play/pause; opens the app first when it is not running
-#   retrobox-app media PlayPause|Next|Previous|title|playing
-#   retrobox-app pads                  note the connected controllers in the log (for troubleshooting)
-#   retrobox-app list                  the apps that are set up
+#   emubox-app open <app> [--wait]   start it, or bring it back if it is running
+#   emubox-app detach <command...>   run any of these in the background and return at once
+#                                    (the in-game menu stops a button's command after 3 seconds)
+#   emubox-app mic in-use|muted|mute|unmute   the microphone, for a quick mute during a call
+#   emubox-app back [<app>]          hide it and return to the game (it keeps running)
+#   emubox-app close <app>           quit it
+#   emubox-app install <app>         download it (needs internet); "open" does this when needed
+#   emubox-app fetch <name> <flatpak id>   download any Flathub program behind the same notice
+#   emubox-app running <app>         exit status 0 if it is running
+#   emubox-app play <app>            play/pause; opens the app first when it is not running
+#   emubox-app media PlayPause|Next|Previous|title|playing
+#   emubox-app setting [is|get|set <name> [value]]   EmuBox's switches (see lib/settings.py)
+#   emubox-app pads                  note the connected controllers in the log (for troubleshooting)
+#   emubox-app list                  the apps that are set up
 #
 # Each app is one folder, apps/<app>/, whose app.json says what to start, how
 # its window is named, and what the controller's buttons do in it.
 
 ROOT=$(dirname "$(dirname "$(readlink -f "$0")")")
-RUN=/var/run/retrobox
-LOG=/userdata/system/logs/retrobox.log
+RUN=/var/run/emubox
+LOG=/userdata/system/logs/emubox.log
 mkdir -p "$RUN" "$(dirname "$LOG")"
 
 # Batocera's display, for when we are called from a menu with a bare environment.
@@ -40,7 +44,7 @@ conf() { jq -r "$2" "$ROOT/apps/$1/app.json"; }
 list_apps() { for f in "$ROOT"/apps/*/app.json; do [ -f "$f" ] && basename "$(dirname "$f")"; done; }
 need_app() {
     [ -f "$ROOT/apps/$1/app.json" ] && return
-    echo "retrobox-app: no such app '$1' (have: $(list_apps | tr '\n' ' '))" >&2
+    echo "emubox-app: no such app '$1' (have: $(list_apps | tr '\n' ' '))" >&2
     exit 2
 }
 
@@ -59,7 +63,8 @@ download() {
     if [ "${free_gb:-0}" -lt 3 ]; then echo "Not enough free space for $name (${free_gb} GB free, 3 GB needed)."; return 1; fi
     echo "Getting ready..."
     flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo || return 1
-    flatpak install -y --noninteractive flathub "$flatpak" || return 1
+    # One download at a time: a second request waits here, then finds the first one's work done.
+    flock "$RUN/download.lock" flatpak install -y --noninteractive flathub "$flatpak" || return 1
     # Same permission fix Batocera applies after installing a flatpak.
     chmod -R a+rX /userdata/saves/flatpak/binaries
     chmod a+rx /userdata /userdata/saves /userdata/saves/flatpak
@@ -97,7 +102,7 @@ open_app() {
     start_bus
     w=$(window "$app")
     if [ -z "$w" ]; then
-        install_app "$app" || { echo "retrobox-app: $(conf "$app" .name) could not be downloaded; see $LOG" >&2; return 1; }
+        install_app "$app" || { echo "emubox-app: $(conf "$app" .name) could not be downloaded; see $LOG" >&2; return 1; }
         # Sound for the sandboxed app (the same fix Batocera applies to its own flatpaks).
         chown -R root:audio /var/run/pulse 2>/dev/null; chmod -R g+rwX /var/run/pulse 2>/dev/null
         mapfile -t args < <(conf "$app" '.args[]')
@@ -108,11 +113,12 @@ open_app() {
             w=$(window "$app"); [ -n "$w" ] && break
             sleep 0.25
         done
-        [ -n "$w" ] || { echo "retrobox-app: $app did not open a window; see $LOG" >&2; return 1; }
+        [ -n "$w" ] || { echo "emubox-app: $app did not open a window; see $LOG" >&2; return 1; }
         wlrctl toplevel fullscreen "app_id:$w"
     fi
     wlrctl toplevel focus "app_id:$w"
     start_pad "$app"
+    start_watch "$app"
 }
 
 # Used when the app is started like a game from the menu: come back when the
@@ -133,7 +139,22 @@ back() {
     done
 }
 
+# The microphone as a whole, so it works whichever window is in front. "in-use" prints
+# something while an app is recording (in a call); "muted" prints true while it is off.
+mic() {
+    case $1 in
+    in-use)  # nobody listening any more: never leave the microphone off behind a finished call
+        if pactl list short source-outputs 2>/dev/null | grep -q .; then echo yes
+        elif [ -e "$RUN/mic.muted" ]; then mic unmute; fi ;;
+    muted)   pactl get-source-mute @DEFAULT_SOURCE@ 2>/dev/null | grep -q yes && echo true ;;
+    mute)    pactl set-source-mute @DEFAULT_SOURCE@ 1 && touch "$RUN/mic.muted" ;;
+    unmute)  pactl set-source-mute @DEFAULT_SOURCE@ 0; rm -f "$RUN/mic.muted" ;;
+    *) echo "emubox-app mic in-use|muted|mute|unmute" >&2; exit 2 ;;
+    esac
+}
+
 close_app() {
+    [ -e "$RUN/mic.muted" ] && mic unmute
     flatpak kill "$(conf "$1" .flatpak)" 2>/dev/null
     rm -f "$RUN/$1.started"
     [ -e "$RUN/$1.pad.pid" ] && kill "$(cat "$RUN/$1.pad.pid")" 2>/dev/null
@@ -151,24 +172,81 @@ media() {
         for p in $(players); do
             bus_call --dest="$p" /org/mpris/MediaPlayer2 "org.mpris.MediaPlayer2.Player.$1" >/dev/null
         done ;;
-    title)  # "Song - Artist" of whatever is playing, or nothing
+    title)  # "Song by Artist" of whatever is playing, or nothing
         for p in $(players); do
             bus_call --dest="$p" /org/mpris/MediaPlayer2 org.freedesktop.DBus.Properties.Get \
                 string:org.mpris.MediaPlayer2.Player string:Metadata |
                 awk -F'"' '/xesam:title/ { want = "t" } /xesam:artist/ { want = "a" }
                            /string "/ && !/xesam:|mpris:/ { if (want == "t" && !t) t = $2; if (want == "a" && !a) a = $2; want = "" }
-                           END { if (t) print t (a ? " - " a : "") }'
+                           END { if (t) print t (a ? " by " a : "") }'
         done | head -n 1 ;;
+    sounding)  # prints "yes" while music is actually coming out (not paused, not stopped)
+        for p in $(players); do
+            bus_call --dest="$p" /org/mpris/MediaPlayer2 org.freedesktop.DBus.Properties.Get \
+                string:org.mpris.MediaPlayer2.Player string:PlaybackStatus | grep -q '"Playing"' && { echo yes; break; }
+        done ;;
+    silent)  # the opposite: prints "yes" when nothing is coming out
+        [ -z "$(media sounding)" ] && echo yes ;;
     playing)  # the same, for showing on screen: never empty
         local title; title=$(media title)
         echo "${title:-Nothing playing}" ;;
-    *) echo "retrobox-app media PlayPause|Next|Previous|title|playing" >&2; exit 2 ;;
+    *) echo "emubox-app media PlayPause|Next|Previous|title|playing|sounding|silent" >&2; exit 2 ;;
     esac
 }
 
-# Play or pause; with nothing playing yet, open the app so there is something to play.
+# The in-game menu decides which rows and buttons it has once, when it starts. The "Now
+# Playing" row exists only while there is a song, and the Play button only while nothing is
+# coming out, so when either changes the menu is started afresh, hidden, exactly as it was
+# running (never while it is on screen).
+MENU_PID=/var/run/batocera-controlcenter.pid
+# On screen? The menu holds the controllers open only while it is showing.
+menu_visible() {
+    local menu; menu=$(cat "$MENU_PID" 2>/dev/null)
+    [ -n "$menu" ] && ls -l "/proc/$menu/fd" 2>/dev/null | grep -q '/dev/input/event'
+}
+restart_menu() {
+    local menu
+    menu=$(cat "$MENU_PID" 2>/dev/null)
+    [ -n "$menu" ] && kill "$menu" 2>/dev/null
+    sleep 1
+    rm -f "$MENU_PID"
+    batocera-controlcenter hidden >/dev/null 2>&1   # Batocera's own launcher: right screen, right size
+    echo "$(date '+%F %T') in-game menu restarted (music ${1:-stopped})" >>"$LOG"
+}
+# Runs beside a music player for as long as it is open.
+watch_player() {
+    local app=$1 now last gone=0
+    while [ "$gone" -lt 3 ]; do
+        sleep 3
+        if running "$app"; then gone=0; else gone=$((gone + 1)); fi
+        now=
+        if [ "$gone" -eq 0 ]; then   # "song" while there is one, "song sounding" while it is not paused
+            [ -n "$(media title)" ] && now=song
+            [ -n "$(media sounding)" ] && now="$now sounding"
+        fi
+        last=$(cat "$RUN/menu.playing" 2>/dev/null)
+        if [ "$now" != "$last" ] && ! menu_visible; then
+            echo "$now" >"$RUN/menu.playing"
+            restart_menu "$now"
+        fi
+    done
+    while [ -s "$RUN/menu.playing" ]; do   # the player has gone: take the row away once the menu is out of sight
+        if menu_visible; then sleep 3; else : >"$RUN/menu.playing"; restart_menu; fi
+    done
+    rm -f "$RUN/$app.watch.pid"
+}
+start_watch() {
+    [ "$(conf "$1" '.player // false')" = true ] || return 0
+    local pidfile="$RUN/$1.watch.pid"
+    [ -e "$pidfile" ] && kill -0 "$(cat "$pidfile")" 2>/dev/null && return
+    setsid "$0" watch "$1" </dev/null >/dev/null 2>&1 &
+    echo $! >"$pidfile"
+}
+
+# The menu's quick Play: carry on with the paused song; with no song yet, open the app
+# so there is something to play.
 play() {
-    if [ -n "$(players)" ]; then media PlayPause; else open_app "$1"; fi
+    if [ -n "$(players)" ]; then media Play; else open_app "$1"; fi
 }
 
 # Which controllers are connected, and what Batocera's menu calls their buttons.
@@ -191,6 +269,10 @@ PY
 }
 
 case $1 in
+detach)   shift; setsid "$0" "$@" </dev/null >/dev/null 2>&1 & ;;
+mic)      mic "$2" ;;
+setting)  shift; exec python3 "$ROOT/lib/settings.py" "$@" ;;
+watch)    need_app "$2"; watch_player "$2" ;;
 open)     need_app "$2"; open_app "$2" || exit 1; if [ "$3" = --wait ]; then wait_until_left "$2"; fi ;;
 back)     [ -n "$2" ] && need_app "$2"; back "$2" ;;
 close)    need_app "$2"; close_app "$2" ;;
@@ -202,5 +284,5 @@ media)    media "$2" ;;
 play)     need_app "$2"; play "$2" ;;
 pads)     pads ;;
 list)     list_apps ;;
-*)        sed -n '2,14s/^# \{0,1\}//p' "$0" >&2; exit 2 ;;
+*)        sed -n '2,18s/^# \{0,1\}//p' "$0" >&2; exit 2 ;;
 esac

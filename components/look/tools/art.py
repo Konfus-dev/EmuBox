@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generates every image used by the RetroBox theme.  Usage: python3 art.py <theme folder>
+"""Generates every image used by the EmuBox theme.  Usage: python3 art.py <theme folder>
 All artwork and audio is original and procedural (no console maker's assets are used)."""
 import sys, math, random, struct, wave, os
 from PIL import Image, ImageDraw, ImageFilter, ImageOps, ImageChops, ImageFont
@@ -182,9 +182,7 @@ def frame(name, top, bottom, edge, size=96, cut=20):               # nine-patch 
     m = Image.new("L", (n, n), 0); ImageDraw.Draw(m).polygon(pts, fill=255)
     im.alpha_composite(with_alpha(vgrad((n, n), top, bottom), m, 244)); d = ImageDraw.Draw(im)
     d.line(pts + [pts[0]], fill=edge, width=3 * s, joint="curve"); im.resize((size, size), Image.LANCZOS).save(f"{OUT}/{name}")
-frame("frame.png", (8, 52, 8), (2, 24, 2), (140, 236, 72, 255))
-frame("button.png", (16, 80, 14), (8, 50, 8), (100, 190, 56, 255), 48, 10)
-frame("button_filled.png", (226, 250, 84), (150, 214, 28), (240, 255, 170, 255), 48, 10)
+# The pop-up menus' pane, buttons and switches are drawn by menu_art.py (run it after this).
 Image.new("RGBA", (8, 8), (255, 255, 255, 255)).save(f"{OUT}/white.png")
 # hologram overlays for the whole screen: fine scan lines (tiled) and a soft band of light that rolls down
 sl = Image.new("RGBA", (4, 3), (0, 0, 0, 0))

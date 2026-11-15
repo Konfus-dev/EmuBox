@@ -1,7 +1,7 @@
 """OMEN Lights: offered only on a PC that has the hardware; installed by its own script.
 
 The program lives in its own repository (see "source" in component.json). We
-fetch it and run the installer it ships, so RetroBox never carries a copy.
+fetch it and run the installer it ships, so EmuBox never carries a copy.
 """
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ INSTALLER = Path("install") / "install-batocera.sh"
 
 
 def _local_checkout(repo: Path, name: str) -> Path | None:
-    """The lights program's installer, when its repository is checked out near RetroBox."""
+    """The lights program's installer, when its repository is checked out near EmuBox."""
     for folder in (repo.parent, repo.parent.parent):
         if (folder / name / INSTALLER).is_file():
             return folder / name / INSTALLER

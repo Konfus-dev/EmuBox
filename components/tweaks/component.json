@@ -1,6 +1,6 @@
 {
   "title": "Play settings",
-  "question": "Apply the RetroBox play settings (auto-save, rewind on 8/16-bit systems, zfast shader, tidy network share)?",
+  "question": "Apply the EmuBox play settings (auto-save, rewind on 8/16-bit systems, zfast shader, tidy network share)?",
   "default": true,
   "order": 50,
   "files": [

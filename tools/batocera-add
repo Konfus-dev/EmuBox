@@ -122,7 +122,7 @@ def main():
         print("ADDED %s -> roms/%s" % (name, system))
         added += 1
     if patches or added:
-        tool = os.path.join(drive, "system", "retrobox", "tools", "apply-patches.py")
+        tool = os.path.join(drive, "system", "emubox", "tools", "apply-patches.py")
         if os.path.isfile(tool) and os.path.isdir(os.path.join(drive, "patches")):
             subprocess.run([sys.executable, tool, drive])
     os.sync()

@@ -1,0 +1,51 @@
+#!/usr/bin/env python3
+"""Set up Vault on the Batocera USB stick, from this PC.
+
+  batocera-vault add "Name" https://address    add a page (same name again: change its address)
+  batocera-vault rename "Name" "New name"      give a page another name
+  batocera-vault remove "Name"                 take a page off
+  batocera-vault pages                         list the pages
+  batocera-vault show                          everything that is set
+  batocera-vault command 'shell line'          what runs for each download
+  batocera-vault refresh 'shell line'          what runs once on leaving Vault, after any install
+  batocera-vault reset                         command, refresh and downloads folder back to the built-in ones
+
+Add  --drive /path/to/SHARE  when the stick is mounted somewhere unusual. The stick's
+settings folder belongs to root, so changes ask for your password.
+"""
+import getpass, os, subprocess, sys
+
+VAULT = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "components", "vault", "files", "vault.py")
+READS = ("pages", "show")
+
+
+def find_drive(arg):
+    if arg:
+        return arg
+    path = "/run/media/%s/SHARE" % getpass.getuser()
+    conf = os.path.join(path, "system", "batocera.conf")
+    if not os.path.isfile(conf) and os.path.exists("/dev/disk/by-label/SHARE"):
+        subprocess.run(["udisksctl", "mount", "-b", "/dev/disk/by-label/SHARE"], capture_output=True)
+    if not os.path.isfile(conf):
+        sys.exit("Can't find the Batocera stick. Plug it in (or pass --drive /path/to/SHARE).")
+    return path
+
+
+def main():
+    args, drive = sys.argv[1:], None
+    if "--drive" in args:
+        at = args.index("--drive")
+        drive, args = args[at + 1], args[:at] + args[at + 2:]
+    if not args or args[0] in ("-h", "--help") or args[0] in ("open", "go"):
+        sys.exit(__doc__)
+    home = os.path.join(find_drive(drive), "system", "vault")
+    command = [sys.executable, VAULT, "--home", home] + args
+    reading = args[0] in READS or (args[0] in ("command", "refresh", "downloads") and len(args) == 1)
+    writable = os.access(home if os.path.isdir(home) else os.path.dirname(home), os.W_OK)
+    if not reading and not writable:
+        command = ["pkexec", "/usr/bin/python3"] + command[1:]
+    return subprocess.run(command).returncode
+
+
+if __name__ == "__main__":
+    sys.exit(main())

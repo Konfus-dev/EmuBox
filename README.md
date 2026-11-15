@@ -1,4 +1,4 @@
-# RetroBox
+# EmuBox
 
 A console-style setup for [Batocera](https://batocera.org): an Xbox-style look, Discord and Apple
 Music you can drive with a controller, a few quality-of-life settings, and an installer that also
@@ -15,8 +15,8 @@ be taken off again.
 **From a Linux PC**, with the Batocera drive plugged in and opened in the file manager:
 
 ```sh
-git clone https://github.com/Konfus-dev/RetroBox
-cd RetroBox
+git clone https://github.com/Konfus-dev/EmuBox
+cd EmuBox
 ./install
 ```
 
@@ -24,8 +24,8 @@ cd RetroBox
 
 ```sh
 cd /userdata/system
-curl -L https://github.com/Konfus-dev/RetroBox/archive/HEAD.tar.gz | tar xz
-RetroBox-*/install
+curl -L https://github.com/Konfus-dev/EmuBox/archive/HEAD.tar.gz | tar xz
+EmuBox-*/install
 ```
 
 The installer finds the drive and asks what you want:
@@ -58,8 +58,8 @@ things or update; it only copies what is missing.
 
 | | |
 | --- | --- |
-| **Xbox-style look** | Theme for the menus, matching colours for the in-game menu, fonts, sounds |
-| **Discord**, **Apple Music** | Open from Ports, or over a running game from the in-game menu's **Apps** tab. Each downloads itself the first time you open it |
+| **Xbox-style look** | Theme for the menus, a start-up film (the orb waking, then the EmuBox name, with its own sound) that goes straight to the menus without Batocera's loading screen, the EmuBox name on the home screen and on an OMEN cooler's screen, matching colours for the in-game menu, fonts, sounds. One row along the top: a light per controller on the left; how full the drive is, the clock and the network on the right |
+| **Discord**, **Apple Music** | Open from Ports, or over a running game from the in-game menu's **Apps** tab. The installer puts each one's program on the drive (with `flatpak` on the PC), so there is no waiting in Batocera; without that, or with `--download-later`, it downloads the first time you open it |
 | **ROM-hack patcher** | Drop a `.ips`/`.bps`/`.ups` file in `patches` and it is applied at boot |
 | **Play settings** | Auto-save, rewind on 8/16-bit systems, a light CRT shader, a tidier network share |
 | **Bluetooth controllers** | Offered when preparing a drive on a PC with paired controllers: copies the pairings so the same controller works in Linux and Batocera without re-pairing |
@@ -67,6 +67,7 @@ things or update; it only copies what is missing.
 | **ScreenScraper account** | For box art, videos and descriptions; with the picture style and extras already chosen |
 | **RetroAchievements account** | Trophies for older games |
 | **Store** | A Store on the home screen: Batocera's catalogue of free games (browse and install with the controller), Steam, and Heroic for Epic and GOG. Each downloads itself the first time you open it |
+| **Vault** | In the Store: your own list of store pages, browsed with the controller. Downloads are noticed straight away, Vault asks which system to install them to, then moves them into your games. See [Vault](docs/vault.md) |
 | **OMEN lights** | Only offered on an HP OMEN PC that has the lights; fetched from [its own repository](https://github.com/Konfus-dev/OmenRGB-Controller) |
 
 ### Controller buttons in the apps
@@ -86,8 +87,24 @@ Each app adds its own on top (see its `app.json`): in Discord, X mutes, Y search
 through items, LT/RT switch servers; in Apple Music, X or Start plays and pauses, LB/RB change
 song, LT/RT change the volume, Y opens the keyboard.
 
-In the in-game menu's **Apps** tab each app has one box: Open and Quit, and for a player what is
-playing with Previous, Play/Pause and Next.
+In the in-game menu's **Apps** tab each app has one row: Open and Close. A music player also has
+a quick Play while nothing is playing (it carries on with the paused song, or opens the app when
+there is none), and while it has a song a second row under it:
+`Now Playing: Song by Artist  <  ||  >`. A
+**Call** tab appears while an app is using the microphone, with a switch that mutes it, whichever
+window is in front.
+
+The Apps tab also has **Menu sounds**: which sound set, the volume, and a switch each for moving
+through a list, choosing, going back and opening the menu. EmuBox's own set is synthesised; a
+folder of your own WAV files in `system/configs/emubox/sounds/<Name>/` (any of `scroll.wav`,
+`select.wav`, `back.wav`, `menuopen.wav`) is listed as another set. Keep such sets in a folder
+named `Sounds` beside this repository (one sub-folder per set) and the installer copies them to
+the drive each time; they are yours and stay out of the repository.
+
+The Apps tab ends with the settings: the menus going quiet while your music plays (Batocera's menu
+music would otherwise play over it), music dropping to a fifth during a call, the ad blocker for
+web apps, and, on a PC with them, everything about the OMEN lights (on/off, brightness, following
+the game, a colour per light, effects, the cooler's screen and its picture).
 
 ## Your BIOS files and games
 
@@ -130,7 +147,7 @@ See [docs/extending.md](docs/extending.md).
   Chromium-based programs must there. Treat the drive as a games machine, not a place for
   sensitive browsing.
 - Controller buttons are read by their Xbox-pad labels.
-- Log on Batocera: `/userdata/system/logs/retrobox.log` (`RETROBOX_DEBUG=1` logs every button).
+- Log on Batocera: `/userdata/system/logs/emubox.log` (`EMUBOX_DEBUG=1` logs every button).
 
 Licence: GPL-3.0-or-later. Fonts: SIL Open Font Licence (see `components/look/files/fonts`).
-RetroBox is not affiliated with Microsoft, Discord or Apple; it ships none of their artwork or software.
+EmuBox is not affiliated with Microsoft, Discord or Apple; it ships none of their artwork or software.

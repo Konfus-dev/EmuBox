@@ -4,7 +4,7 @@
   "default": true,
   "order": 40,
   "files": [
-    {"from": "files/apply-patches.py", "to": "system/retrobox/tools/apply-patches.py", "mode": "755"},
+    {"from": "files/apply-patches.py", "to": "system/emubox/tools/apply-patches.py", "mode": "755"},
     {"from": "files/rom_patcher", "to": "system/services/rom_patcher", "mode": "755"},
     {"from": "files/patches-README.txt", "to": "patches/README.txt"}
   ],

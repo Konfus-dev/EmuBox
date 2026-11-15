@@ -1,0 +1,284 @@
+#!/usr/bin/env python3
+"""Menu sounds: which set, how loud, and the ones Batocera's menu program does not play itself.
+
+    menusounds.py              run until stopped (the emubox service starts it at boot)
+    menusounds.py sets         list the sound sets
+    menusounds.py set <name>   use a set
+    menusounds.py set-now      print the set in use
+    menusounds.py volume <+/-n|n>    change or set the volume (0..100)
+    menusounds.py on|off <scroll|select|back|menuopen>    one sound's switch
+    menusounds.py apply        redraw the scroll sound the menus play (after a change)
+
+Batocera's menus only ever play a theme's scroll sound. This listens to the
+controllers and keyboards (without taking them from anyone) and, while the menus are what is
+on screen, plays the sounds for the buttons that select, go back and open the
+main menu.
+
+A sound set is a folder with any of scroll.wav, select.wav, back.wav and
+menuopen.wav. "EmuBox" is the active theme's own (art/sounds in its folder).
+Your own sets go in /userdata/system/configs/emubox/sounds/<Name>/ and show up
+by that name; a sound a set lacks is taken from EmuBox. Each sound has its own
+on/off switch and they share one volume, all in the in-game menu's Apps tab.
+
+The scroll sound is played by the menu program from a file in the theme
+(art/sounds/scroll-now.wav), which `apply` rewrites: so a change to it is
+heard after the menus restart, the others at once.
+
+Silent whenever something else has the controller or the screen: during a
+game, inside an app, the in-game menu or the on-screen keyboard, and while
+your own music has made the menus quiet.
+"""
+from __future__ import annotations
+
+import array
+import json
+import os
+import re
+import selectors
+import subprocess
+import sys
+import time
+import urllib.request
+import wave
+from pathlib import Path
+
+import settings
+
+os.environ.setdefault("XDG_RUNTIME_DIR", "/var/run")
+ES_SETTINGS = Path("/userdata/system/configs/emulationstation/es_settings.cfg")
+THEMES = (Path("/userdata/themes"), Path("/usr/share/emulationstation/themes"))
+MINE = Path("/userdata/system/configs/emubox/sounds")
+QUIET_FLAG = Path("/var/run/emubox/menus-quiet")   # kept by audio.py while your music plays
+RUNNING_GAME = "http://127.0.0.1:1234/runningGame"
+SOUTH, EAST, START = 304, 305, 315                 # BTN_SOUTH, BTN_EAST, BTN_START
+ENTER, ESCAPE, SPACE = 28, 1, 57                   # a keyboard's keys for the same three things
+KINDS = ("scroll", "select", "back", "menuopen")
+BUILT_IN = "EmuBox"
+RESCAN_S, LOOK_S = 5.0, 1.0
+README = """Sound sets for the menus.
+
+Make a folder here, named as you want it listed (for example "My Sounds"), and put in any of:
+  scroll.wav   select.wav   back.wav   menuopen.wav
+WAV files, 16-bit. After the next boot the folder is offered under
+in-game menu (Guide) > Apps > Menu sounds > Sound set. A sound the folder lacks is taken from EmuBox.
+"""
+
+
+def es_setting(name: str, text: str) -> str:
+    found = re.search(rf'<\w+ name="{re.escape(name)}" value="([^"]*)"', text)
+    return found.group(1) if found else ""
+
+
+def es_text() -> str:
+    try:
+        return ES_SETTINGS.read_text(errors="replace")
+    except OSError:
+        return ""
+
+
+def sound_for(code: int, inverted: bool) -> str:
+    """Which sound a button makes in the menus: "select", "back", "menuopen" or ""."""
+    accept, back = (EAST, SOUTH) if inverted else (SOUTH, EAST)
+    return {accept: "select", back: "back", START: "menuopen",
+            ENTER: "select", ESCAPE: "back", SPACE: "menuopen"}.get(code, "")
+
+
+def should_play(kind: str, switches: dict[str, str], in_menus: bool, quiet: bool) -> bool:
+    return switches.get(f"ui.sound.{kind}", "on").lower() in settings.ON and in_menus and not quiet
+
+
+def theme_folder(text: str, themes=THEMES) -> Path | None:
+    name = es_setting("ThemeSet", text)
+    for root in themes:
+        if name and (Path(root) / name / "art" / "sounds").is_dir():
+            return Path(root) / name / "art" / "sounds"
+    return None
+
+
+def sets(text: str, mine: Path = MINE, themes=THEMES) -> dict[str, Path]:
+    """Every sound set by name: the theme's own first, then the folders of yours that hold a sound."""
+    found: dict[str, Path] = {}
+    built_in = theme_folder(text, themes)
+    if built_in:
+        found[BUILT_IN] = built_in
+    try:
+        for folder in sorted(mine.iterdir()):
+            if folder.is_dir() and folder.name != BUILT_IN and any((folder / f"{k}.wav").is_file() for k in KINDS):
+                found[folder.name] = folder
+    except OSError:
+        pass
+    return found
+
+
+def sounds_of(chosen: str, all_sets: dict[str, Path]) -> dict[str, Path]:
+    """The file for each kind of sound: from the chosen set, else from the built-in one."""
+    files: dict[str, Path] = {}
+    for kind in KINDS:
+        for name in (chosen, BUILT_IN):
+            file = all_sets.get(name, Path("/nonexistent")) / f"{kind}.wav"
+            if file.is_file():
+                files[kind] = file
+                break
+    return files
+
+
+def volume(switches: dict[str, str]) -> int:
+    try:
+        return max(0, min(100, int(switches.get("ui.sound_volume", "60"))))
+    except ValueError:
+        return 60
+
+
+def scaled(source: Path, target: Path, percent: int) -> bool:
+    """Write the sound at a volume (0 = silence of the same length). 16-bit WAV only."""
+    try:
+        with wave.open(str(source), "rb") as wav:
+            params, frames = wav.getparams(), wav.readframes(wav.getnframes())
+        if params.sampwidth != 2:
+            return False
+        samples = array.array("h")
+        samples.frombytes(frames[:len(frames) // 2 * 2])
+        if sys.byteorder == "big":
+            samples.byteswap()
+        gain = percent / 100
+        samples = array.array("h", (max(-32768, min(32767, int(v * gain))) for v in samples))
+        if sys.byteorder == "big":
+            samples.byteswap()
+        fresh = target.with_suffix(".new")
+        with wave.open(str(fresh), "wb") as wav:
+            wav.setparams(params)
+            wav.writeframes(samples.tobytes())
+        os.replace(fresh, target)
+        return True
+    except (OSError, wave.Error, EOFError):
+        return False
+
+
+def apply(text: str | None = None, mine: Path = MINE, themes=THEMES, switches: dict[str, str] | None = None) -> bool:
+    """Redraw the scroll sound the menu program plays, from the set, the volume and its switch."""
+    text = es_text() if text is None else text
+    switches = settings.read() if switches is None else switches
+    folder = theme_folder(text, themes)
+    if not folder or not (folder / "scroll-now.wav").exists():
+        return False   # a theme that is not ours: its scroll sound is its own business
+    source = sounds_of(switches.get("ui.sound_set", BUILT_IN), sets(text, mine, themes)).get("scroll")
+    if not source:
+        return False
+    on = switches.get("ui.sound.scroll", "on").lower() in settings.ON
+    return scaled(source, folder / "scroll-now.wav", volume(switches) if on else 0)
+
+
+def game_running() -> bool | None:
+    """True while a game (or an app started like one) runs; None when the menus cannot be asked."""
+    try:
+        with urllib.request.urlopen(RUNNING_GAME, timeout=1) as reply:
+            text = reply.read().decode(errors="replace").strip()
+    except OSError:
+        return None
+    try:
+        game = json.loads(text) if text else None
+    except ValueError:
+        return False
+    return bool(isinstance(game, dict) and (game.get("path") or game.get("name")))
+
+
+def listen() -> int:
+    import evdev   # Batocera has it; kept out of the top so the rest can be tried anywhere
+
+    try:
+        MINE.mkdir(parents=True, exist_ok=True)
+        if not (MINE / "README.txt").exists():
+            (MINE / "README.txt").write_text(README)
+    except OSError:
+        pass
+    apply()
+    selector = selectors.DefaultSelector()
+    pads: dict[str, object] = {}
+    files: dict[str, Path] = {}
+    inverted, in_menus = False, False
+    next_scan = next_look = 0.0
+    playing: subprocess.Popen | None = None
+    while True:
+        now = time.monotonic()
+        if now >= next_scan:
+            next_scan = now + RESCAN_S
+            for path in evdev.list_devices():
+                if path in pads:
+                    continue
+                try:
+                    device = evdev.InputDevice(path)
+                    keys = device.capabilities().get(evdev.ecodes.EV_KEY, [])
+                    ours = "EmuBox" in device.name or "hotkeys" in device.name   # pretend devices: never real presses
+                    if (SOUTH in keys or (ENTER in keys and ESCAPE in keys)) and not ours:
+                        pads[path] = device
+                        selector.register(device, selectors.EVENT_READ)
+                    else:
+                        device.close()
+                except OSError:
+                    continue
+            text = es_text()
+            files = sounds_of(settings.get("ui.sound_set"), sets(text))
+            inverted = es_setting("InvertButtons", text) == "true"
+        if now >= next_look:
+            next_look = now + LOOK_S
+            in_menus = game_running() is False
+        for key, _ in selector.select(timeout=LOOK_S):
+            device = key.fileobj
+            try:
+                events = list(device.read())
+            except BlockingIOError:
+                continue
+            except OSError:   # unplugged
+                selector.unregister(device)
+                pads.pop(device.path, None)
+                continue
+            for event in events:
+                if event.type != evdev.ecodes.EV_KEY or event.value != 1:
+                    continue
+                kind = sound_for(event.code, inverted)
+                switches = settings.read()
+                if kind in files and should_play(kind, switches, in_menus, QUIET_FLAG.exists()):
+                    if playing and playing.poll() is None:
+                        playing.kill()   # a fresh press cuts the last sound short rather than piling up
+                    try:
+                        playing = subprocess.Popen(
+                            ["paplay", f"--volume={int(65536 * volume(switches) / 100)}", str(files[kind])],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    except OSError:
+                        return 1
+    return 0
+
+
+def main(argv: list[str]) -> int:
+    if not argv:
+        return listen()
+    action, rest = argv[0], argv[1:]
+    if action == "sets":
+        print("\n".join(sets(es_text())))
+    elif action == "set-now":
+        chosen = settings.get("ui.sound_set")
+        print(chosen if chosen in sets(es_text()) else BUILT_IN)
+    elif action == "set" and rest:
+        settings.write("ui.sound_set", rest[0])
+        apply()
+    elif action == "volume" and rest:
+        now = volume(settings.read())
+        wanted = now + int(rest[0]) if rest[0][:1] in "+-" else int(rest[0])
+        settings.write("ui.sound_volume", str(max(0, min(100, wanted))))
+        apply()
+    elif action in ("on", "off") and rest and rest[0] in KINDS:
+        settings.write(f"ui.sound.{rest[0]}", action)
+        apply()
+    elif action == "apply":
+        return 0 if apply() else 1
+    else:
+        print(__doc__, file=sys.stderr)
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main(sys.argv[1:]))
+    except KeyboardInterrupt:
+        sys.exit(0)

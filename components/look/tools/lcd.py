@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Renders the plasma ball as an animation for the OMEN cooler LCD.
 
-    python3 lcd.py            (writes omen-lights/ next to this file)
+    python3 lcd.py            (writes ../files/theme/omen-lights)
 
 OmenRGB-Controller plays any theme's `omen-lights/` folder on the LCD while
 Batocera is in its menus: LCD-ready frames (480x480 JPEG) plus a `frame_ms`
 file. This script builds that folder from the same layers the theme uses on
-screen, moving the way theme.xml moves them.
+screen, moving the way theme.xml moves them, with the EmuBox name across the ball.
 
 The loop is 24 seconds long. Every motion below is fitted to a whole number
 of turns or pulses in that time, so the last frame flows into the first.
@@ -18,9 +18,11 @@ from pathlib import Path
 
 from PIL import Image
 
+import brand
+
 HERE = Path(__file__).resolve().parent
-ART = HERE / "art"
-OUT = HERE / "omen-lights"
+ART = HERE.parent / "files" / "theme" / "art"
+OUT = HERE.parent / "files" / "theme" / "omen-lights"
 
 LCD = 480  # the screen is 480x480 (and round)
 BALL = 380  # diameter of the glass shell on the LCD
@@ -65,6 +67,7 @@ def main() -> None:
 
     layers = [(name, load(name, size), turns, scale, opacity)
               for name, size, turns, scale, opacity in LAYERS]
+    name_text, name_behind = brand.wordmark(LCD, LCD, 42)   # inside the round screen with room to spare
 
     shutil.rmtree(OUT, ignore_errors=True)
     OUT.mkdir()
@@ -86,6 +89,11 @@ def main() -> None:
             corner = ((LCD - image.width) // 2, (LCD - image.height) // 2)
             frame.alpha_composite(image, corner) if min(corner) >= 0 else frame.paste(
                 image, corner, image)
+        glow = pulse(0.75, 1.0, 6, t)   # the name breathes a little with the ball
+        behind = name_behind.copy()
+        behind.putalpha(behind.getchannel("A").point(lambda a, glow=glow: round(a * glow)))
+        frame.alpha_composite(behind)
+        frame.alpha_composite(name_text)
         path = OUT / f"{index:03d}.jpg"
         frame.convert("RGB").save(path, "JPEG", quality=JPEG_QUALITY)
         biggest = max(biggest, path.stat().st_size)

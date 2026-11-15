@@ -1,0 +1,51 @@
+#!/bin/bash
+# EmuBox for Batocera. Shows up as a switch under
+#   Main menu > System Settings > Services
+# and adds the "Apps" tab (your apps and music buttons) to the in-game menu.
+#
+# Batocera calls this with "start" or "stop".
+
+root=/userdata/system/emubox
+
+case "$1" in
+    start)
+        # Rebuilt at every boot from Batocera's own menu, so it follows updates.
+        # The menu program reads its layout once, when it starts; if it is
+        # already running and the layout changed, start it afresh (hidden).
+        python3 "$root/lib/space.py" --theme 2>/dev/null   # the "how full is the drive" indicator in the menus
+        # Menus go quiet under your music, music makes way for a call (lib/audio.py).
+        mkdir -p /var/run/emubox
+        if ! kill -0 "$(cat /var/run/emubox/audio.pid 2>/dev/null)" 2>/dev/null; then
+            setsid python3 "$root/lib/audio.py" >>/userdata/system/logs/emubox.log 2>&1 &
+            echo $! >/var/run/emubox/audio.pid
+        fi
+        # Menu sounds: the chosen set and volume, and the select, back and menu sounds Batocera's menus lack.
+        if ! kill -0 "$(cat /var/run/emubox/menusounds.pid 2>/dev/null)" 2>/dev/null; then
+            setsid python3 "$root/lib/menusounds.py" >>/userdata/system/logs/emubox.log 2>&1 &
+            echo $! >/var/run/emubox/menusounds.pid
+        fi
+        python3 "$root/lib/menu.py" >>/userdata/system/logs/emubox.log 2>&1
+        changed=$?
+        # The menu program reads its layout once, when it starts. Start it afresh (hidden) when
+        # the layout changed, and also when it is not running at all: it gives up on a layout
+        # it does not accept, and then the Guide button would do nothing until the next boot.
+        menu=$(cat /var/run/batocera-controlcenter.pid 2>/dev/null)
+        if [ -n "$menu" ] && [ -e "/proc/$menu" ]; then alive=1; else alive=0; fi
+        if [ "$changed" -eq 10 ] || [ "$alive" -eq 0 ]; then
+            [ "$alive" -eq 1 ] && kill "$menu" 2>/dev/null
+            # In a session of its own: started as our child, it would be stopped along with us.
+            setsid sh -c 'sleep 1; rm -f /var/run/batocera-controlcenter.pid; batocera-controlcenter hidden' >/dev/null 2>&1 </dev/null &
+        fi
+        # A note of the connected controllers, a little after start-up when
+        # wireless ones have had time to connect. Helps explain odd buttons.
+        (sleep 60; "$root/bin/emubox-app" pads) >/dev/null 2>&1 &
+        ;;
+    stop)
+        kill "$(cat /var/run/emubox/audio.pid 2>/dev/null)" 2>/dev/null; rm -f /var/run/emubox/audio.pid
+        kill "$(cat /var/run/emubox/menusounds.pid 2>/dev/null)" 2>/dev/null; rm -f /var/run/emubox/menusounds.pid
+        # The Apps tab stays in place: Batocera also calls "stop" at shutdown,
+        # and its menu may start before we do at the next boot.
+        for app in $("$root/bin/emubox-app" list); do "$root/bin/emubox-app" close "$app"; done
+        python3 "$root/lib/space.py" --theme 2>/dev/null   # so the indicator is right at the next start
+        ;;
+esac

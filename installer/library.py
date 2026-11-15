@@ -212,7 +212,7 @@ def write_index(library_root: Path, say: Callable[[str], None]) -> None:
                 if size >= TOO_BIG_FOR_GIT:
                     too_big.append(path)
     manifest.write_text("size\tsha256\tpath\n" + "".join(f"{s}\t{c}\t{p}\n" for s, c, p in rows))
-    lines = ["# Written by RetroBox's backup-games. Files of 95 MB and more cannot go to GitHub;",
+    lines = ["# Written by EmuBox's backup-games. Files of 95 MB and more cannot go to GitHub;",
              "# they stay in this folder only. MANIFEST.tsv lists them with checksums.",
              *(f"/{_escape(path)}" for path in too_big)]
     (library_root / ".gitignore").write_text("\n".join(lines) + "\n")

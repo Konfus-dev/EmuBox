@@ -8,9 +8,16 @@ Commands for looking after a Batocera drive from a Linux PC. `./install` links t
 | `batocera-add` | copy games and ROM-hack patches onto the drive, into the right folders |
 | `batocera-backup` | back up saves, screenshots and settings |
 | `batocera-wifi` | set the drive's Wi-Fi network |
+| `batocera-vault` | set Vault's pages and install command on the drive |
 | `batocera-scraper`, `batocera-achievements` | set the ScreenScraper / RetroAchievements account |
 | `batocera-vm` | boot the drive in a window (QEMU), without restarting the PC |
 | `batocera-preview` | preview a theme in a window (needs a `~/batocera-preview` folder with Batocera's files) |
 
-`dev/` holds two helpers for working on RetroBox itself: `fakepad.py` (a pretend controller for
-testing in a virtual machine) and `tile.py` (draws an app's menu picture).
+`dev/` holds helpers for working on EmuBox itself:
+
+| | |
+| --- | --- |
+| `fakepad.py` | a pretend controller that plays commands written to a pipe |
+| `tile.py` | draws an app's picture for the menus |
+| `headless` | runs a command on a display nobody sees, so trying a screen does not pop a window up: `tools/dev/headless batocera-preview` |
+| `webcheck.py` | drives Vault and the web view from start to finish against a pretend shop: `tools/dev/headless python3 tools/dev/webcheck.py` |

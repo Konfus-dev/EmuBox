@@ -98,7 +98,7 @@ def catalogue() -> list[dict]:
 
 class Store(Gtk.Window):
     def __init__(self):
-        super().__init__(title="RetroBox Store")
+        super().__init__(title="EmuBox Store")
         GtkLayerShell.init_for_window(self)
         GtkLayerShell.set_layer(self, GtkLayerShell.Layer.OVERLAY)
         GtkLayerShell.set_keyboard_interactivity(self, False)
@@ -230,7 +230,8 @@ def main() -> int:
         Gtk.main()
     finally:
         store.pads.release()
-    if store.changed:   # have the menu notice the new games
+    if store.changed:   # have the menu notice the new games, and how much room is left
+        subprocess.run([sys.executable, os.path.join(HERE, "space.py"), "--theme"], check=False)
         subprocess.run(["curl", "-s", "http://127.0.0.1:1234/reloadgames"], capture_output=True, check=False)
     return 0
 

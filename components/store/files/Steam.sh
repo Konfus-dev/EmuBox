@@ -1,6 +1,6 @@
 #!/bin/bash
 # Steam. Downloads itself the first time (needs internet), then opens.
-app=/userdata/system/retrobox/bin/retrobox-app
+app=/userdata/system/emubox/bin/emubox-app
 if ! flatpak info com.valvesoftware.Steam >/dev/null 2>&1; then
     "$app" fetch Steam com.valvesoftware.Steam || exit 0
     # Tell Batocera about it, so Steam and your installed games get their own entries too.

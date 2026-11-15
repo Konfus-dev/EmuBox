@@ -56,12 +56,15 @@ else echo "Test mode: nothing is written to the stick."; fi
 cpus=$(( $(nproc) / 2 )); [ "$cpus" -gt 6 ] && cpus=6; [ "$cpus" -lt 2 ] && cpus=2
 
 # Batocera's menu needs accelerated graphics, so the virtual screen uses this PC's GPU (virgl).
+# WLR_NO_HARDWARE_CURSORS (handed to Batocera's compositor through the kernel's command line) has
+# it draw the mouse pointer itself: the virtual screen's own pointer comes out upside down and
+# offset from where it really is.
 # BATOCERA_VM_DISPLAY and BATOCERA_VM_EXTRA are for troubleshooting, e.g.
 #   BATOCERA_VM_DISPLAY=sdl,gl=on batocera-vm
 qemu-system-x86_64 \
     -name "Batocera ($MODE mode)" -machine q35,accel=kvm -cpu host -smp "$cpus" -m 6G \
     -kernel "$run/linux" -initrd "$run/initrd.gz" \
-    -append "label=BATOCERA console=tty3 quiet loglevel=0 vt.global_cursor_default=0" \
+    -append "label=BATOCERA console=tty3 quiet loglevel=0 vt.global_cursor_default=0 WLR_NO_HARDWARE_CURSORS=1" \
     -drive file="$disk",format=raw,if=none,id=stick,snapshot=$snap,cache=writeback \
     -device ich9-ahci,id=ahci -device ide-hd,drive=stick,bus=ahci.0 \
     -device qemu-xhci -device usb-kbd -device usb-tablet \

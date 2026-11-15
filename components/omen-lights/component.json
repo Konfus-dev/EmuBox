@@ -7,6 +7,21 @@
     "sibling": "OmenRGB-Controller",
     "url": "https://github.com/Konfus-dev/OmenRGB-Controller"
   },
-  "usb_devices": ["03f0:7397", "103c:84fd"],
-  "services": ["omen_lights"]
+  "usb_devices": [
+    "03f0:7397",
+    "103c:84fd"
+  ],
+  "services": [
+    "omen_lights"
+  ],
+  "requires": [
+    "console"
+  ],
+  "files": [
+    {
+      "from": "files/menu_omen.py",
+      "to": "system/emubox/lib/menu_omen.py"
+    }
+  ],
+  "after": "The lights' settings are in the in-game menu (Guide button) > Apps, under OMEN lights. Pictures for the cooler's screen go in system/configs/omen-lights/pictures."
 }

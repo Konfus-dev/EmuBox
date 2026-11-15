@@ -1,0 +1,22 @@
+#!/bin/bash
+# Run a command on a display nobody sees: a headless desktop, 1280x720 by default.
+#
+#   tools/dev/headless <command...>          e.g.  tools/dev/headless python3 some-gtk-app.py
+#   HEADLESS_SIZE=1920x1080 tools/dev/headless ...
+#
+# For trying screens (Vault, the web view, the theme in batocera-preview) without a window
+# popping up and taking the keyboard. The command gets WAYLAND_DISPLAY set and no DISPLAY;
+# SDL programs are told to use Wayland. Needs gnome-shell and dbus-run-session.
+name="headless-$$"
+exec dbus-run-session -- bash -c '
+    gnome-shell --headless --virtual-monitor "$1" --wayland-display "$2" --no-x11 >/dev/null 2>&1 &
+    shell=$!
+    for _ in $(seq 50); do [ -e "$XDG_RUNTIME_DIR/$2" ] && break; sleep 0.2; done
+    sleep 2
+    display=$2
+    shift 2
+    env -u DISPLAY WAYLAND_DISPLAY="$display" GDK_BACKEND=wayland SDL_VIDEODRIVER=wayland "$@"
+    status=$?
+    kill $shell 2>/dev/null
+    exit $status
+' headless "${HEADLESS_SIZE:-1280x720}" "$name" "$@" 2>/dev/null

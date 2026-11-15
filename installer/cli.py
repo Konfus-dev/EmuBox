@@ -36,17 +36,19 @@ class Stop(Exception):
 # --- small helpers ----------------------------------------------------------------------
 
 def parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="install", description="RetroBox: a look, apps, settings, BIOS files and games for Batocera.")
+    p = argparse.ArgumentParser(prog="install", description="EmuBox: a look, apps, settings, BIOS files and games for Batocera.")
     p.add_argument("--target", metavar="FOLDER", help="the Batocera data folder (default: found automatically)")
     p.add_argument("--yes", action="store_true", help="take the default answer to every question")
     p.add_argument("--with", dest="include", metavar="IDS", help="with --yes: install exactly these, comma-separated (see --list)")
     p.add_argument("--set", dest="values", action="append", default=[], metavar="ID.FIELD=VALUE",
                    help="answer a component's question in advance, e.g. --set wifi.ssid=Home "
-                        "(for passwords prefer the environment: RETROBOX_WIFI_KEY=...)")
+                        "(for passwords prefer the environment: EMUBOX_WIFI_KEY=...)")
     p.add_argument("--bios", metavar="WHERE", help="BIOS library: a folder or a repository address")
     p.add_argument("--games", metavar="WHERE", help="games library: a folder or a repository address")
     p.add_argument("--bios-systems", metavar="IDS", help="only these systems' BIOS files, comma-separated")
     p.add_argument("--game-systems", dest="games_systems", metavar="IDS", help="only these systems' games, comma-separated")
+    p.add_argument("--download-later", action="store_true",
+                   help="do not fetch the apps' programs onto the drive now; each downloads when first opened")
     p.add_argument("--list", action="store_true", help="show what can be installed and what is installed")
     p.add_argument("--remove", nargs="+", metavar="ID", help="take these components off the drive")
     p.add_argument("--backup-games", metavar="FOLDER", help="copy the drive's games into this library folder")
@@ -109,7 +111,7 @@ class Downloads:
 
     def __init__(self, target: Target):
         # Batocera keeps /tmp in memory, so on Batocera itself we use the drive.
-        self.base = Path(tempfile.mkdtemp(prefix="retrobox-", dir=target.path("system") if target.live else None))
+        self.base = Path(tempfile.mkdtemp(prefix="emubox-", dir=target.path("system") if target.live else None))
 
     def get(self, url: str, name: str) -> Path:
         return fetch(url, self.base / name)
@@ -122,12 +124,12 @@ class Downloads:
 
 def typed_answers(component: Component, args, ask: Prompts) -> dict[str, str]:
     """What a component needs typed in (a network name, an account). Given ahead with --set or
-    RETROBOX_<ID>_<FIELD>, asked for otherwise."""
+    EMUBOX_<ID>_<FIELD>, asked for otherwise."""
     given = dict(item.split("=", 1) for item in args.values if "=" in item)
     answers = {}
     for wanted in component.spec.get("ask", []):
         name = f"{component.id}.{wanted['id']}"
-        variable = "RETROBOX_" + name.upper().replace(".", "_").replace("-", "_")
+        variable = "EMUBOX_" + name.upper().replace(".", "_").replace("-", "_")
         while True:
             if name in given:
                 answer = given[name]
@@ -233,11 +235,30 @@ def summary(chosen: list[Component], libraries: list[tuple[str, Library, Selecti
 
 # --- the commands -------------------------------------------------------------------------
 
+SOUND_KINDS = ("scroll.wav", "select.wav", "back.wav", "menuopen.wav")
+
+
+def copy_sound_sets(target: Target, folder: Path) -> list[str]:
+    """Your own menu-sound sets, kept in a "Sounds" folder beside this repository (never in it):
+    each sub-folder holding one of the sounds goes to the drive, where the menus offer it by name."""
+    if not folder.is_dir() or not target.path("system/emubox/lib/menusounds.py").exists():
+        return []
+    copied = []
+    for one in sorted(p for p in folder.iterdir() if p.is_dir()):
+        sounds = [one / kind for kind in SOUND_KINDS if (one / kind).is_file()]
+        for sound in sounds:
+            target.copy_file(sound, f"system/configs/emubox/sounds/{one.name}/{sound.name}")
+        if sounds:
+            copied.append(one.name)
+    return copied
+
+
 def run_install(args, target: Target, ask: Prompts) -> None:
     downloads = Downloads(target)
     try:
         everything = components.discover(REPO)
-        env = Env(target=target, repo=REPO, host=Host(), fetch=downloads.get, say=ask.say)
+        env = Env(target=target, repo=REPO, host=Host(), fetch=downloads.get, say=ask.say,
+                  downloads=not args.download_later and not os.environ.get("EMUBOX_DOWNLOAD_LATER"))
         ask.say()
         ids = components.with_requirements(choose_components(everything, env, args, ask), everything)
         chosen = [everything[i] for i in ids]
@@ -252,9 +273,18 @@ def run_install(args, target: Target, ask: Prompts) -> None:
 
         ask.say()
         with menu_paused(target, any(c.spec.get("es_settings") for c in chosen), ask.say):
+            before = components.retire_old_names(target)
+            if before:
+                ask.say(f"This drive had RetroBox, EmuBox's old name. Taken off: {', '.join(sorted(before))}.")
+                missing = sorted(set(before) - {c.title for c in chosen})
+                if missing:
+                    ask.say(f"  Not chosen this time, so no longer installed: {', '.join(missing)}.")
             for component in chosen:
                 ask.say(f"Installing {component.title}...")
                 components.remember(target, component, components.install(component, env))
+        copied = copy_sound_sets(target, REPO.parent / "Sounds")
+        if copied:
+            ask.say(f"Copying your sound sets ({', '.join(copied)})...")
         for title, library_, selection in libraries:
             ask.say(f"Copying {title}...")
             library.install(library_, selection, target, ask.say)
@@ -290,7 +320,7 @@ def run_remove(ids: list[str], target: Target, ask: Prompts) -> None:
         done = components.uninstall(component_id, target)
         ask.say(f"Removed {component_id}." if done else f"{component_id} is not installed.")
     remaining = target.manifest()["components"]
-    if "console" in remaining and not any(f"system/retrobox/apps/" in f for e in remaining.values() for f in e["files"]):
+    if "console" in remaining and not any(f"system/emubox/apps/" in f for e in remaining.values() for f in e["files"]):
         components.uninstall("console", target)   # no apps left that need it
         ask.say("Removed the console tools (no apps left).")
 
@@ -308,7 +338,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     ask = Prompts(assume_defaults=args.yes)
     try:
-        ask.say("RetroBox")
+        ask.say("EmuBox")
         if args.list:
             found = Target.find()
             run_list(Target(expand(args.target)) if args.target else Target(found[0]) if len(found) == 1 else None, ask)

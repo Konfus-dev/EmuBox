@@ -1,4 +1,4 @@
-/* RetroBox look for Batocera's Control Center (the menu that appears
+/* EmuBox look for Batocera's Control Center (the menu that appears
    over a running game). Batocera's own stylesheet, recoloured to the theme's
    greens and set in the theme's fonts. Lives in
    /userdata/system/configs/controlcenter/style.css; delete it to go back to
@@ -478,8 +478,81 @@ dialog .dialog-action-area,
 }
 
 
-/* ---- RetroBox additions ---- */
+/* ---- EmuBox additions ---- */
 * { font-family: "Rajdhani", "Rajdhani Medium", sans-serif; }
 .group-title, button.cc-tab > label { font-family: "Michroma", "Rajdhani", sans-serif; letter-spacing: 1px; }
 /* The original dashboard was all straight edges and cut corners. */
 frame > border, .group-frame, button, button.cc-tab, .popup-root, .confirm-dialog { border-radius: 2px; }
+
+/* ---------------------------------------------------------------------------
+   Dashboard pass: the same feel as the pop-up menus in the main screens.
+   Hard corners instead of round ones, panes of dark glass with a lit edge,
+   the chosen thing as a bar of light. These rules come last, so they win.
+   --------------------------------------------------------------------------- */
+.popup-root {
+  background-color: rgba(2, 18, 2, 0.90);
+  background-image: linear-gradient(to bottom, rgba(14, 80, 12, 0.55), rgba(1, 20, 1, 0.2));
+  border: 2px solid #a8f65c;
+  box-shadow: inset 0 0 0 5px rgba(2, 18, 2, 0.0), inset 0 0 0 6px rgba(58, 140, 44, 0.75), inset 0 0 26px rgba(120, 255, 60, 0.16);
+}
+.group-title, frame > border, button, entry, .cc-switch, .cc-switch > slider, progressbar trough, progressbar progress {
+  border-radius: 0;
+}
+frame > border {
+  border: 1px solid rgba(150, 245, 80, 0.45);
+  background-color: rgba(4, 30, 4, 0.55);
+}
+.group-title {
+  background-color: rgba(150, 245, 80, 0.10);
+  border-bottom: 1px solid rgba(150, 245, 80, 0.45);
+  color: #c8f03c;
+}
+.item-text { color: #d6f9b8; }
+
+/* Buttons: dark glass with a thin edge; the chosen one lights up whole. */
+button.cc-button, button.cc-choice, button.choice-option, button.cc-toggle {
+  background-color: rgba(8, 52, 8, 0.85);
+  background-image: linear-gradient(to bottom, rgba(40, 120, 30, 0.45), rgba(4, 30, 4, 0.2));
+  border: 1px solid #68c43c;
+  border-left-width: 3px;
+  padding: 5px 16px;
+}
+button.cc-button.choice-selected, button.cc-button.focused-cell, button.cc-button:focus,
+button.cc-choice.choice-selected, button.choice-option.choice-selected, button.focused-cell,
+button.cc-toggle.choice-selected, button.cc-toggle.focused-cell, button.cc-toggle:focus {
+  background-color: #c8f03c;
+  background-image: linear-gradient(to bottom, #f0ff8c, #9adc20);
+  border-color: #f4ffb4;
+  box-shadow: 0 0 10px rgba(180, 255, 70, 0.75);
+}
+button.cc-button.choice-selected > label, button.cc-button.focused-cell > label, button.cc-button:focus > label,
+button.cc-choice.choice-selected > label, button.choice-option.choice-selected > label, button.focused-cell > label,
+button.cc-toggle.choice-selected > label, button.cc-toggle.focused-cell > label, button.cc-toggle:focus > label {
+  color: #0a2a00;
+  font-weight: 700;
+}
+
+/* Tabs: flat-topped plates; the open one is lit along its top. */
+button.cc-tab, .scale-small button.cc-tab {
+  border-radius: 0;
+  border: 1px solid #2f7d1e;
+  border-top: 3px solid #2f7d1e;
+  border-bottom: none;
+  background-color: rgba(4, 30, 4, 0.8);
+  box-shadow: none;
+}
+button.cc-tab:checked, .scale-small button.cc-tab:checked {
+  border: 1px solid #a8f65c;
+  border-top: 3px solid #c8f03c;
+  border-bottom: none;
+  background-image: linear-gradient(to bottom, rgba(120, 255, 60, 0.30), rgba(4, 30, 4, 0.0));
+  box-shadow: 0 -4px 12px rgba(150, 255, 60, 0.35);
+}
+
+/* Switches and bars: blocks, not pills. */
+.cc-switch { border: 1px solid #68c43c; background-color: rgba(4, 30, 4, 0.9); }
+.cc-switch:checked { background-color: #2f7d1e; }
+.cc-switch > slider { background-color: #8fcf6a; border: none; }
+.cc-switch:checked > slider { background-color: #c8f03c; box-shadow: 0 0 8px rgba(180, 255, 70, 0.8); }
+progressbar trough { background-color: rgba(4, 30, 4, 0.9); border: 1px solid #2f7d1e; min-height: 10px; }
+progressbar progress { background-color: #c8f03c; background-image: linear-gradient(to bottom, #f0ff8c, #9adc20); border: none; min-height: 10px; }

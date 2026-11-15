@@ -7,7 +7,7 @@
   "renamed_from": ["pc-launchers"],
   "files": [
     {"from": "files/es_systems_store.cfg", "to": "system/configs/emulationstation/es_systems_store.cfg"},
-    {"from": "files/heroic", "to": "system/retrobox/apps/heroic"}
+    {"from": "files/heroic", "to": "system/emubox/apps/heroic"}
   ],
   "ports": [
     {
@@ -21,7 +21,7 @@
       "description": "Your Steam library and the Steam store. Downloads itself the first time you open it (needs internet, about 3 GB)."
     },
     {
-      "system": "store", "name": "Heroic", "command": "exec /userdata/system/retrobox/bin/retrobox-app open heroic --wait",
+      "system": "store", "name": "Heroic", "command": "exec /userdata/system/emubox/bin/emubox-app open heroic --wait",
       "image": "files/heroic.png", "genre": "Store",
       "description": "Your Epic Games, GOG and Amazon libraries, through the Heroic launcher. Downloads itself the first time you open it (needs internet)."
     }

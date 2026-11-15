@@ -37,9 +37,9 @@ import evdev
 from evdev import UInput, ecodes as e
 
 HERE = os.path.dirname(os.path.realpath(__file__))
-RETROBOX_APP = os.path.join(os.path.dirname(HERE), "bin", "retrobox-app")
+EMUBOX_APP = os.path.join(os.path.dirname(HERE), "bin", "emubox-app")
 OSK = os.path.join(HERE, "osk.py")
-DEBUG = bool(os.environ.get("RETROBOX_DEBUG"))
+DEBUG = bool(os.environ.get("EMUBOX_DEBUG"))
 
 FOCUS_POLL_S = 0.4        # how often we ask the compositor who has the focus
 HANDOVER_S = 1.2          # time we give the keyboard / Control Center to take the pad
@@ -105,7 +105,7 @@ class Pad:
         keys = {e.ecodes[k] for action in self.map.values() if isinstance(action, list) for k in action}
         self.out = UInput(
             {e.EV_KEY: sorted(keys | set(MOUSE_BUTTONS.values())), e.EV_REL: [e.REL_X, e.REL_Y, e.REL_WHEEL]},
-            name="RetroBox app controller",
+            name="EmuBox app controller",
         )
 
     # --- taking and releasing the controllers -----------------------------------
@@ -198,7 +198,7 @@ class Pad:
         elif not pressed:
             return
         elif isinstance(action, dict) and "media" in action:
-            subprocess.Popen([RETROBOX_APP, "media", action["media"]], start_new_session=True)
+            subprocess.Popen([EMUBOX_APP, "media", action["media"]], start_new_session=True)
         elif isinstance(action, dict):
             subprocess.Popen(action["run"], shell=True, start_new_session=True)
         elif action == "osk":
@@ -209,7 +209,7 @@ class Pad:
             subprocess.Popen(["batocera-controlcenter"], start_new_session=True)
         elif action in ("back", "close"):
             self.hand_over()
-            subprocess.Popen([RETROBOX_APP, action, self.name], start_new_session=True)
+            subprocess.Popen([EMUBOX_APP, action, self.name], start_new_session=True)
 
     def _stick_as_dpad(self, stick: str) -> None:
         x, y = self.sticks[stick]

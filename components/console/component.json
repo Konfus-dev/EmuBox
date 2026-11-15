@@ -4,21 +4,21 @@
   "files": [
     {
       "from": "files/bin",
-      "to": "system/retrobox/bin",
+      "to": "system/emubox/bin",
       "mode": "755"
     },
     {
       "from": "files/lib",
-      "to": "system/retrobox/lib"
+      "to": "system/emubox/lib"
     },
     {
-      "from": "files/services/retrobox",
-      "to": "system/services/retrobox",
+      "from": "files/services/emubox",
+      "to": "system/services/emubox",
       "mode": "755"
     }
   ],
   "services": [
-    "retrobox"
+    "emubox"
   ],
   "replaces": [
     "system/console-apps",
@@ -34,7 +34,7 @@
   "generated": [
     {
       "path": "system/configs/controlcenter/controlcenter.xml",
-      "contains": "<!-- retrobox apps -->"
+      "contains": "<!-- emubox apps -->"
     }
   ]
 }

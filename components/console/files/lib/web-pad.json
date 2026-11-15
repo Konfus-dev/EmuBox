@@ -1,0 +1,54 @@
+{
+  "up": [
+    "KEY_UP"
+  ],
+  "down": [
+    "KEY_DOWN"
+  ],
+  "left": [
+    "KEY_LEFT"
+  ],
+  "right": [
+    "KEY_RIGHT"
+  ],
+  "a": [
+    "KEY_ENTER"
+  ],
+  "b": [
+    "KEY_ESC"
+  ],
+  "x": "osk",
+  "y": [
+    "KEY_LEFTALT",
+    "KEY_HOME"
+  ],
+  "lb": [
+    "KEY_LEFTALT",
+    "KEY_LEFT"
+  ],
+  "rb": [
+    "KEY_LEFTALT",
+    "KEY_RIGHT"
+  ],
+  "lt": [
+    "KEY_LEFTCTRL",
+    "KEY_MINUS"
+  ],
+  "rt": [
+    "KEY_LEFTCTRL",
+    "KEY_EQUAL"
+  ],
+  "start": [
+    "KEY_F5"
+  ],
+  "select+a": "rightclick",
+  "select+start": [
+    "KEY_LEFTCTRL",
+    "KEY_Q"
+  ],
+  "guide": "menu",
+  "l3": "osk",
+  "r3": "click",
+  "left_stick": "scroll",
+  "right_stick": "pointer"
+}
