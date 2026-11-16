@@ -55,11 +55,16 @@ def material(name, colour, metallic=1.0, roughness=0.3, emission=None):
     return m
 
 
-def tube(name, spine, radii, sides=24):
-    """A smooth tube along a list of points, its thickness given per point (0 makes a point)."""
+def tube(name, spine, radii, sides=24, closed=False):
+    """A smooth tube along a list of points, its thickness given per point (0 makes a point).
+    closed: the spine is a loop, and its last point joins back to its first without a seam."""
     verts, faces = [], []
+    n = len(spine)
     for i, (p, r) in enumerate(zip(spine, radii)):
-        ahead = spine[min(i + 1, len(spine) - 1)] - spine[max(i - 1, 0)]
+        if closed:
+            ahead = spine[(i + 1) % n] - spine[(i - 1) % n]
+        else:
+            ahead = spine[min(i + 1, n - 1)] - spine[max(i - 1, 0)]
         ahead.normalize()
         side = ahead.cross(Vector((0, 0, 1)))
         if side.length < 1e-4:
@@ -70,10 +75,11 @@ def tube(name, spine, radii, sides=24):
         for k in range(sides):
             a = 2 * math.pi * k / sides
             verts.append(p + side * math.cos(a) * r * 1.35 + up * math.sin(a) * r * 0.8)
-    for i in range(len(spine) - 1):
+    for i in range(n if closed else n - 1):
+        j = (i + 1) % n
         for k in range(sides):
             a, b = i * sides + k, i * sides + (k + 1) % sides
-            faces.append((a, b, b + sides, a + sides))
+            faces.append((a, b, j * sides + (k + 1) % sides, j * sides + k))
     mesh = bpy.data.meshes.new(name)
     mesh.from_pydata([tuple(v) for v in verts], [], faces)
     mesh.update()
@@ -248,8 +254,8 @@ def claw(scene):
     holdout_ball()
     look = glow_glass("claw")
     look.node_tree.nodes["Mix Shader"].inputs["Fac"].default_value = 1.0   # solid: see fade() below
-    ring_line = [Vector((1.86 * math.cos(2 * math.pi * i / 128), 1.86 * math.sin(2 * math.pi * i / 128), 0.1)) for i in range(129)]
-    band = tube("ring", ring_line, [0.085] * 129, sides=16)
+    ring_line = [Vector((1.86 * math.cos(2 * math.pi * i / 128), 1.86 * math.sin(2 * math.pi * i / 128), 0.1)) for i in range(128)]
+    band = tube("ring", ring_line, [0.085] * 128, sides=16, closed=True)
     band.data.materials.append(look)
     for k in range(4):
         a = math.radians(45 + 90 * k)
@@ -357,13 +363,13 @@ def wall(scene, name, brightness, centre=(0.0, 0.0)):
     links.new(axis.outputs["Vector"], sepz.inputs["Vector"])
     falloff = nodes.new("ShaderNodeMapRange")
     links.new(sepz.outputs["Z"], falloff.inputs["Value"])
-    falloff.inputs["From Min"].default_value = 0.97
-    falloff.inputs["From Max"].default_value = 0.35
+    falloff.inputs["From Min"].default_value = 0.965   # black only behind the orb (it covers about 18° of view)
+    falloff.inputs["From Max"].default_value = 0.75
     falloff.inputs["To Min"].default_value = 0.0
     falloff.inputs["To Max"].default_value = 1.0
-    deep = nodes.new("ShaderNodeMath"); deep.operation = "POWER"               # fades to black well before the middle
+    deep = nodes.new("ShaderNodeMath"); deep.operation = "POWER"               # how quickly it fades towards the middle
     links.new(falloff.outputs["Result"], deep.inputs[0])
-    deep.inputs[1].default_value = 1.8
+    deep.inputs[1].default_value = 1.0
     level = nodes.new("ShaderNodeMath"); level.operation = "MULTIPLY"
     links.new(lines.outputs["Result"], level.inputs[0])
     links.new(deep.outputs["Value"], level.inputs[1])
