@@ -153,9 +153,9 @@ def row(name, bright, w=806, h=119):
     x0, y0, x1, y1 = 150, 24, w - 8, h - 24
     pts = bar_poly(x0, y0, x1, y1)
     # The connector: a small metal arm seen from the side (rendered by tools/blender/scene.py),
-    # from the top right of the pod into the bar's top-left corner.
+    # from behind the pod into the bar's top-left corner.
     arm = Image.open(f"{OUT}/row_arm.png").convert("RGBA")
-    box = tuple(int(v) for v in (78 * s, (y - 32) * s, (x0 + 6) * s, (y0 + 30) * s))
+    box = tuple(int(v) for v in (50 * s, (y - 32) * s, (x0 + 6) * s, (y0 + 30) * s))   # from the pod's middle: it runs on behind the icon
     arm = arm.resize((box[2] - box[0], box[3] - box[1]), Image.LANCZOS)
     if bright:   # the selected row's arm glows lighter, like its bar
         r, g, b_, a_ = arm.split()

@@ -141,6 +141,17 @@ def holdout_ball():
     return ball
 
 
+def fade(path, opacity):
+    """Make a rendered picture evenly see-through. The holder is rendered solid and faded as one
+    whole, so where its parts overlap (an arm over the ring) they don't show through each other."""
+    image = bpy.data.images.load(str(path))
+    pixels = list(image.pixels)
+    pixels[3::4] = [v * opacity for v in pixels[3::4]]
+    image.pixels.foreach_set(pixels)
+    image.filepath_raw = str(path)
+    image.save()
+
+
 def glow_glass(name, colour=(0.06, 0.50, 0.05)):
     """The dashboard's look for its machinery: green, lit from within, brighter where a surface
     turns away from you (its edges), and a little see-through."""
@@ -159,7 +170,7 @@ def glow_glass(name, colour=(0.06, 0.50, 0.05)):
     edge.inputs["Blend"].default_value = 0.45
     strength = n.new("ShaderNodeMath")
     strength.operation = "MULTIPLY_ADD"
-    strength.inputs[1].default_value = 1.3                      # edges glow
+    strength.inputs[1].default_value = 0.9                      # edges glow
     strength.inputs[2].default_value = 0.22                     # faces a little
     l.new(edge.outputs["Facing"], strength.inputs[0])
     l.new(strength.outputs[0], glow.inputs["Strength"])
@@ -168,7 +179,7 @@ def glow_glass(name, colour=(0.06, 0.50, 0.05)):
     l.new(glow.outputs[0], add.inputs[1])
     see = n.new("ShaderNodeBsdfTransparent")
     mix = n.new("ShaderNodeMixShader")
-    mix.inputs["Fac"].default_value = 0.42                     # mostly see-through, as the dashboard draws it
+    mix.inputs["Fac"].default_value = 0.2                      # mostly see-through, as the dashboard draws it
     l.new(see.outputs[0], mix.inputs[1])
     l.new(add.outputs[0], mix.inputs[2])
     l.new(mix.outputs[0], out.inputs["Surface"])
@@ -236,6 +247,7 @@ def claw(scene):
     even_lights()
     holdout_ball()
     look = glow_glass("claw")
+    look.node_tree.nodes["Mix Shader"].inputs["Fac"].default_value = 1.0   # solid: see fade() below
     ring_line = [Vector((1.86 * math.cos(2 * math.pi * i / 128), 1.86 * math.sin(2 * math.pi * i / 128), 0.1)) for i in range(129)]
     band = tube("ring", ring_line, [0.085] * 129, sides=16)
     band.data.materials.append(look)
@@ -255,6 +267,7 @@ def claw(scene):
     scene.cycles.samples = 96
     scene.render.filepath = str(OUT / "rings_a.png")
     bpy.ops.render.render(write_still=True)
+    fade(OUT / "rings_a.png", 0.35)
 
 
 def row_arm(scene, width=300, height=160):
@@ -275,7 +288,7 @@ def row_arm(scene, width=300, height=160):
     world_colour(scene, (0.0, 0.0, 0.0), 0.0)
     even_lights()
     look = glow_glass("strut", colour=(0.08, 0.55, 0.06))
-    look.node_tree.nodes["Mix Shader"].inputs["Fac"].default_value = 0.9
+    look.node_tree.nodes["Mix Shader"].inputs["Fac"].default_value = 1.0
     w = width / height * 100
     # Out to the right, a smooth step down, on into the bar: points in the picture's units.
     knots = [(6, 74), (w * 0.40, 74), (w * 0.68, 32), (w - 4, 32)]
@@ -344,16 +357,19 @@ def wall(scene, name, brightness, centre=(0.0, 0.0)):
     links.new(axis.outputs["Vector"], sepz.inputs["Vector"])
     falloff = nodes.new("ShaderNodeMapRange")
     links.new(sepz.outputs["Z"], falloff.inputs["Value"])
-    falloff.inputs["From Min"].default_value = 0.98
-    falloff.inputs["From Max"].default_value = 0.55
-    falloff.inputs["To Min"].default_value = 0.05
+    falloff.inputs["From Min"].default_value = 0.97
+    falloff.inputs["From Max"].default_value = 0.35
+    falloff.inputs["To Min"].default_value = 0.0
     falloff.inputs["To Max"].default_value = 1.0
+    deep = nodes.new("ShaderNodeMath"); deep.operation = "POWER"               # fades to black well before the middle
+    links.new(falloff.outputs["Result"], deep.inputs[0])
+    deep.inputs[1].default_value = 1.8
     level = nodes.new("ShaderNodeMath"); level.operation = "MULTIPLY"
     links.new(lines.outputs["Result"], level.inputs[0])
-    links.new(falloff.outputs["Result"], level.inputs[1])
+    links.new(deep.outputs["Value"], level.inputs[1])
     ground = nodes.new("ShaderNodeMath"); ground.operation = "MULTIPLY_ADD"     # a faint green between the lines
-    links.new(falloff.outputs["Result"], ground.inputs[0])
-    ground.inputs[1].default_value = 0.06
+    links.new(deep.outputs["Value"], ground.inputs[0])
+    ground.inputs[1].default_value = 0.03
     links.new(level.outputs["Value"], ground.inputs[2])
     links.new(ground.outputs["Value"], emit.inputs["Strength"])
     emit.inputs["Color"].default_value = (0.25 * brightness, 1.0 * brightness, 0.12 * brightness, 1)
@@ -379,5 +395,5 @@ if "claw" in WANTED:
 if "rowarm" in WANTED:
     row_arm(fresh())
 if "wall" in WANTED:
-    wall(fresh(), "bg_system.jpg", 1.0, centre=(25, -2))   # the far end behind the orb (at 0.27 across)
-    wall(fresh(), "bg_list.jpg", 0.6)
+    wall(fresh(), "bg_system.jpg", 0.6, centre=(25, -2))   # the far end behind the orb (at 0.27 across)
+    wall(fresh(), "bg_list.jpg", 0.4)

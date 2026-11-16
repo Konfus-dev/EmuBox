@@ -4,7 +4,7 @@
 
 - `bg_system.jpg`, `bg_list.jpg`: the inside of a huge globe covered in a repeated cell tile, seen
   from near its middle, looking at one pole (the tunnel of cells behind the menus).
-- `rings_a.png`: what holds the orb (drawn behind it): a thick ring with four loop clips, and four curved, see-through
+- `rings_a.png`: what holds the orb (drawn behind it; rendered solid, then faded as one piece so overlaps never double up): a thick ring with four loop clips, and four curved, see-through
   shell arms that leave the clips, reach the orb's edge and curl over its front, gripping it. The theme turns it a quarter
   turn on each move, so all four quarters are alike and it is lit evenly.
 - `row_arm.png`: the small metal arm joining each menu row's pod to its bar, seen from the side
