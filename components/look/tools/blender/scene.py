@@ -401,5 +401,5 @@ if "claw" in WANTED:
 if "rowarm" in WANTED:
     row_arm(fresh())
 if "wall" in WANTED:
-    wall(fresh(), "bg_system.jpg", 0.6, centre=(25, -2))   # the far end behind the orb (at 0.27 across)
-    wall(fresh(), "bg_list.jpg", 0.4)
+    wall(fresh(), "bg_system.jpg", 0.45, centre=(25, -2))   # the far end behind the orb (at 0.27 across)
+    wall(fresh(), "bg_list.jpg", 0.3)

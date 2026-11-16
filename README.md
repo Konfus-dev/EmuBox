@@ -48,7 +48,7 @@ there is; `./install --remove <name>` takes something off.
   never mounts Windows, Linux or another Batocera drive; this keeps working through Batocera updates.
 - **The look**: the theme, a start-up film, glass-pane menus, the systems on a wheel that turns
   round the orb on the home screen (each with its own console in its row), and the indicators at
-  the top left (clock, network, space used and free, with the controllers in a row beneath).
+  the top left (network, clock, space used and free, with the controllers in a row beneath).
 - **Apps**, a section of their own on the home screen: Discord and Apple Music, set up for the
   controller and already downloaded onto the drive, plus a Terminal, Files, and Claude Code.
 - **Store**: games (free games, Steam, Heroic, itch.io and **Vault**, your own list of store

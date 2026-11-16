@@ -8,7 +8,7 @@ art/logos and art/badges hold EmuBox's own for systems that theme does not know 
 -->
 <theme defaultView="detailed">
   <formatVersion>7</formatVersion>
-  <!-- How full the drive is, in the top row right of the clock; redrawn on Batocera by lib/space.py. -->
+  <!-- How full the drive is, in the top row after the network icon and the clock; redrawn on Batocera by lib/space.py. -->
   <include>./space.xml</include>
   <variables>
     <fontTitle>${themePath}/art/fonts/Michroma-Regular.ttf</fontTitle>
@@ -161,16 +161,6 @@ art/logos and art/badges hold EmuBox's own for systems that theme does not know 
       <storyboard>
         <animation property="scale" from="1.06" to="0.94" duration="4200" mode="easeinout" repeat="forever" autoReverse="true"/>
         <animation property="opacity" from="1" to="0.65" duration="3100" mode="easeinout" repeat="forever" autoReverse="true"/>
-      </storyboard>
-    </image>
-    <image name="ringsA" extra="static">
-      <path>${themePath}/art/rings_a.png</path>
-      <pos>0.27 0.485</pos>
-      <origin>0.5 0.5</origin>
-      <maxSize>0.560 0.950</maxSize>
-      <zIndex>4</zIndex>
-      <storyboard>
-        <animation property="rotation" from="0" to="90" duration="900" mode="easeoutcubic"/>
       </storyboard>
     </image>
     <image name="plasmaOuter" extra="static">
@@ -326,7 +316,7 @@ art/logos and art/badges hold EmuBox's own for systems that theme does not know 
       <defaultTransition>slide</defaultTransition>
       <transitionSpeed>260</transitionSpeed>
       <scrollSound>${themePath}/art/sounds/scroll-now.wav</scrollSound>
-      <zIndex>20</zIndex>
+      <zIndex>4</zIndex>   <!-- under the orb: the chosen row carries the orb's holder (below) -->
       <itemTemplate>
         <image name="row">
           <path>${themePath}/art/row.png</path>
@@ -338,6 +328,25 @@ art/logos and art/badges hold EmuBox's own for systems that theme does not know 
             <animation property="path" to="${themePath}/art/row.png"/>
           </storyboard>
           <container>
+            <!-- The orb's holder, shown on the chosen row only. It turns about the orb with that row, so
+                 when the wheel moves, the holder moves with it, and the pod's strut stays fixed to it. -->
+            <image name="holder" pos="-0.6203 0.5" origin="0.5 0.5" size="1.2730 8.6218" linearSmooth="true">
+              <path>${themePath}/art/rings_a.png</path>
+              <zIndex>0</zIndex>
+              <opacity>0</opacity>
+              <storyboard event="activate">
+                <animation property="opacity" to="1" duration="120"/>
+              </storyboard>
+              <storyboard event="deactivate">
+                <animation property="opacity" to="0" duration="120"/>
+              </storyboard>
+            </image>
+            <!-- The strut from the pod in to the orb's holder (the row turns about the orb, so it points at the middle). -->
+            <image name="spoke" pos="-0.105 0.5" origin="0 0.5" size="0.124 0.3">
+              <path>${themePath}/art/spoke.png</path>
+              <zIndex>1</zIndex>
+              <shader><path>${themePath}/shaders/wheelfade.glsl</path></shader>
+            </image>
             <!-- Each system's own console in the row's glass sphere (Carbon's pictures, borrowed at
                  run time like the logos); EmuBox's drawn icons for the Store, Apps and the rest. -->
             <image name="badge" pos="0.062 0.5" origin="0.5 0.5" maxSize="0.086 0.56" linearSmooth="true">
@@ -473,7 +482,8 @@ art/logos and art/badges hold EmuBox's own for systems that theme does not know 
       <maxSize>0.488 0.817</maxSize>
       <zIndex>4</zIndex>
       <storyboard>
-        <animation property="rotation" from="0" to="90" duration="900" mode="easeoutcubic"/>
+        <animation property="rotation" from="0" to="10" duration="350" mode="easeoutcubic"/>
+        <animation property="rotation" from="10" to="0" begin="350" duration="900" mode="easeinout"/>
       </storyboard>
     </image>
     <image name="plasmaOuter" extra="static">
@@ -711,13 +721,14 @@ art/logos and art/badges hold EmuBox's own for systems that theme does not know 
   </view>
 
   <!-- ===================== always on screen: top left =====================
-       One row (centred on y = 0.037): the clock, Batocera's network and battery icons, then how
-       full the drive is (space.xml). Under it, a small controller per connected pad.
+       One row (centred on y = 0.037), evenly spaced: Batocera's network and battery icons, the
+       clock, then how full the drive is (space.xml). Under it, a small controller per connected
+       pad, starting at the same left edge as the network icon.
        The home screen has the console's name on the right of the same row. -->
   <view name="screen">
     <!-- One small controller per connected pad: light green at rest, dark green while a button is held. -->
     <controllerActivity name="controllerActivity">
-      <pos>0.014 0.066</pos>
+      <pos>0.02 0.066</pos>
       <size>0.30 0.03</size>
       <horizontalAlignment>left</horizontalAlignment>
       <itemSpacing>0.004</itemSpacing>
@@ -732,13 +743,13 @@ art/logos and art/badges hold EmuBox's own for systems that theme does not know 
       <fontPath>${fontTitle}</fontPath>
       <fontSize>0.026</fontSize>
       <color>${colText}</color>
-      <pos>0.014 0.012</pos>
+      <pos>0.044 0.012</pos>
       <size>0.088 0.05</size>
       <alignment>left</alignment>
       <verticalAlignment>center</verticalAlignment>
     </text>
     <batteryIndicator name="batteryIndicator">
-      <pos>0.098 0.023</pos>
+      <pos>0.02 0.023</pos>
       <size>0.03 0.028</size>
       <horizontalAlignment>left</horizontalAlignment>
       <color>d6f9b8ff</color>

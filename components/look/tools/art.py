@@ -171,6 +171,24 @@ def row(name, bright, w=806, h=119):
     im.resize((w, h), Image.LANCZOS).save(f"{OUT}/{name}")
 row("row.png", False); row("row_selected.png", True)
 
+
+def spoke(name="spoke.png", w=100, h=36):
+    """The strut joining each row's pod to the orb's holder: a glowing green rod with a collar at
+    each end. Each row is turned about the orb, so it always points at the middle."""
+    s = 4; im = Image.new("RGBA", (w * s, h * s), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
+    mid, r = h * s / 2, 5.5 * s
+    rod = Image.new("L", im.size, 0); ImageDraw.Draw(rod).rounded_rectangle((6 * s, mid - r, (w - 6) * s, mid + r), radius=r, fill=255)
+    im.alpha_composite(glow_of(rod, (120, 240, 60), 4 * s, 1.0))
+    for y in range(int(mid - r), int(mid + r) + 1):
+        t = abs(y - mid) / r
+        col = (int(150 - 90 * t), int(235 - 120 * t), int(80 - 50 * t), 235)
+        d.line((6 * s, y, (w - 6) * s, y), fill=col)
+    d.line((8 * s, mid - r * 0.45, (w - 8) * s, mid - r * 0.45), fill=(225, 255, 170, 200), width=s)
+    for x in (6, w - 12):
+        d.rounded_rectangle((x * s, mid - 10 * s, (x + 6) * s, mid + 10 * s), radius=2 * s, fill=(60, 150, 30, 245), outline=(180, 255, 110, 255), width=s)
+    im.resize((w, h), Image.LANCZOS).save(f"{OUT}/{name}")
+spoke()
+
 def badge(name, draw):
     """A picture for the sphere of a home-screen row whose system has no console picture in
     Batocera's Carbon theme: EmuBox's Store and Apps, and a socket for anything else."""
