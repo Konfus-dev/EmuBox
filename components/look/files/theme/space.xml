@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <!-- drawn by space.py -->
-<!-- How full the drive is, top right under the controller lights. This file is redrawn on
+<!-- How full the drive is, top left beside the clock. This file is redrawn on
      Batocera by the console tools (lib/space.py); until then it shows nothing. -->
 <theme>
   <formatVersion>7</formatVersion>

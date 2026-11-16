@@ -73,7 +73,7 @@ Settings are one file, `/userdata/system/vault/vault.json`; sign-ins are kept ne
 
 ## When the drive is full
 
-Vault shows the free space at the top right of its lists, and the menus show it under the clock.
+Vault shows the free space at the top right of its lists, and the menus show it at the top left, beside the clock.
 A download that would not fit is refused before it starts, with what it needs and what is free.
 If the drive fills up while downloading, the half file is removed and Vault says so. If the install
 command fails, its last line of output is shown and the file stays in downloads; nothing is lost.

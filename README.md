@@ -46,9 +46,9 @@ there is; `./install --remove <name>` takes something off.
   open its options and choose *Edit this game's metadata*; EmuBox will not change that name again.
 - **Your PC's other disks stay untouched**: Batocera only offers USB drives as extra games drives and
   never mounts Windows, Linux or another Batocera drive; this keeps working through Batocera updates.
-- **The look**: the theme, a start-up film, glass-pane menus, each system's own console in its
-  row on the home screen, and one row of indicators along the top (controllers, free space, clock,
-  network).
+- **The look**: the theme, a start-up film, glass-pane menus, the systems on a wheel that turns
+  round the orb on the home screen (each with its own console in its row), and the indicators at
+  the top left (clock, network, space used and free, with the controllers in a row beneath).
 - **Apps**, a section of their own on the home screen: Discord and Apple Music, set up for the
   controller and already downloaded onto the drive, plus a Terminal, Files, and Claude Code.
 - **Store**: games (free games, Steam, Heroic, itch.io and **Vault**, your own list of store

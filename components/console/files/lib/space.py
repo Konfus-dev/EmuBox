@@ -26,12 +26,12 @@ INDICATOR = """<?xml version="1.0"?>
 {mark}
 <theme>
   <formatVersion>7</formatVersion>
-  <!-- In the top row, left of the clock: a bar that fills as the drive does, with what is free right beside it. -->
+  <!-- In the top row, right of the clock and network icons: a bar that fills as the drive does, then what is used and free. -->
   <view name="system, basic, detailed, video, grid">
     <image name="spaceTrack" extra="static">
       <path>./art/white.png</path>
       <color>124a10ff</color>
-      <pos>0.718 0.0335</pos>
+      <pos>0.136 0.0335</pos>
       <origin>0 0</origin>
       <size>0.055 0.007</size>
       <zIndex>70</zIndex>
@@ -39,7 +39,7 @@ INDICATOR = """<?xml version="1.0"?>
     <image name="spaceFill" extra="static">
       <path>./art/white.png</path>
       <color>{colour}</color>
-      <pos>0.718 0.0335</pos>
+      <pos>0.136 0.0335</pos>
       <origin>0 0</origin>
       <size>{width:.4f} 0.007</size>
       <zIndex>71</zIndex>
@@ -49,9 +49,9 @@ INDICATOR = """<?xml version="1.0"?>
       <fontPath>./art/fonts/Rajdhani-Medium.ttf</fontPath>
       <fontSize>0.022</fontSize>
       <color>{text_colour}</color>
-      <pos>0.781 0.012</pos>
+      <pos>0.198 0.012</pos>
       <origin>0 0</origin>
-      <size>0.085 0.05</size>
+      <size>0.2 0.05</size>
       <alignment>left</alignment>
       <verticalAlignment>center</verticalAlignment>
       <zIndex>71</zIndex>
@@ -105,7 +105,7 @@ def draw_indicator(themes: str | os.PathLike = THEMES, folder: str | os.PathLike
     full = 1 - free / total
     nearly = full >= NEARLY_FULL or free <= RESERVE
     text = INDICATOR.format(
-        mark=MARK, width=max(0.002, 0.055 * full), words=f"{size(free)} FREE".upper(),
+        mark=MARK, width=max(0.002, 0.055 * full), words=f"{size(total - free)} USED / {size(free)} FREE".upper(),
         colour="ff7a3cff" if nearly else "c8f03cff", text_colour="ffb08aff" if nearly else "8fc878ff")
     written = []
     try:

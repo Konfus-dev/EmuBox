@@ -8,7 +8,7 @@ art/logos and art/badges hold EmuBox's own for systems that theme does not know 
 -->
 <theme defaultView="detailed">
   <formatVersion>7</formatVersion>
-  <!-- How full the drive is, in the top row left of the clock; redrawn on Batocera by lib/space.py. -->
+  <!-- How full the drive is, in the top row right of the clock; redrawn on Batocera by lib/space.py. -->
   <include>./space.xml</include>
   <variables>
     <fontTitle>${themePath}/art/fonts/Michroma-Regular.ttf</fontTitle>
@@ -133,16 +133,16 @@ art/logos and art/badges hold EmuBox's own for systems that theme does not know 
 
   <!-- ===================== system list (main screen) ===================== -->
   <view name="system">
-    <!-- The console's name, top centre of the home screen. -->
+    <!-- The console's name, top right of the home screen. -->
     <text name="brand" extra="static">
-      <text>EMUBOX</text>
+      <text>EMUBOX V1</text>
       <fontPath>${fontTitle}</fontPath>
       <fontSize>0.026</fontSize>
       <color>c8f03cff</color>
-      <pos>0.5 0.037</pos>
-      <origin>0.5 0.5</origin>
+      <pos>0.986 0.037</pos>
+      <origin>1 0.5</origin>
       <size>0.3 0.05</size>
-      <alignment>center</alignment>
+      <alignment>right</alignment>
       <zIndex>70</zIndex>
     </text>
     <image name="background" extra="static">
@@ -307,21 +307,30 @@ art/logos and art/badges hold EmuBox's own for systems that theme does not know 
       <visible>false</visible>
     </image>
 
-    <textlist name="textlist">
-      <pos>0.53 0.215</pos>
-      <size>0.42 0.55</size>
-      <lines>5</lines>
-      <selectorColor>00000000</selectorColor>
-      <primaryColor>${colText}</primaryColor>
-      <selectedColor>${colOnBright}</selectedColor>
-      <fontPath>${fontTitle}</fontPath>
-      <fontSize>0.026</fontSize>
-      <forceUppercase>1</forceUppercase>
+    <!-- The systems on a wheel round the orb: each row turns about the orb's middle, 14 degrees per
+         place, the chosen one level to its right; turning the wheel slides them round. The rows fade
+         out towards the top and bottom (wheelfade.glsl; labels are cut where their bars are gone). -->
+    <carousel name="systemcarousel">
+      <type>vertical_wheel</type>
+      <pos>0 0</pos>
+      <size>1 1</size>
+      <logoSize>0.4198 0.1102</logoSize>
+      <logoPos>0.5302 0.4299</logoPos>
+      <logoRotation>14</logoRotation>
+      <logoRotationOrigin>-0.6203 0.5</logoRotationOrigin>
+      <maxLogoCount>3</maxLogoCount>
+      <minLogoOpacity>0.6</minLogoOpacity>
+      <logoScale>1</logoScale>
+      <color>00000000</color>
+      <colorEnd>00000000</colorEnd>
+      <defaultTransition>slide</defaultTransition>
+      <transitionSpeed>260</transitionSpeed>
       <scrollSound>${themePath}/art/sounds/scroll-now.wav</scrollSound>
       <zIndex>20</zIndex>
       <itemTemplate>
         <image name="row">
           <path>${themePath}/art/row.png</path>
+          <shader><path>${themePath}/shaders/wheelfade.glsl</path></shader>
           <storyboard event="activate">
             <animation property="path" to="${themePath}/art/row_selected.png"/>
           </storyboard>
@@ -334,6 +343,7 @@ art/logos and art/badges hold EmuBox's own for systems that theme does not know 
             <image name="badge" pos="0.062 0.5" origin="0.5 0.5" maxSize="0.086 0.56" linearSmooth="true">
               <path>firstfile("${carbonConsoles}/" + {system:theme} + ".png", "${themePath}/art/badges/" + {system:theme} + ".png", "${themePath}/art/badges/default.png")</path>
               <zIndex>2</zIndex>
+              <shader><path>${themePath}/shaders/wheelfade.glsl</path></shader>
             </image>
             <text name="label" pos="0.205 0" size="0.76 1">
               <text>{system:fullName}</text>
@@ -343,6 +353,7 @@ art/logos and art/badges hold EmuBox's own for systems that theme does not know 
               <fontPath>${fontTitle}</fontPath>
               <fontSize>0.0235</fontSize>
               <multiLine>false</multiLine>
+              <clipRect>0.575 0.115 0.425 0.77</clipRect>   <!-- only the rows nearest the middle reach in here -->
               <color>${colText}</color>
               <storyboard event="activate">
                 <animation property="color" to="${colOnBright}"/>
@@ -354,7 +365,7 @@ art/logos and art/badges hold EmuBox's own for systems that theme does not know 
           </container>
         </image>
       </itemTemplate>
-    </textlist>
+    </carousel>
 
     <text name="systemInfo">
       <visible>false</visible>
@@ -699,13 +710,14 @@ art/logos and art/badges hold EmuBox's own for systems that theme does not know 
     </datetime>
   </view>
 
-  <!-- ===================== always on screen: one row along the top =====================
-       Far left, a light per controller. On the right: how full the drive is (space.xml), the clock,
-       then Batocera's network and battery icons. Everything is centred on the same line (y = 0.037). -->
+  <!-- ===================== always on screen: top left =====================
+       One row (centred on y = 0.037): the clock, Batocera's network and battery icons, then how
+       full the drive is (space.xml). Under it, a small controller per connected pad.
+       The home screen has the console's name on the right of the same row. -->
   <view name="screen">
     <!-- One small controller per connected pad: light green at rest, dark green while a button is held. -->
     <controllerActivity name="controllerActivity">
-      <pos>0.014 0.022</pos>
+      <pos>0.014 0.066</pos>
       <size>0.30 0.03</size>
       <horizontalAlignment>left</horizontalAlignment>
       <itemSpacing>0.004</itemSpacing>
@@ -720,15 +732,15 @@ art/logos and art/badges hold EmuBox's own for systems that theme does not know 
       <fontPath>${fontTitle}</fontPath>
       <fontSize>0.026</fontSize>
       <color>${colText}</color>
-      <pos>0.862 0.012</pos>
+      <pos>0.014 0.012</pos>
       <size>0.088 0.05</size>
-      <alignment>right</alignment>
+      <alignment>left</alignment>
       <verticalAlignment>center</verticalAlignment>
     </text>
     <batteryIndicator name="batteryIndicator">
-      <pos>0.957 0.023</pos>
+      <pos>0.098 0.023</pos>
       <size>0.03 0.028</size>
-      <horizontalAlignment>right</horizontalAlignment>
+      <horizontalAlignment>left</horizontalAlignment>
       <color>d6f9b8ff</color>
     </batteryIndicator>
   </view>
