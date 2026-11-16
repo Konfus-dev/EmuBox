@@ -14,7 +14,7 @@ from mathutils import Vector
 HERE = Path(__file__).resolve().parent
 ARGS = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 OUT = Path(ARGS[0]) if ARGS else HERE.parent.parent / "files" / "theme" / "art"
-WANTED = set(ARGS[1:]) or {"wall", "claw"}
+WANTED = set(ARGS[1:]) or {"wall", "claw", "rowarm"}
 
 # The orb's size in the rings' pictures (art.py's SPHERE_R): radius 1 here is that fraction of the picture.
 SPHERE_R = 0.227
@@ -257,6 +257,51 @@ def claw(scene):
     bpy.ops.render.render(write_still=True)
 
 
+def row_arm(scene, width=300, height=160):
+    """The little arm joining each menu row's pod to its bar, seen from the side: a tapered metal
+    strut leaving the pod's top right, bending down in a step, and reaching into the bar's corner.
+    art.py lays this picture into the rows (render it first). Units: 100 = the picture's height."""
+    cam = bpy.data.cameras.new("camera")
+    cam.type = "ORTHO"
+    cam.ortho_scale = width / height * 100
+    obj = bpy.data.objects.new("camera", cam)
+    obj.location = (width / height * 50, 50, 50)
+    bpy.context.collection.objects.link(obj)
+    scene.camera = obj
+    scene.render.resolution_x, scene.render.resolution_y = width, height
+    scene.render.film_transparent = True
+    scene.render.image_settings.file_format = "PNG"
+    scene.render.image_settings.color_mode = "RGBA"
+    world_colour(scene, (0.0, 0.0, 0.0), 0.0)
+    even_lights()
+    look = glow_glass("strut", colour=(0.08, 0.55, 0.06))
+    look.node_tree.nodes["Mix Shader"].inputs["Fac"].default_value = 0.9
+    w = width / height * 100
+    # Out to the right, a smooth step down, on into the bar: points in the picture's units.
+    knots = [(6, 74), (w * 0.40, 74), (w * 0.68, 32), (w - 4, 32)]
+    spine = []
+    for i in range(len(knots) - 1):
+        (x0, y0), (x1, y1) = knots[i], knots[i + 1]
+        steps = 24 if i == 1 else 10
+        for k in range(steps):
+            t = k / steps
+            ease = 3 * t * t - 2 * t * t * t if i == 1 else t   # the step down eases in and out
+            spine.append(Vector((x0 + (x1 - x0) * t, y0 + (y1 - y0) * ease, 0)))
+    spine.append(Vector((*knots[-1], 0)))
+    n = len(spine)
+    radii = [7.0 + 4.0 * math.sin(math.pi * i / (n - 1)) for i in range(n)]   # thicker in the middle, like a strut
+    strut = tube("strut", spine, radii, sides=20)
+    strut.data.materials.append(look)
+    for end in (spine[0], spine[-1]):                        # a collar at each end where it joins
+        bpy.ops.mesh.primitive_cylinder_add(radius=10.0, depth=8.0, location=end)
+        collar = bpy.context.active_object
+        collar.rotation_euler = (0, math.pi / 2, 0)
+        collar.data.materials.append(look)
+    scene.cycles.samples = 64
+    scene.render.filepath = str(OUT / "row_arm.png")
+    bpy.ops.render.render(write_still=True)
+
+
 def wall(scene, name, brightness, centre=(0.0, 0.0)):
     """The tunnel of cells: the inside of a globe covered in the cell tile, glowing green, dark
     straight ahead and brighter towards the sides, seen from near its middle towards a pole."""
@@ -331,6 +376,8 @@ def wall(scene, name, brightness, centre=(0.0, 0.0)):
 
 if "claw" in WANTED:
     claw(fresh())
+if "rowarm" in WANTED:
+    row_arm(fresh())
 if "wall" in WANTED:
     wall(fresh(), "bg_system.jpg", 1.0, centre=(25, -2))   # the far end behind the orb (at 0.27 across)
     wall(fresh(), "bg_list.jpg", 0.6)

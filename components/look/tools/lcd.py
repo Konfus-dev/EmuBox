@@ -35,12 +35,12 @@ MAX_BYTES = 60000  # the LCD's limit for one frame
 # (scale from, scale to, seconds per pulse), (opacity from, to, seconds per pulse)
 LAYERS = [
     ("plasma_glow", 1.793, 0, (1.06, 0.94, 8), (1.0, 0.65, 6)),
+    ("rings_a", 1.638, 0, None, None),          # the holder, behind the orb
     ("plasma_outer", 1.0, 1, (1.06, 0.94, 12), None),
     ("plasma_mid", 1.0, -1, (1.06, 0.93, 8), None),
     ("plasma_core", 1.0, 2, (1.05, 0.95, 6), None),
     ("plasma_spot", 1.0, -3, None, (1.0, 0.35, 4.8)),
     ("shell", 1.0, 0, None, None),
-    ("rings_a", 1.638, 0, None, None),          # the claw, in front of the orb's edge
 ]
 # The rings sit where theme.xml leaves them after its opening turn.
 RESTING_ANGLE = {"rings_a": 90}

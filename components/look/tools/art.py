@@ -148,15 +148,19 @@ def bar_poly(x0, y0, x1, y1, inset=0):
 
 def row(name, bright, w=806, h=119):
     """One line of the console list: the pod, a stepped connector, the tabbed glass bar."""
-    s = 3; im = Image.new("RGBA", (w * s, h * s), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
-    line = (215, 255, 150, 255) if bright else (120, 225, 65, 235); y = h / 2
+    s = 3; im = Image.new("RGBA", (w * s, h * s), (0, 0, 0, 0))
+    y = h / 2
     x0, y0, x1, y1 = 150, 24, w - 8, h - 24
     pts = bar_poly(x0, y0, x1, y1)
-    # The connector: out from the top right of the pod, a step down, along into the bar's top-left corner.
-    path = [(80, y - 26), (98, y - 26), (110, y - 14), (128, y - 14), (136, y0 + 10)]
-    for a, b in zip(path, path[1:]):
-        d.line((a[0] * s, a[1] * s, b[0] * s, b[1] * s), fill=line, width=2 * s)
-    d.line((136 * s, (y0 + 10) * s, x0 * s, (y0 + 12) * s), fill=line, width=2 * s)
+    # The connector: a small metal arm seen from the side (rendered by tools/blender/scene.py),
+    # from the top right of the pod into the bar's top-left corner.
+    arm = Image.open(f"{OUT}/row_arm.png").convert("RGBA")
+    box = tuple(int(v) for v in (78 * s, (y - 32) * s, (x0 + 6) * s, (y0 + 30) * s))
+    arm = arm.resize((box[2] - box[0], box[3] - box[1]), Image.LANCZOS)
+    if bright:   # the selected row's arm glows lighter, like its bar
+        r, g, b_, a_ = arm.split()
+        arm = Image.merge("RGBA", (r.point(lambda v: min(255, int(v * 1.5 + 30))), g.point(lambda v: min(255, int(v * 1.25 + 20))), b_, a_))
+    im.alpha_composite(arm, (box[0], box[1]))
     if bright:
         glass((w, h), pts, (226, 250, 84), (150, 214, 28), 250, (245, 255, 185), (200, 255, 80), s, 3, 9, 1.9, im)
     else:
