@@ -542,6 +542,50 @@ progressbar progress { background-image: linear-gradient(to bottom, #f0ff8c, #9a
 """
 
 
+# --- the Guide button ----------------------------------------------------------------------
+
+class GuideButton:
+    """When one press of the Guide button opens or closes the menu. It is heard twice: the moment
+    it goes down (read from the controller directly) and again when it is let go (Batocera's
+    hotkeys, which only ever say "toggle"). Taking the let-go as a second press closed the menu
+    the instant it opened, so a press that has just opened or closed it makes the next toggle
+    deaf. Kept apart from the screen so the tests can press and let go without one."""
+
+    def __init__(self, clock: Callable[[], float] = time.monotonic):
+        self.clock = clock
+        self.showing = False
+        self.changed_at = 0.0     # when the menu last opened or closed
+        self.deaf_until = 0.0     # a toggle before this is the let-go of a press already acted on
+
+    def changed(self, showing: bool) -> None:
+        self.showing, self.changed_at = showing, self.clock()
+
+    def went_down(self) -> bool:
+        """Guide went down on a controller we listen to: should the menu open?"""
+        return not self.showing and self.clock() - self.changed_at > TWICE_S
+
+    def asked_to_show(self) -> bool:
+        """Show now (the press itself, or an app's pad mapper); its let-go is not a new press.
+        True when the menu has to be opened."""
+        opening = not self.showing
+        self.deaf_until = self.clock() + LET_GO_S
+        return opening
+
+    def closed_by_press(self) -> None:
+        """Guide pressed inside the menu closed it: its let-go must not open it again."""
+        self.deaf_until = self.clock() + LET_GO_S
+
+    def toggle(self) -> str:
+        """Batocera's hotkeys say "toggle" (on the let-go): "show", "hide" or "" for nothing."""
+        now = self.clock()
+        if now < self.deaf_until:
+            self.deaf_until = 0.0
+            return ""
+        if now - self.changed_at < TWICE_S:   # the same press, heard twice (a controller that shows up
+            return ""                          # as two devices): opening and closing at once otherwise
+        return "hide" if self.showing else "show"
+
+
 def screen(show_now: bool) -> int:
     # One Guide at a time. The boot service and the Guide button (bin/emubox-guide) can both start
     # one while the other is still loading; the second hands its request to the first and goes.
@@ -584,6 +628,8 @@ def screen(show_now: bool) -> int:
         return widget
 
     class Guide(Gtk.Window):
+        showing = property(lambda self: self.button.showing)
+
         def __init__(self):
             super().__init__(title="EmuBox Guide")
             GtkLayerShell.init_for_window(self)
@@ -598,9 +644,7 @@ def screen(show_now: bool) -> int:
             self.model = Model(*layout())
             self.load = Load()
             self.pads = None
-            self.showing = False
-            self.deaf_until = 0.0
-            self.changed_at = 0.0
+            self.button = GuideButton()  # whether the menu is showing, and how a press is heard
             self.waiting = None          # set while "Opening ..." is up
             self.busy = False            # a reading of the values is under way
             self.read_once = False       # until then we do not know whether a game is running
@@ -706,7 +750,7 @@ def screen(show_now: bool) -> int:
                 return False
             for event in events:
                 if event.type == evdev.ecodes.EV_KEY and event.code == evdev.ecodes.BTN_MODE and event.value == 1 \
-                        and not self.showing and time.monotonic() - self.changed_at > TWICE_S:
+                        and self.button.went_down():
                     self._asked_to_show()
             return True
 
@@ -716,20 +760,17 @@ def screen(show_now: bool) -> int:
             """The Guide button, from Batocera's hotkeys: it tells us when the button is let go.
             When a press has just opened or closed the menu (an app's pad mapper asking for it, or
             Guide pressed in the menu itself), this is that same press being let go: not a new one."""
-            now = time.monotonic()
-            if now < self.deaf_until:
-                self.deaf_until = 0.0
-                return True
-            if now - self.changed_at < TWICE_S:   # the same press, heard twice (a controller that shows up
-                return True                        # as two devices): opening and closing at once otherwise
-            self._hide() if self.showing else self._show()
+            what = self.button.toggle()
+            if what == "hide":
+                self._hide()
+            elif what == "show":
+                self._show()
             return True
 
         def _asked_to_show(self) -> bool:
             """An app's pad mapper, at the moment Guide is pressed."""
-            if not self.showing:
+            if self.button.asked_to_show():
                 self._show()
-            self.deaf_until = time.monotonic() + LET_GO_S
             return True
 
         def _quit(self) -> bool:
@@ -753,8 +794,7 @@ def screen(show_now: bool) -> int:
                 return False
 
             GLib.idle_add(opened)
-            self.showing = True
-            self.changed_at = time.monotonic()
+            self.button.changed(True)
             # Drawn at once with what was last read (reading runs a dozen commands); fresh values follow.
             self.model.open_on("Running" if self.model.tabs[0].when and self.model.tabs[0].shown and self.read_once else "Settings")
             self._draw()
@@ -785,8 +825,7 @@ def screen(show_now: bool) -> int:
 
         def _hide(self) -> None:
             self.waiting = None
-            self.showing = False
-            self.changed_at = time.monotonic()
+            self.button.changed(False)
             if self.pads:
                 self.pads.release()
                 self.pads = None
@@ -1002,7 +1041,7 @@ def screen(show_now: bool) -> int:
                 return
             if result == "close":
                 if key == "guide":
-                    self.deaf_until = time.monotonic() + LET_GO_S
+                    self.button.closed_by_press()
                 self._hide()
                 return
             self._draw()

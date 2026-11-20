@@ -67,8 +67,23 @@ def ascii_label(words: str) -> str:
     return plain.strip() or "Sound set"
 
 
+def plain_feature(xml: str) -> bool:
+    """Can Batocera's menu take this <feature>? One empty label made it reject the whole file
+    (every EmuBox setting gone), and a letter outside plain ASCII crashed the menu program when
+    it was started without a language set. So every label, choice and description must be
+    non-empty plain text, and the piece must be well-formed."""
+    import xml.etree.ElementTree as ET
+    try:
+        element = ET.fromstring(xml)
+    except ET.ParseError:
+        return False
+    words = [element.get("name"), element.get("description", "-")] + [c.get("name") for c in element.iter("choice")]
+    return element.tag == "feature" and all(w and w.strip() and w.isascii() and w.isprintable() for w in words)
+
+
 def build(sound_sets: list[str], extra: list[tuple[str, str]]) -> str:
-    """The whole file. `extra` is [(setting name, <feature> xml)] from the add-ons."""
+    """The whole file. `extra` is [(setting name, <feature> xml)] from the add-ons; one that
+    Batocera's menu could not take is left out (and said so), so it cannot cost the rest."""
     own: list[tuple[str, str]] = []
     for name, (_, label, kind, what) in settings.KNOWN.items():
         if not kind:
@@ -77,7 +92,10 @@ def build(sound_sets: list[str], extra: list[tuple[str, str]]) -> str:
         # Labels in plain letters: Batocera's menu can crash on others ("Série" is shown as "Serie").
         choices = [(ascii_label(one), one) for one in sound_sets] if name == "ui.sound_set" else None
         own.append((settings.conf_key(name), feature(settings.conf_key(name), label, submenu, what, kind, choices)))
-    every = own + extra
+    for name, xml in extra:
+        if not plain_feature(xml):
+            print(f"startmenu: the setting {name} was left out: an empty or non-ASCII label", file=sys.stderr)
+    every = own + [(name, xml) for name, xml in extra if plain_feature(xml)]
     return "\n".join(
         ['<?xml version="1.0"?>', MARK, "<features>", "  <sharedFeatures>"] + [xml for _, xml in every] +
         ["  </sharedFeatures>", "  <globalFeatures>"] + [f'    <sharedFeature value={quoteattr(name)} />' for name, _ in every] +

@@ -4,6 +4,7 @@
 """
 import importlib.util
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -119,6 +120,134 @@ class GuideTests(unittest.TestCase):
     def test_every_label_is_plain(self):
         for row in [r for t in self.tabs for r in t.rows] + self.bars:
             self.assertTrue(row.label.isascii() and all(c.label.isascii() for c in row.controls), row.label)
+
+
+class GuideButtonTests(unittest.TestCase):
+    """Regression: the Guide opened as the button went down, then Batocera's hotkeys said
+    "toggle" as it was let go, and the menu closed again at once (it never seemed to open)."""
+
+    def setUp(self):
+        self.now = [100.0]
+        self.button = guide.GuideButton(clock=lambda: self.now[0])
+
+    def later(self, seconds: float) -> None:
+        self.now[0] += seconds
+
+    def press_and_let_go(self, listened: bool = True, heard_twice: bool = False) -> bool:
+        """One press of Guide as the menu hears it; whether it is showing a while afterwards."""
+        button = self.button
+        if listened and button.showing:                    # pressed inside the open menu: it closes
+            button.closed_by_press()
+            button.changed(False)
+        elif listened and button.went_down() and button.asked_to_show():
+            button.changed(True)
+        self.later(1.0)                                    # held a moment, let go: Batocera's hotkeys say "toggle"
+        for _ in range(2 if heard_twice else 1):
+            what = button.toggle()
+            if what:
+                button.changed(what == "show")
+            self.later(0.05)
+        self.later(3)
+        return button.showing
+
+    def test_a_press_and_its_let_go_leave_the_menu_open(self):
+        self.assertTrue(self.press_and_let_go())
+        self.assertFalse(self.press_and_let_go())          # the next press closes it, and it stays closed
+        self.assertTrue(self.press_and_let_go())
+
+    def test_a_controller_heard_only_on_the_let_go_still_opens_and_closes_it(self):
+        self.assertTrue(self.press_and_let_go(listened=False, heard_twice=True))   # one press, two devices
+        self.assertFalse(self.press_and_let_go(listened=False))
+
+    def test_an_apps_pad_mapper_asking_for_the_menu_keeps_it_open(self):
+        self.assertTrue(self.button.asked_to_show())
+        self.button.changed(True)
+        self.later(1.0)
+        self.assertEqual(self.button.toggle(), "")         # that press being let go
+        self.assertFalse(self.button.asked_to_show())      # already open: nothing to do
+
+
+class MenuLabelGuards(unittest.TestCase):
+    """Regressions: an empty label made Batocera reject its whole menu file; a non-ASCII letter
+    crashed the menu program started without a language; a second footer (or a fourth thing in
+    it) made the menu wider than the screen."""
+
+    def layouts(self):
+        for found, lights in ((APPS, True), (guide.apps(REPO / "apps"), True), ([], False)):
+            yield guide.layout(found, lights=lights)
+
+    def test_every_tab_row_and_button_has_plain_words(self):
+        for tabs, bars in self.layouts():
+            for tab in tabs:
+                self.assertTrue(tab.title.strip() and tab.title.isascii(), tab.title)
+            for row in [r for t in tabs for r in t.rows] + bars:
+                self.assertTrue(row.label.isascii(), row.label)
+                self.assertTrue(row.label.strip() or row.controls, "a row with neither words nor controls")
+                for control in row.controls:
+                    self.assertTrue(control.label.isascii(), control.label)
+                    if control.kind == "button":
+                        self.assertTrue(control.label.strip(), f"a button without words in {row.label}")
+
+    def test_one_footer_and_bars_that_fit_across_the_screen(self):
+        for _tabs, bars in self.layouts():
+            for bar in bars:
+                self.assertLessEqual(len([c for c in bar.controls if c.kind == "button"]), 3, bar.label)
+                self.assertLessEqual(len(bar.controls), 4, bar.label)
+        source = (REPO / "components/console/files/lib/guide.py").read_text()
+        self.assertEqual(source.count('add_class("foot")'), 1)          # one footer, never a second block
+
+    def test_batoceras_menu_file_takes_only_plain_complete_settings(self):
+        hub = importlib.util.spec_from_file_location("startmenu_rgbhub", REPO / "components/rgb-hub/files/startmenu_rgbhub.py")
+        module = importlib.util.module_from_spec(hub)
+        hub.loader.exec_module(module)
+        broken = [("global.empty", startmenu.feature("global.empty", "", "X", "words")),
+                  ("global.accent", startmenu.feature("global.accent", "Série", "X", "words")),
+                  ("global.nochoice", startmenu.feature("global.nochoice", "Pick", "X", "words", "list", [("", "1")])),
+                  ("global.broken", "<feature name=")]
+        with mock.patch("sys.stderr"):
+            text = startmenu.build(["Série", "日本", "", "Xbox 360"], module.features() + broken)
+        root = ET.fromstring(text)
+        names = [f.get("value") for f in root.iter("feature")]
+        self.assertTrue(names)
+        for name, _xml in broken:
+            self.assertNotIn(name, names)
+            self.assertNotIn(name, [f.get("value") for f in root.iter("sharedFeature")])
+        for element in list(root.iter("feature")) + list(root.iter("choice")):
+            for words in (element.get("name", ""), element.get("description", "-")):
+                self.assertTrue(words.strip() and words.isascii(), ET.tostring(element)[:80])   # what the menu shows
+        self.assertNotIn('role="footer"', text)
+        for name, _xml in module.features():
+            self.assertIn(name, names)                                  # the add-on's own settings all made it
+
+
+class GuideReadingBudget(unittest.TestCase):
+    """Regression: every opening of the Guide started some forty programs (python, bash, jq read
+    off a USB drive each time) and took about three seconds."""
+
+    def test_one_reading_of_the_settings_tab_starts_few_programs(self):
+        started = []
+
+        def run(command, *_args, **_kwargs):
+            started.append(command)
+            return subprocess.CompletedProcess(command, 0, "", "")
+
+        def popen(command, *_args, **_kwargs):
+            started.append(command)
+            raise OSError("not in a test")
+
+        with mock.patch.object(subprocess, "run", run), mock.patch.object(subprocess, "Popen", popen), \
+                mock.patch.object(subprocess, "check_output", lambda command, *a, **k: started.append(command) or ""), \
+                mock.patch("urllib.request.urlopen", side_effect=OSError("no Batocera here")):
+            model = guide.Model(*guide.layout(guide.apps(REPO / "apps"), lights=True))
+            guide.refresh(model)                      # which tabs show
+            model.open_on("Settings")
+            started.clear()
+            guide.refresh(model)
+            self.assertEqual(model.page().title, "Settings")
+            self.assertLessEqual(len(started), 12, started)
+            started.clear()
+            guide.refresh(model, everything=True)    # the first reading, of every tab
+            self.assertLessEqual(len(started), 20, started)
 
 
 class AppStoreTests(unittest.TestCase):
