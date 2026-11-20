@@ -341,6 +341,11 @@ for path in evdev.list_devices():
 PY
         grep -h -B1 -A3 'inputConfig' /userdata/system/configs/emulationstation/es_input.cfg 2>/dev/null | head -60
         tail -n 5 /userdata/system/configs/emulationstation/es_last_input.cfg 2>/dev/null
+        # Bluetooth: is the adapter there and powered, which devices are paired (names only).
+        echo "bluetooth:"
+        timeout 5 bluetoothctl show 2>&1 | grep -E "^Controller|Powered|Pairable" | sed 's/^/  /'
+        timeout 5 bluetoothctl devices Paired 2>&1 | sed 's/^/  paired: /'
+        dmesg 2>/dev/null | grep -iE "bluetooth|btusb|hci0" | tail -n 8 | sed 's/^/  /'
     } >>"$LOG" 2>&1
 }
 

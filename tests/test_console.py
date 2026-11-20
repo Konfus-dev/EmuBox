@@ -40,7 +40,7 @@ class GuideTests(unittest.TestCase):
     def test_the_tabs_and_what_is_in_them(self):
         self.assertEqual([t.title for t in self.tabs], ["Running", "Settings", "Apps", "Capture"])
         settings = {row.label: row.controls for row in self.tabs[1].rows}
-        self.assertEqual(list(settings), ["Sound", "Volume", "Mute", "Menu sounds", "Menu sound volume",
+        self.assertEqual(list(settings), ["Sound", "Volume", "Mute", "Sound output", "Menu sounds", "Menu sound volume",
                                           "RGB Hub", "Follow the game", "PC lights", "Keyboard lights", "PC brightness",
                                           "Keyboard brightness", "Default look",
                                           "System", "Power", "Plane mode", "Stuck emulator?", "Everything else"])

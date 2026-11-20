@@ -1,7 +1,8 @@
 #!/bin/bash
 # Boot the Batocera USB stick in a window on this PC (a virtual machine), without restarting.
 #
-#   batocera-vm            test mode: nothing is written to the stick; changes vanish when you close it
+#   batocera-vm            test mode: nothing is written to the stick; changes vanish when you close it,
+#                          and the access it opens (stick, controllers) is taken back
 #   batocera-vm --write    changes made inside (settings, saves, scraped art) are kept on the stick
 #
 # Game controllers connected to this PC are handed to Batocera while it runs, also ones that
@@ -54,13 +55,20 @@ if [ "$want_pads" = yes ] || ! { [ -r "$disk" ] && { [ "$MODE" = test ] || [ -w 
     pkexec /bin/bash -c '
         user=$1 disk=$2 need=$3 alive=$4 pads=$5
         /usr/bin/setfacl -m "u:$user:$need" "$disk" || exit 1
-        [ "$pads" = yes ] || exit 0
+        opened=""
         while [ -e "$alive" ]; do
-            for event in $(awk "BEGIN { RS = \"\" } /Handlers=[^\n]*js[0-9]/ { if (match(\$0, /event[0-9]+/)) print substr(\$0, RSTART, RLENGTH) }" /proc/bus/input/devices); do
-                [ -e "/dev/input/$event" ] && /usr/bin/setfacl -m "u:$user:rw" "/dev/input/$event" 2>/dev/null
-            done
+            if [ "$pads" = yes ]; then
+                for event in $(awk "BEGIN { RS = \"\" } /Handlers=[^\n]*js[0-9]/ { if (match(\$0, /event[0-9]+/)) print substr(\$0, RSTART, RLENGTH) }" /proc/bus/input/devices); do
+                    [ -e "/dev/input/$event" ] && /usr/bin/setfacl -m "u:$user:rw" "/dev/input/$event" 2>/dev/null &&
+                        case " $opened " in *" $event "*) ;; *) opened="$opened $event" ;; esac
+                done
+            fi
             sleep 1
-        done' batocera-vm "$(id -un)" "$disk" "$need" "$run/alive" "$want_pads" &
+        done
+        # The window has closed: take back everything opened to you above, so nothing is left behind.
+        /usr/bin/setfacl -x "u:$user" "$disk" 2>/dev/null
+        for event in $opened; do [ -e "/dev/input/$event" ] && /usr/bin/setfacl -x "u:$user" "/dev/input/$event" 2>/dev/null; done
+        exit 0' batocera-vm "$(id -un)" "$disk" "$need" "$run/alive" "$want_pads" &
     for _ in $(seq 600); do   # until the password has been given and the stick can be read
         { [ -r "$disk" ] && { [ "$MODE" = test ] || [ -w "$disk" ]; }; } && break
         kill -0 $! 2>/dev/null || break
@@ -132,7 +140,8 @@ WATCH
 fi
 
 cleanup() {
-    rm -rf "$run"   # this also tells the two helpers above to stop
+    rm -rf "$run"   # this also tells the two helpers above to stop (and the root one to take back its access)
+    rm -f "${shell:-}"
     for p in "${mounted[@]}"; do udisksctl mount -b "$p" >/dev/null 2>&1 || true; done
 }
 trap cleanup EXIT

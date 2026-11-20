@@ -68,6 +68,21 @@ SPLASH
         chmod 755 "$S"
     fi
 
+    # --- the test VM's controller layout, in the VM only (added 2026-11-19) ---
+    # Batocera's menus read the controller list once, when they start (S31emulationstation), and
+    # /userdata is not there yet while this file runs. So a step that runs in between is added (in
+    # memory): lib/vmpads.py puts the VM's layout in the list inside a VM and takes it out on real
+    # hardware, where it made every face button of the real Xbox pad wrong.
+    cat > /etc/init.d/S30emuboxpads <<'PADS'
+#!/bin/sh
+# EMUBOX (written by /boot/boot-custom.sh): the test VM's controller layout, in a VM only.
+[ "$1" = start ] || exit 0
+f=/userdata/system/emubox/lib/vmpads.py
+[ -f "$f" ] && python3 "$f" >> /var/log/emubox-boot.log 2>&1
+exit 0
+PADS
+    chmod 755 /etc/init.d/S30emuboxpads
+
     # --- EmuBox's look from the first moment (added 2026-11-19) ---
     # Batocera's logo is the first thing on screen (S03system-splash, just after this file runs).
     # EmuBox's own loading picture takes its place, in memory only: the boot guard keeps a copy on

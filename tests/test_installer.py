@@ -306,19 +306,30 @@ class ComponentTests(Drive):
             code, out = run(self.root, "--yes", "--with", "discord")      # next time it is used without asking
             self.assertIn("Arcade", out)
 
-    def test_the_plain_form_of_the_xbox_pad_is_added_to_the_controllers_list(self):
-        run(self.root, "--yes", "--with", "discord")
+    def test_the_test_vms_pad_layout_is_taken_off_real_drives(self):
+        # It made every face button of the real pad wrong (Batocera falls back to a name match);
+        # it is added at start-up inside the VM only (lib/vmpads.py).
         file = self.root / "system/configs/emulationstation/es_input.cfg"
-        self.assertEqual(file.read_text().count("050000005e040000220b000023050000"), 1)
-        file.write_text('<?xml version="1.0"?>\n<inputList>\n\t<inputConfig deviceName="Mine" deviceGUID="abc" />\n</inputList>\n')
+        run(self.root, "--yes", "--with", "discord")
+        self.assertFalse(file.exists() and "220b000023050000" in file.read_text())
+        old = (self.repo_vmpads().with_layout(
+            '<?xml version="1.0"?>\n<inputList>\n\t<inputConfig deviceName="Mine" deviceGUID="abc" />\n</inputList>\n'))
+        file.write_text(old)
         run(self.root, "--yes", "--with", "discord")
         text = file.read_text()
         self.assertIn('deviceName="Mine"', text)                 # yours stay
-        self.assertEqual(text.count("220b000023050000"), 1)
+        self.assertNotIn("220b000023050000", text)
         import xml.etree.ElementTree as ET
-        self.assertEqual(len(ET.fromstring(text)), 2)
-        run(self.root, "--yes", "--with", "discord")
-        self.assertEqual(file.read_text(), text)                 # and it is added once
+        self.assertEqual(len(ET.fromstring(text)), 1)
+
+    @staticmethod
+    def repo_vmpads():
+        import importlib.util
+        path = Path(__file__).parent.parent / "components/console/files/lib/vmpads.py"
+        spec = importlib.util.spec_from_file_location("vmpads", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
 
     def test_installing_twice_changes_nothing_more(self):
         run(self.root, "--yes", "--with", "discord")

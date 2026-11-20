@@ -231,6 +231,8 @@ def layout(found: list[tuple[str, dict]] | None = None, lights: bool | None = No
                                "batocera-audio setSystemVolume +5")]),
         Row("Mute", [switch("batocera-audio getSystemMute", "batocera-audio setSystemVolume mute",
                             "batocera-audio setSystemVolume unmute")]),
+        Row("Sound output", [chooser(f"python3 {lib}/audioout.py show",
+                                     f"python3 {lib}/audioout.py previous", f"python3 {lib}/audioout.py next")]),
         Row("Menu sounds", [chooser(own("menusounds", lambda m: m.chosen_set(m.settings.get("ui.sound_set"), m.sets(m.es_text()))),
                                     f"{sounds} previous", f"{sounds} next")]),
         Row("Menu sound volume", [stepper(own("settings", lambda m: m.get("ui.sound_volume")),
