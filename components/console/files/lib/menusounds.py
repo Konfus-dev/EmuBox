@@ -16,9 +16,8 @@ on screen, plays the sounds for the buttons that select, go back and open the
 main menu.
 
 A sound set is a folder with any of scroll.wav, select.wav, back.wav and
-menuopen.wav, and optionally boot.mp4: the start-up film with that set's
-sound (made on a PC with the look's tools/splash.py --sound), used from the
-next start while the set is chosen. "EmuBox" is the active theme's own (art/sounds in its folder).
+menuopen.wav. Sets change sounds only: the start-up film is always EmuBox's own.
+"EmuBox" is the active theme's own (art/sounds in its folder).
 Your own sets go in /userdata/system/configs/emubox/sounds/<Name>/ and show up
 by that name; a sound a set lacks is taken from EmuBox. Until you choose one,
 an Xbox set is used when the drive has one (a folder with "xbox" in its name),
@@ -201,16 +200,14 @@ def apply(text: str | None = None, mine: Path = MINE, themes=THEMES, switches: d
         return False
     # We play the moving sound ourselves, everywhere (lists and pop-up menus alike), so the
     # menu program's copy is kept silent: otherwise lists would sound twice.
-    start_up_film(using, mine)
+    start_up_film()
     return scaled(source, folder / "scroll-now.wav", 0)
 
 
-def start_up_film(chosen: str, mine: Path = MINE, splash: Path = SPLASH, own: Path = OWN_FILM) -> bool:
-    """A set may bring its own start-up film (boot.mp4: the same pictures with that set's sound).
-    Put the chosen set's in place for the next start, or EmuBox's own back. True when it changed."""
-    wanted = mine / chosen / "boot.mp4"
-    if not wanted.is_file():
-        wanted = own
+def start_up_film(splash: Path = SPLASH, own: Path = OWN_FILM) -> bool:
+    """EmuBox's own start-up film for the next start. Earlier versions put the chosen sound set's
+    film there instead; this puts EmuBox's back. True when it changed."""
+    wanted = own
     target = splash / "emubox.mp4"
     try:
         if not wanted.is_file() or not target.is_file():

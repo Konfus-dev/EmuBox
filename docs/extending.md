@@ -128,8 +128,10 @@ Make a folder `components/<id>/` with a `component.json`:
   "order": 50,
   "files": [{"from": "files/my_script", "to": "system/services/my_service", "mode": "755"}],
   "services": ["my_service"],
-  "batocera_conf": {"global.shaderset": "zfast"},
-  "es_settings": {"ThemeSet": "emubox"},
+  "batocera_conf": {"some.setting": "1"},
+  "es_settings": {"SomeSetting": "value"},
+  "batocera_defaults": {"global.shaderset": "zfast"},
+  "es_defaults": {"ThemeSet": "emubox"},
   "ports": [{"name": "My Port", "script": "files/My Port.sh", "image": "files/tile.png", "description": "...",
              "system": "store"}],
   "after": "A note printed when the installation is done."
@@ -149,6 +151,16 @@ settings as `{id}`:
 
 Answers are used once and never recorded by the installer. For scripts they can be given ahead:
 `--set <component>.user=me`, or the environment variable `EMUBOX_<COMPONENT>_PASSWORD`.
+
+`batocera_conf` and `es_settings` are set at every install. Use `batocera_defaults` and
+`es_defaults` for anything the user can change in Batocera's menus: those are set the first time
+the component goes on a drive only, so a later install does not undo the user's choice. A
+`component.py` that changes the menu's settings itself says `"changes_es_settings": true`, so the
+installer stops Batocera's menu meanwhile when it runs on Batocera.
+
+Nothing made for testing (the VM, a stand-in controller) may be put on a real drive: Batocera
+matches controllers by name when it has no exact entry, so a test layout changes real buttons.
+Add such things at start-up only when running in the VM (`lib/vmpads.py` is the example).
 
 A menu entry goes in Ports unless `"system"` names another system folder; `"store"` puts it in the
 Store on the home screen (`components/store` is the example).

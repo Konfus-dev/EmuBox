@@ -29,6 +29,7 @@ import settings
 
 os.environ.setdefault("XDG_RUNTIME_DIR", "/var/run")
 ROOT = Path(__file__).resolve().parent.parent
+ES_QUIET = Path("/usr/bin/emubox-es")      # Batocera's menu starts without its own music (esquiet.py)
 SCREENSAVER = music.RUN / "screensaver"   # there while Batocera's screensaver shows (scripts/screensaver-*)
 MENU_MUSIC = "emubox menu music"   # our own player (music.py), as the sound server names it
 EVERY_S = 2.0
@@ -127,7 +128,10 @@ def listing(what: str) -> list[dict]:
 def look(words: list[str], state: dict) -> list[list[str]]:
     es = music.es_text()
     switches = dict(settings.read())
-    switches["music.menu"] = "on" if music.frontend_music(es) else "off"   # Sound settings > FRONTEND MUSIC
+    # Sound settings > FRONTEND MUSIC. Batocera's own player is kept silent by esquiet.py, which
+    # the drive guard's boot-custom.sh puts in place; without that, Batocera plays the music itself.
+    ours = music.frontend_music(es) and ES_QUIET.exists()
+    switches["music.menu"] = "on" if ours else "off"
     playing = listing("sink-inputs")
     commands = plan(playing, listing("source-outputs"), words, switches, state)
     for command in commands:

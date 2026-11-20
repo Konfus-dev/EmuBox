@@ -12,7 +12,7 @@ Commands for looking after a Batocera drive from a Linux PC. `./install` links t
 | `batocera-names` | tidy the names the menus show for games (`--dry-run` to look first), or give one game a name of your own: `--set SYSTEM FILE NAME`. Files are never renamed |
 | `batocera-vault` | set Vault's pages and install command on the drive |
 | `batocera-scraper`, `batocera-achievements` | set the ScreenScraper / RetroAchievements account |
-| `batocera-vm` | boot the drive in a window (QEMU), without restarting the PC |
+| `batocera-vm` | boot the drive in a window (QEMU), without restarting the PC. Test mode (the default) writes nothing to the drive and takes back the access it gave you to the drive and the controllers when the window closes; `--write` keeps changes |
 | `batocera-preview` | preview a theme in a window (needs a `~/batocera-preview` folder with Batocera's files) |
 | `dualboot/build-loader` | builds the boot loader for Batocera on the PC's own disk (a GRUB EFI program for the boot menu). It starts Batocera from its partition by filesystem id and puts `/boot/boot-custom.sh` back before Batocera starts when an update removed it |
 

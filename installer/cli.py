@@ -332,10 +332,10 @@ SOUND_FILES = {
     "select.wav": "choosing",
     "back.wav": "going back",
     "menuopen.wav": "opening the main menu",
-    "boot.wav": "the start-up film's sound (made into boot.mp4 here, with GStreamer)",
-    "boot.mp4": "a ready-made start-up film, used as it is",
 }
-FILM_TOOL = REPO / "components" / "look" / "tools" / "splash.py"
+# Start-up films are no longer part of a sound set (EmuBox's own film always plays): a set's old
+# boot.wav / boot.mp4 is not copied, and copies left on a drive by earlier versions are removed.
+OLD_SET_FILMS = ("boot.wav", "boot.mp4")
 SOUNDS_BESIDE = REPO.parent / "Sounds"   # offered as the folder when it exists
 
 
@@ -367,18 +367,7 @@ def ask_sounds(args, target: Target, ask: Prompts) -> Path | None:
     return folder
 
 
-def film_for(sound: Path, out: Path) -> bool:
-    """The start-up film with this sound, made with the look's own tool. False when that is not possible here."""
-    if not shutil.which("gst-launch-1.0") or not FILM_TOOL.is_file():
-        return False
-    try:
-        return subprocess.run([sys.executable, str(FILM_TOOL), "--sound", str(sound), str(out)],
-                              capture_output=True, timeout=600, check=False).returncode == 0 and out.is_file()
-    except (OSError, subprocess.TimeoutExpired):
-        return False
-
-
-def copy_sound_sets(target: Target, folder: Path | None, say=lambda text: None, make_film=film_for) -> list[str]:
+def copy_sound_sets(target: Target, folder: Path | None, say=lambda text: None) -> list[str]:
     """Copy your sound sets to the drive, where the menus offer each by its folder's name."""
     if not folder or not folder.is_dir() or not target.path("system/emubox/lib/menusounds.py").exists():
         return []
@@ -389,44 +378,21 @@ def copy_sound_sets(target: Target, folder: Path | None, say=lambda text: None, 
             continue
         there = f"system/configs/emubox/sounds/{one.name}"
         for sound in sounds:
-            if sound.name != "boot.wav":
-                target.copy_file(sound, f"{there}/{sound.name}")
-        jingle, film = one / "boot.wav", target.path(f"{there}/boot.mp4")
-        if jingle.is_file() and not (one / "boot.mp4").is_file():
-            newest = max(jingle.stat().st_mtime, FILM_TOOL.stat().st_mtime if FILM_TOOL.is_file() else 0)
-            if not film.is_file() or film.stat().st_mtime < newest:   # not made yet, or the sound or the film's pictures changed
-                say(f"  Making the start-up film for {one.name}...")
-                with tempfile.TemporaryDirectory() as temp:
-                    made = Path(temp) / "boot.mp4"
-                    if make_film(jingle, made):
-                        target.copy_file(made, f"{there}/boot.mp4")
-                    else:
-                        say(f"  It could not be made here (it needs GStreamer); {one.name} keeps EmuBox's own film.")
+            target.copy_file(sound, f"{there}/{sound.name}")
+        for old in OLD_SET_FILMS:
+            target.path(f"{there}/{old}").unlink(missing_ok=True)
         copied.append(one.name)
     return copied
 
 
 def put_start_up_film(target: Target) -> bool:
-    """The film Batocera plays at start: the chosen sound set's own (its boot.mp4), or EmuBox's.
-    The look puts EmuBox's film in place on every install, and the menus only swap in the set's
-    when they next start, so without this the first start after an install, and every start of a
-    test machine that keeps nothing, shows the wrong one. True when it changed."""
-    lib = REPO / "components" / "console" / "files" / "lib"
-    mine = target.path("system/configs/emubox/sounds")
-    if not mine.is_dir() or not target.path("splash/emubox.mp4").is_file():
+    """EmuBox's own start-up film where Batocera plays it from (/userdata/splash), replacing a
+    sound set's film that earlier versions put there. True when it changed."""
+    own, played = target.path("system/emubox/splash/emubox.mp4"), target.path("splash/emubox.mp4")
+    if not own.is_file() or not played.is_file() or own.read_bytes() == played.read_bytes():
         return False
-    sys.path.insert(0, str(lib))
-    try:
-        import menusounds
-        import settings
-        value = settings.read(target.path("system/configs/emubox/settings.conf"), target.path("system/batocera.conf")).get("ui.sound_set", "")
-        names = [menusounds.BUILT_IN] + sorted(p.name for p in mine.iterdir() if p.is_dir())
-        chosen = menusounds.chosen_set(value, names)
-        return menusounds.start_up_film(chosen, mine, target.path("splash"), target.path("system/emubox/splash/emubox.mp4"))
-    except Exception:   # noqa: BLE001  the menus put it right at their next start anyway
-        return False
-    finally:
-        sys.path.remove(str(lib))
+    target.copy_file(own, "splash/emubox.mp4")
+    return True
 
 
 def write_start_menu(target: Target) -> bool:
@@ -490,7 +456,7 @@ def run_install(args, target: Target, ask: Prompts) -> None:
             ask.say(f"  {', '.join(copied)}" if copied else f"  No sound sets found in {sounds}.")
         write_start_menu(target)
         if put_start_up_film(target):
-            ask.say("The chosen sound set's start-up film is in place.")
+            ask.say("EmuBox's own start-up film is back in place.")
         if args.pages and "vault" in ids:
             added = add_vault_pages(target, args.pages)
             if added:

@@ -56,7 +56,7 @@ things or update; it only copies what is missing.
 | **Terminal**, **Files**, **Browser**, **Claude** | Come with any app, in **Apps**: a command line, Batocera's file manager opened on the drive, and Claude Code in a terminal (it downloads itself the first time and asks you to sign in; a keyboard helps) |
 | **ROM-hack patcher** | Drop a `.ips`/`.bps`/`.ups` file in `patches` and it is applied at boot |
 | **Play settings** | Auto-save, rewind on 8/16-bit systems, a light CRT shader, a tidier network share |
-| **Bluetooth controllers** | Offered when preparing a drive on a PC with paired controllers: copies the pairings so the same controller works in Linux and Batocera without re-pairing |
+| **Bluetooth controllers** | Offered when preparing a drive on a PC with paired controllers: copies the pairings so the same controller works in Linux and Batocera without re-pairing. To keep Linux, Windows and Batocera sharing pairings all the time, see bt-share in MacWinBuntu |
 | **Wi-Fi** | Asks for the network name and password, so Batocera connects by itself |
 | **ScreenScraper account** | For box art, videos and descriptions; with the picture style and extras already chosen |
 | **RetroAchievements account** | Trophies for older games |
@@ -96,7 +96,7 @@ phone app.)
 
 - **MENU SOUNDS**: which sound set, the volume, and a switch each for moving (through lists and
   pop-up menus alike), choosing, going back and opening the menu.
-- **APPS**: the menu music and whether it waits for your own, music dropping during a call and how
+- **APPS**: whether the menu music waits for your own, music dropping during a call and how
   far, and the ad blocker for web apps.
 - **RGB HUB** (on a PC with the OMEN lights or the IQUNIX keyboard): following the game (both devices,
   or each on its own), lights on/off and brightness for the PC and the keyboard, a colour per light,
@@ -105,9 +105,24 @@ phone app.)
 
 (Batocera's main menu cannot take a new entry of its own, so they sit inside Game Settings.)
 
+**Batocera's own Sound settings work as they say**, although EmuBox plays the menu music and the
+menu sounds itself:
+
+- **FRONTEND MUSIC** turns the menu music on and off (Batocera's own player is kept from finding
+  the songs, so only one ever plays), **MUSIC VOLUME** sets how loud it is, **STOP MUSIC ON
+  SCREENSAVER** pauses it while the screensaver shows, and **DISPLAY SONG TITLES** (with **SONG
+  TITLE DISPLAY DURATION**) shows each new song's name at the top of the screen.
+- **ENABLE NAVIGATION SOUNDS** turns every menu sound off, EmuBox's included.
+- Not followed yet: **PLAY SYSTEM-SPECIFIC MUSIC** and **LOWER MUSIC WHEN PLAYING VIDEO**.
+
+Settings the installer chooses for you (the theme, navigation sounds, the play settings, the Store
+and Captures folder views) are set the first time only: what you change afterwards in Batocera's
+menus stays, also when you run the installer again.
+
 **Guide** opens EmuBox's own quick menu, over the menus or a running game:
 
-- **Settings**: the system volume and mute, the menu sound set and its volume, the lights' basics
+- **Settings**: the system volume and mute, the **sound output** (TV, speakers, headphones: every
+  output Batocera knows, kept for the next start), the menu sound set and its volume, the lights' basics
   (following the game, on/off and brightness for the PC and the keyboard, saving the look as the Default),
   power mode, plane mode, stopping a stuck emulator, and **Open full settings** (Batocera's main menu).
 - **Apps**: open an app or a tool, or hide the apps and go back. **Capture**: take a screenshot (the menu
@@ -144,8 +159,7 @@ press instead of being read from the drive each time.
 EmuBox's own set is synthesised and is what you get unless you bring your own: the installer asks
 for a folder of sound sets (or take `--sounds FOLDER`), one sub-folder per set, named as it should
 be listed. What a file does is told by its name: `scroll.wav`, `select.wav`, `back.wav`,
-`menuopen.wav`, and `boot.wav` for the start-up film's sound (the installer makes that set's film
-from it; it needs GStreamer). A sound a set lacks is taken from EmuBox's. Until you choose a set in the menu, one with "xbox" in its name is used when there is one. Such sets are yours and
+and `menuopen.wav`. A set changes the sounds only: the start-up film is always EmuBox's own. A sound a set lacks is taken from EmuBox's. Until you choose a set in the menu, one with "xbox" in its name is used when there is one. Such sets are yours and
 stay out of the repository.
 
 ## Your BIOS files and games
@@ -194,7 +208,14 @@ See [docs/extending.md](extending.md).
   Chromium-based programs must there. Treat the drive as a games machine, not a place for
   sensitive browsing.
 - Controller buttons are read by their Xbox-pad labels.
-- Log on Batocera: `/userdata/system/logs/emubox.log` (`EMUBOX_DEBUG=1` logs every button).
+- Log on Batocera: `/userdata/system/logs/emubox.log` (`EMUBOX_DEBUG=1` logs every button). About a
+  minute after start-up it notes the connected controllers and the Bluetooth adapter's state (is it
+  there and powered, what is paired): the place to look when a controller has odd buttons or will
+  not connect.
+- If a controller's buttons all do the wrong thing, look in `system/configs/emulationstation/es_input.cfg`
+  for an entry with the controller's name but another id: Batocera falls back to an entry with the
+  same name when it has no exact one, and uses that entry's button numbers. (The test VM's layout
+  for the Xbox pad did that once; it is now only added inside the VM, by `lib/vmpads.py`.)
 
 Licence: GPL-3.0-or-later. Fonts: SIL Open Font Licence (see `components/look/files/fonts`).
 EmuBox is not affiliated with Microsoft, Discord or Apple; it ships none of their artwork or software.
