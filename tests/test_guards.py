@@ -619,3 +619,39 @@ class CopyTests(unittest.TestCase):
         self.assertIn("already", done.stderr)
         self.assertEqual([p.read_text() for p in earlier], ["an earlier save"] * 2)
         self.assertEqual((drive / "saves/game.srm").read_text(), "my save")
+
+
+# --- Bluetooth pairings are never lost ---------------------------------------------------------
+
+class BluetoothArchiveTests(unittest.TestCase):
+    """The drive's system/bluetooth/bluetooth.tar was once saved empty: every controller had to be
+    paired again."""
+
+    @staticmethod
+    def archive(*devices: str) -> bytes:
+        import io
+        import tarfile
+        data = io.BytesIO()
+        with tarfile.open(fileobj=data, mode="w") as tar:
+            for device in devices:
+                text = f"[General]\nName=Pad\n\n[LinkKey]\nKey={device}\n".encode()
+                entry = tarfile.TarInfo(f"bluetooth/AA:AA:AA:AA:AA:AA/{device}/info")
+                entry.size = len(text)
+                tar.addfile(entry, io.BytesIO(text))
+        return data.getvalue()
+
+    def test_an_archive_with_pairings_is_never_replaced_by_one_without(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("bt", REPO / "components/bluetooth/component.py")
+        bt = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(bt)
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "bluetooth.tar"
+            path.write_bytes(self.archive("11:11:11:11:11:11"))
+            for empty in (self.archive(), b"", b"not an archive"):
+                self.assertFalse(bt.save_archive(path, empty))
+                self.assertEqual(bt.pairings(path.read_bytes()), 1)
+            self.assertTrue(bt.save_archive(path, self.archive("11:11:11:11:11:11", "22:22:22:22:22:22")))
+            self.assertEqual(bt.pairings(path.read_bytes()), 2)
+            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+            self.assertEqual(sorted(p.name for p in Path(folder).iterdir()), ["bluetooth.tar"])   # nothing half-written

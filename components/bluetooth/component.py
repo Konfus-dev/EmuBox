@@ -10,6 +10,7 @@ Offered only when preparing a drive from a Linux PC that has paired input device
 from __future__ import annotations
 
 import io
+import os
 import re
 import tarfile
 import time
@@ -65,7 +66,8 @@ def install(env) -> None:
                 kept.append((member, old.extractfile(member).read() if member.isfile() else None))
 
     env.target.make_dir(archive_path.parent)
-    with tarfile.open(archive_path, "w") as new:
+    built = io.BytesIO()
+    with tarfile.open(fileobj=built, mode="w") as new:
         names = {member.name for member, _ in kept}
         for member, data in kept:
             new.addfile(member, io.BytesIO(data) if data is not None else None)
@@ -94,4 +96,33 @@ def install(env) -> None:
                 entry.size, entry.mode, entry.mtime = len(data), 0o600, source.stat().st_mtime if source.exists() else time.time()
                 new.addfile(entry, io.BytesIO(data))
             env.say(f"  {_name(info)}")   # the name only; the keys are never shown
-    archive_path.chmod(0o600)
+    if not save_archive(archive_path, built.getvalue()):
+        env.say("  The drive's pairings were kept: the new copy had none (nothing was changed).")
+
+
+def pairings(data: bytes) -> int:
+    """How many pairings (a device's info file holding a key) an archive has; 0 for a damaged one."""
+    try:
+        with tarfile.open(fileobj=io.BytesIO(data)) as archive:
+            return sum(1 for member in archive.getmembers()
+                       if member.isfile() and member.name.endswith("/info")
+                       and b"Key=" in (archive.extractfile(member).read()))
+    except (tarfile.TarError, OSError, EOFError):
+        return 0
+
+
+def save_archive(path: Path, data: bytes) -> bool:
+    """Put the archive on the drive, unless it would lose every pairing: once it was saved empty,
+    and every controller had to be paired again. An archive with pairings is never replaced by one
+    without; and it is written beside and then moved into place, so it is never half-written.
+    False when it was left as it was."""
+    if path.exists() and pairings(path.read_bytes()) and not pairings(data):
+        return False
+    part = path.with_name(path.name + ".emubox-part")
+    try:
+        part.write_bytes(data)
+        part.chmod(0o600)
+        os.replace(part, path)
+    finally:
+        part.unlink(missing_ok=True)
+    return True
