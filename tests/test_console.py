@@ -439,7 +439,7 @@ class RgbHubTests(unittest.TestCase):
         run(["colour", "all", "Green"])
         run(["effect", "all", "Rainbow"])    # the case and the keyboard have no rainbow: only the memory takes it
         run(["effect", "case", "Breathing"])
-        run(["effect", "keyboard", "Effect 7"])
+        run(["effect", "keyboard", "Rain"])
         run(["speed", "100"])
         run(["dim", "min", "25"])
         run(["picture", "/somewhere/dragon.png"])
@@ -448,12 +448,12 @@ class RgbHubTests(unittest.TestCase):
         self.assertEqual(set(saved["zone-colours"].values()), {"#3CE61E"})
         self.assertEqual(len(saved["zone-colours"]), 7)
         self.assertIn("IQUNIX MG65/All keys", saved["zone-colours"])
-        self.assertEqual(saved["device-modes"], {"RAM": "Rainbow", "HP Omen 30L": "Breathing", "IQUNIX MG65": "Effect 7"})
+        self.assertEqual(saved["device-modes"], {"RAM": "Rainbow", "HP Omen 30L": "Breathing", "IQUNIX MG65": "Rain"})
         self.assertEqual(saved["device-speeds"], {"HP Omen 30L": 100, "RAM": 100, "IQUNIX MG65": 100})
         self.assertEqual(saved["device-min-brightness"]["RAM"], 25)
         self.assertEqual((saved["lcd-image"], saved["auto-idle-image"]), ("/somewhere/dragon.png",) * 2)
         self.assertEqual((run(["colour-of", "menus"]), run(["speed-of"]), run(["picture-of"]), run(["effect-of", "keyboard"])),
-                         ("Blue", "Fast", "dragon", "Effect 7"))
+                         ("Blue", "Fast", "dragon", "Rain"))
         run(["colour", "menus", "picture"])
         self.assertEqual(run(["colour-of", "menus"]), "From the picture")
         self.assertEqual(self.hub.main(["colour", "all", "mauve-ish"]), 2)
@@ -485,14 +485,14 @@ class RgbHubTests(unittest.TestCase):
         self.assertEqual(by_value["rgbhub_auto_devices_all"].get("preset"), "switchon")
         self.assertIn("Purple", [c.get("value") for c in by_value["rgbhub_colour_ram_stick_1"]])
         self.assertIn("Purple", [c.get("value") for c in by_value["rgbhub_colour_iqunix_mg65_all_keys"]])
-        self.assertEqual([c.get("value") for c in by_value["rgbhub_effect_keyboard"]][:3], ["Static", "Effect 2", "Effect 3"])
+        self.assertEqual([c.get("value") for c in by_value["rgbhub_effect_keyboard"]][:3], ["Static", "Wave", "Colour cloud"])
         self.assertEqual([c.get("value") for c in by_value["rgbhub_default"]], ["none", "save", "load"])
 
     def test_choices_in_batoceras_menu_reach_the_lights(self):
         changed = self.hub.changed
         changed({"rgbhub_device_enabled_pc": "0", "rgbhub_device_brightness_keyboard": "40.000000",
                  "rgbhub_auto_devices_all": "0", "rgbhub_auto_devices_keyboard": "1", "rgbhub_lcd_brightness": "auto",
-                 "rgbhub_colour_menus": "Blue", "rgbhub_colour_iqunix_mg65_all_keys": "Purple", "rgbhub_effect_keyboard": "Effect 3",
+                 "rgbhub_colour_menus": "Blue", "rgbhub_colour_iqunix_mg65_all_keys": "Purple", "rgbhub_effect_keyboard": "Wave",
                  "rgbhub_speed": "100", "rgbhub_lcd_fit": "fit", "unrelated": "1",
                  "omen_lights_enabled": "1", "omen_colour_ram_stick_1": "Red"})   # from before the rename: not ours now
         saved = self.saved()
@@ -500,7 +500,7 @@ class RgbHubTests(unittest.TestCase):
         self.assertEqual(saved["auto-devices"], {"OMEN-PC": False, "IQUNIX-KEYBOARD": True})   # one device's row after "all"
         self.assertNotIn("lcd-brightness", saved)                                # not chosen: left at its default
         self.assertEqual(saved["zone-colours"], {"IQUNIX MG65/All keys": "#9B30FF"})
-        self.assertEqual((saved["device-modes"]["IQUNIX MG65"], saved["device-speeds"]["RAM"], saved["lcd-fit"]), ("Effect 3", 100, "fit"))
+        self.assertEqual((saved["device-modes"]["IQUNIX MG65"], saved["device-speeds"]["RAM"], saved["lcd-fit"]), ("Wave", 100, "fit"))
         self.assertEqual(saved["auto-idle-colour"], "#1E5BFF")
         self.assertFalse(any(name.startswith("omen_") for name in saved["_seen"]))
         self.hub.run(["set", "device-brightness", "keyboard", "90"])            # then changed in the Guide menu

@@ -21,7 +21,7 @@ done by hand:
     startmenu_rgbhub.py colour <where> <colour>       where: menus, all, or a zone ("RAM/Stick 1");
                                                  colour: a name below, #RRGGBB, or "picture" (menus only)
     startmenu_rgbhub.py colour-of <where>
-    startmenu_rgbhub.py effect <case|ram|keyboard|all> <Static|Breathing|Rainbow|Off|Effect 2..20>
+    startmenu_rgbhub.py effect <case|ram|keyboard|all> <Static|Breathing|Rainbow|Off|Wave|Rain|...>
     startmenu_rgbhub.py effect-of <case|ram|keyboard>
     startmenu_rgbhub.py speed <0..100> / speed-of
     startmenu_rgbhub.py dim <min|max> <0..100> / dim-of <min|max>    how far Breathing fades
@@ -61,7 +61,10 @@ KEYBOARD_ZONE = f"{KEYS}/All keys"
 ZONES = {**PC_ZONES, KEYBOARD_ZONE: "Keyboard"}
 # The keyboard's effects have no names yet: its firmware only numbers them.
 EFFECTS = {"case": ("Static", "Breathing"), "ram": ("Static", "Breathing", "Rainbow", "Off"),
-           "keyboard": ("Static",) + tuple(f"Effect {n}" for n in range(2, 21))}
+           # as RGB-Hub names them (service/rgbhub/iqunix_mg65.py there)
+           "keyboard": ("Static", "Wave", "Colour cloud", "Vortex", "Mixed colours", "Breathe", "Slowly off",
+                        "Stone", "Laser", "Starry", "Flowers opening", "Traverse", "Wave bar", "Meteor", "Rain",
+                        "Scan", "Colour on keypress", "Centre spread")}
 COLOURS = {
     "Green": "#3CE61E", "Lime": "#C8F03C", "White": "#FFFFFF", "Warm white": "#FFD9A0", "Red": "#FF1A1A",
     "Orange": "#FF7A00", "Yellow": "#FFD500", "Cyan": "#00E5FF", "Blue": "#1E5BFF", "Purple": "#9B30FF",
