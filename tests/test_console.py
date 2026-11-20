@@ -4,6 +4,7 @@
 """
 import importlib.util
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -935,6 +936,128 @@ class PointerInApps(unittest.TestCase):
         self.assertEqual([(code, value) for kind, code, value in placer.sent if kind == e.EV_ABS],
                          [(e.ABS_X, middle), (e.ABS_Y, middle)])                    # and in the middle of the screen
         self.assertIn((e.ABS_X, mock.ANY), placer.capabilities[e.EV_ABS])
+
+
+def balanced(events) -> list[str]:
+    """What is wrong with a stream of (code, 1 down / 0 up) key events: a key let go that was
+    never pressed, or a key still held at the end. Empty when every press has its let-go."""
+    held, wrong = [], []
+    for code, value in events:
+        if value == 1:
+            held.append(code)
+        elif value == 0:
+            if code in held:
+                held.remove(code)
+            else:
+                wrong.append(f"{code} let go, never pressed")
+    return wrong + [f"{code} still held" for code in held]
+
+
+class ControllerGuards(unittest.TestCase):
+    """Regressions: the pointer and the controller went dead in apps four times. Batocera's
+    batocera-mouse (and wtype) make a keyboard of their own that leaves Alt and Super held as far
+    as the app can tell, so every key after was ignored; and wtype left keys repeating."""
+
+    CONSOLE = REPO / "components/console/files"
+
+    def test_nothing_runs_batocera_mouse_or_wtype_but_the_typers_last_resort(self):
+        import io
+        import tokenize
+        used = []
+        for path in sorted(p for p in self.CONSOLE.rglob("*") if p.is_file() and "__pycache__" not in p.parts):
+            try:
+                text = path.read_text()
+            except UnicodeDecodeError:
+                continue
+            where = path.relative_to(self.CONSOLE).as_posix()
+            if path.suffix == ".py" or text.startswith("#!/usr/bin/env python"):
+                for token in tokenize.generate_tokens(io.StringIO(text).readline):
+                    if token.type == tokenize.STRING and re.match(r"""^[rbf]*['"]{1,3}(wtype|batocera-mouse)\b""", token.string):
+                        used.append((where, token.start[0]))
+            else:
+                for number, line in enumerate(text.splitlines(), 1):
+                    if re.search(r"\b(wtype|batocera-mouse)\b", line.split("#")[0]):
+                        used.append((where, number))
+        # typer.py's one call: a character its own keyboard has no key for (an accent, a non-US layout).
+        allowed = [("lib/typer.py", n) for n, line in enumerate((self.CONSOLE / "lib/typer.py").read_text().splitlines(), 1)
+                   if 'self.run(["wtype", *words]' in line]
+        self.assertEqual(len(allowed), 1)
+        self.assertEqual(used, allowed)
+
+    def test_the_typer_lets_go_of_every_key_it_presses_and_never_falls_back_for_them(self):
+        try:
+            from evdev import ecodes  # noqa: F401
+        except ImportError:
+            self.skipTest("python-evdev is not on this PC (it is on Batocera)")
+        import typer
+
+        class Device:
+            def __init__(self):
+                self.events = []
+            def write(self, kind, code, value):
+                self.events.append((code, value))
+            def syn(self):
+                pass
+
+        ran = []
+        device = Device()
+        typing = typer.Typer(device=device, pause=0, run=lambda command, **_: ran.append(command))
+        typing.text("".join(typer.US))
+        for name in typer.NAMED:
+            typing.key(name)
+        self.assertEqual(balanced(device.events), [])
+        self.assertEqual(ran, [])                                     # wtype never ran for a key the keyboard has
+
+    def make_pad(self, app: str):
+        import evdev
+        import pad
+
+        class Recorder:
+            def __init__(self, capabilities, name=""):
+                self.name, self.sent = name, []
+            def write(self, kind, code, value):
+                if kind == pad.e.EV_KEY:
+                    self.sent.append((code, value))
+            def syn(self):
+                pass
+            def close(self):
+                pass
+
+        config = json.loads((REPO / f"apps/{app}/app.json").read_text())
+        with mock.patch.object(pad, "UInput", Recorder), mock.patch.object(evdev, "list_devices", return_value=[]):
+            made = pad.Pad({"id": app, **config})
+        made.grabbed = True                                           # holding the controller, as in the app
+        return made, pad
+
+    def test_every_button_of_every_app_lets_go_of_what_it_pressed(self):
+        try:
+            import evdev  # noqa: F401
+        except ImportError:
+            self.skipTest("python-evdev is not on this PC (it is on Batocera)")
+        apps = [p.parent.name for p in sorted((REPO / "apps").glob("*/app.json")) if "pad" in json.loads(p.read_text())]
+        self.assertTrue(apps)
+        for app in apps:
+            app_pad, pad = self.make_pad(app)
+            buttons = sorted({name.split("+")[-1] for name in app_pad.map if not name.endswith("_stick")})
+            with mock.patch.object(pad.subprocess, "Popen"), mock.patch.object(pad.time, "sleep"), \
+                    mock.patch.object(app_pad.app, "title", return_value="page"):
+                for button in buttons:                                # one at a time
+                    app_pad._button(button, True)
+                    app_pad._button(button, False)
+                    app_pad.grabbed = True
+                app_pad._button("select", True)                       # the second layer
+                for button in buttons:
+                    app_pad._button(button, True)
+                    app_pad._button(button, False)
+                    app_pad.grabbed = True
+                app_pad._button("select", False)
+                for button in buttons:                                # all held, then the pad is handed over
+                    app_pad._button(button, True)
+                app_pad.grabbed = True
+                app_pad.release()
+                app_pad._show_pointer(True)
+                app_pad._show_pointer(False)
+            self.assertEqual(balanced(app_pad.out.sent), [], app)
 
 
 class AppsOpenThroughTheMenu(unittest.TestCase):
