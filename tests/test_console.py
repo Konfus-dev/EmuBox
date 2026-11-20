@@ -41,7 +41,8 @@ class GuideTests(unittest.TestCase):
         self.assertEqual([t.title for t in self.tabs], ["Running", "Settings", "Apps", "Capture"])
         settings = {row.label: row.controls for row in self.tabs[1].rows}
         self.assertEqual(list(settings), ["Sound", "Volume", "Mute", "Menu sounds", "Menu sound volume",
-                                          "OMEN Lighting", "Lights", "Brightness", "Follow the game",
+                                          "RGB Hub", "Follow the game", "PC lights", "Keyboard lights", "PC brightness",
+                                          "Keyboard brightness", "Default look",
                                           "System", "Power", "Plane mode", "Stuck emulator?", "Everything else"])
         self.assertEqual(settings["Everything else"][0].do, "hotkeygen --send menu")      # Batocera's main menu
         apps = [(row.label, [c.label for c in row.controls]) for row in self.tabs[2].rows]
@@ -52,7 +53,11 @@ class GuideTests(unittest.TestCase):
         self.assertEqual([row.label for row in with_tools], ["Apps", "Apple Music", "Discord", "Tools", "Terminal", "Return", "Hide apps"])
         self.assertFalse(with_tools[3].focusable)                                         # the highlight passes over a heading
         self.assertEqual([t.title for t in guide.layout(APPS, lights=False)[0]], ["Running", "Settings", "Apps", "Capture"])
-        self.assertNotIn("OMEN Lighting", [row.label for row in guide.layout(APPS, lights=False)[0][1].rows])
+        self.assertTrue(settings["Default look"][0].confirm)
+        self.assertTrue(settings["Default look"][0].do.endswith("/startmenu_rgbhub.py default save"))
+        self.assertTrue(settings["Keyboard lights"][0].on.endswith("/startmenu_rgbhub.py set device-enabled keyboard on"))
+        self.assertTrue(settings["PC brightness"][0].more.endswith("/startmenu_rgbhub.py step device-brightness pc +10"))
+        self.assertNotIn("RGB Hub", [row.label for row in guide.layout(APPS, lights=False)[0][1].rows])
         volumes = [row.label for tab in self.tabs for row in tab.rows if "Volume" == row.label]
         self.assertEqual(volumes, ["Volume"])                                              # the system volume, once
 
@@ -338,7 +343,7 @@ class PhoneKeyboardTests(unittest.TestCase):
 
 class StartMenuTests(unittest.TestCase):
     def test_settings_become_entries_in_batoceras_menu(self):
-        text = startmenu.build(["EmuBox", "OG Xbox"], [("omen_x", '    <feature name="X" submenu="OMEN LIGHTING" value="omen_x" preset="switchon" />')])
+        text = startmenu.build(["EmuBox", "OG Xbox"], [("rgbhub_x", '    <feature name="X" submenu="RGB HUB" value="rgbhub_x" preset="switchon" />')])
         root = ET.fromstring(text)
         features = {f.get("value"): f for f in root.find("sharedFeatures")}
         self.assertEqual([f.get("value") for f in root.find("globalFeatures")], list(features))   # each one is switched on globally
@@ -346,7 +351,7 @@ class StartMenuTests(unittest.TestCase):
         self.assertEqual((sound_set.get("submenu"), [c.get("value") for c in sound_set]), ("MENU SOUNDS", ["EmuBox", "OG Xbox"]))
         self.assertEqual([c.get("value") for c in features["emubox_ui_sound_volume"]][:3], ["0", "10", "20"])
         self.assertEqual((features["emubox_web_block_ads"].get("submenu"), features["emubox_web_block_ads"].get("preset")), ("APPS", "switchon"))
-        self.assertIn("omen_x", features)
+        self.assertIn("rgbhub_x", features)
 
     def test_the_later_change_wins_between_batoceras_menu_and_ours(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -367,86 +372,158 @@ class StartMenuTests(unittest.TestCase):
     def test_a_change_in_batoceras_menu_is_noticed_and_passed_on(self):
         with tempfile.TemporaryDirectory() as folder:
             conf = Path(folder) / "batocera.conf"
-            conf.write_text("global.omen_lights_enabled=0\n")
+            conf.write_text("global.rgbhub_device_enabled_pc=0\n")
             seen = []
             watch = startmenu.Watch(conf)
             watch.modules = [mock.Mock(changed=seen.append, __name__="fake")]
             with mock.patch.object(startmenu.menusounds, "apply"):
                 self.assertTrue(watch.look())
                 self.assertFalse(watch.look())                       # nothing changed since
-            self.assertEqual(seen, [{"omen_lights_enabled": "0"}])
+            self.assertEqual(seen, [{"rgbhub_device_enabled_pc": "0"}])
 
 
-class OmenTests(unittest.TestCase):
+class RgbHubTests(unittest.TestCase):
     def setUp(self):
         self.folder = tempfile.TemporaryDirectory()
         self.addCleanup(self.folder.cleanup)
-        spec = importlib.util.spec_from_file_location("startmenu_omen", REPO / "components/omen-lights/files/startmenu_omen.py")
-        self.omen = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(self.omen)
-        self.omen.HOME = Path(self.folder.name)
-        self.omen.FILE = self.omen.HOME / "settings.json"
-        self.omen.PICTURES = self.omen.HOME / "pictures"
+        spec = importlib.util.spec_from_file_location("startmenu_rgbhub", REPO / "components/rgb-hub/files/startmenu_rgbhub.py")
+        self.hub = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.hub)
+        self.hub.HOME = Path(self.folder.name) / "rgb-hub"
+        self.hub.FILE = self.hub.HOME / "settings.json"
+        self.hub.PICTURES = self.hub.HOME / "pictures"
+        self.hub.OLD_HOME = Path(self.folder.name) / "omen-lights"
 
     def saved(self):
-        return json.loads(self.omen.FILE.read_text())
+        return json.loads(self.hub.FILE.read_text())
 
     def test_switches_numbers_and_defaults(self):
-        run = self.omen.run
-        self.assertEqual((run(["is", "auto-enabled"]), run(["get", "lcd-brightness"])), ("true", "80"))
-        run(["set", "auto-enabled", "off"])
+        run = self.hub.run
+        self.assertEqual((run(["is", "auto-devices", "all"]), run(["get", "lcd-brightness"])), ("true", "80"))
+        self.assertEqual((run(["is", "device-enabled", "keyboard"]), run(["get", "device-brightness", "pc"])), ("true", "100"))
+        run(["set", "lcd-enabled", "off"])
         run(["step", "lcd-brightness", "+30"])
-        run(["step", "lights-brightness", "-10"])
-        self.assertEqual(self.saved(), {"auto-enabled": False, "lcd-brightness": 100, "lights-brightness": 90})
-        self.assertEqual(run(["is", "auto-enabled"]), "")
+        self.assertEqual(self.saved(), {"lcd-enabled": False, "lcd-brightness": 100})
+        self.assertEqual(run(["is", "lcd-enabled"]), "")
+
+    def test_settings_kept_per_device(self):
+        run = self.hub.run
+        run(["set", "device-enabled", "keyboard", "off"])
+        run(["step", "device-brightness", "pc", "-30"])
+        run(["step", "device-brightness", "all", "+10"])
+        run(["set", "auto-devices", "pc", "off"])
+        saved = self.saved()
+        self.assertEqual(saved["device-enabled"], {"IQUNIX-KEYBOARD": False})
+        self.assertEqual(saved["device-brightness"], {"OMEN-PC": 80, "IQUNIX-KEYBOARD": 100})
+        self.assertEqual(saved["auto-devices"], {"OMEN-PC": False, "IQUNIX-KEYBOARD": True})   # both written: missing is off
+        self.assertEqual((run(["is", "device-enabled", "pc"]), run(["is", "device-enabled", "keyboard"])), ("true", ""))
+        self.assertEqual((run(["is", "auto-devices", "all"]), run(["is", "auto-devices", "keyboard"])), ("", "true"))
+        run(["set", "auto-devices", "all", "on"])
+        self.assertEqual(run(["is", "auto-devices", "all"]), "true")
+        run(["set", "lights-enabled", "off"])                  # the old names still work: they meant the PC
+        self.assertEqual(self.saved()["device-enabled"], {"IQUNIX-KEYBOARD": False, "OMEN-PC": False})
+        self.assertEqual(self.hub.main(["set", "device-enabled", "mouse", "on"]), 2)
+        self.assertEqual(self.hub.main(["is", "device-enabled"]), 2)
+
+    def test_default_look_is_asked_of_the_lights_program(self):
+        self.hub.run(["default", "save"])
+        self.assertEqual(self.saved(), {"default-action": "save"})
+        self.hub.run(["default", "load"])
+        self.assertEqual(self.saved()["default-action"], "load")
+        self.assertEqual(self.hub.main(["default", "forget"]), 2)
 
     def test_colours_effects_speed_and_picture(self):
-        run = self.omen.run
+        run = self.hub.run
         run(["colour", "menus", "Blue"])
         run(["colour", "RAM/Stick 1", "#ff0000"])
         run(["colour", "all", "Green"])
-        run(["effect", "all", "Rainbow"])    # the case has no rainbow: only the memory takes it
+        run(["effect", "all", "Rainbow"])    # the case and the keyboard have no rainbow: only the memory takes it
         run(["effect", "case", "Breathing"])
+        run(["effect", "keyboard", "Effect 7"])
         run(["speed", "100"])
         run(["dim", "min", "25"])
         run(["picture", "/somewhere/dragon.png"])
         saved = self.saved()
         self.assertEqual(saved["auto-idle-colour"], "#1E5BFF")
         self.assertEqual(set(saved["zone-colours"].values()), {"#3CE61E"})
-        self.assertEqual(len(saved["zone-colours"]), 6)
-        self.assertEqual(saved["device-modes"], {"RAM": "Rainbow", "HP Omen 30L": "Breathing"})
-        self.assertEqual(saved["device-speeds"], {"HP Omen 30L": 100, "RAM": 100})
+        self.assertEqual(len(saved["zone-colours"]), 7)
+        self.assertIn("IQUNIX MG65/All keys", saved["zone-colours"])
+        self.assertEqual(saved["device-modes"], {"RAM": "Rainbow", "HP Omen 30L": "Breathing", "IQUNIX MG65": "Effect 7"})
+        self.assertEqual(saved["device-speeds"], {"HP Omen 30L": 100, "RAM": 100, "IQUNIX MG65": 100})
         self.assertEqual(saved["device-min-brightness"]["RAM"], 25)
         self.assertEqual((saved["lcd-image"], saved["auto-idle-image"]), ("/somewhere/dragon.png",) * 2)
-        self.assertEqual((run(["colour-of", "menus"]), run(["speed-of"]), run(["picture-of"]), run(["effect-of", "ram"])),
-                         ("Blue", "Fast", "dragon", "Rainbow"))
+        self.assertEqual((run(["colour-of", "menus"]), run(["speed-of"]), run(["picture-of"]), run(["effect-of", "keyboard"])),
+                         ("Blue", "Fast", "dragon", "Effect 7"))
         run(["colour", "menus", "picture"])
         self.assertEqual(run(["colour-of", "menus"]), "From the picture")
-        self.assertEqual(self.omen.main(["colour", "all", "mauve-ish"]), 2)
+        self.assertEqual(self.hub.main(["colour", "all", "mauve-ish"]), 2)
+        values = self.saved()
+        values["_seen"] = {"rgbhub_x": "1"}
+        self.hub.save(values)
         run(["reset"])
-        self.assertEqual(self.saved(), {})
+        self.assertEqual(self.saved(), {"_seen": {"rgbhub_x": "1"}})          # our own note stays
 
-    def test_its_settings_join_batoceras_menu_and_choices_reach_the_lights(self):
-        pairs = self.omen.features()
+    def test_until_the_old_folder_is_moved_its_file_is_used(self):
+        old = self.hub.OLD_HOME
+        old.mkdir()
+        (old / "settings.json").write_text('{"lcd-fit": "fit"}')
+        self.assertEqual(self.hub.run(["get", "lcd-fit"]), "fit")
+        self.hub.run(["set", "device-enabled", "pc", "off"])
+        self.assertFalse(self.hub.HOME.exists())                                  # left for the lights program to make
+        self.assertEqual(json.loads((old / "settings.json").read_text())["device-enabled"], {"OMEN-PC": False})
+
+    def test_its_settings_join_batoceras_menu(self):
+        pairs = self.hub.features()
         root = ET.fromstring("<x>" + "\n".join(xml for _, xml in pairs) + "</x>")
         by_value = {f.get("value"): f for f in root}
         self.assertEqual(list(by_value), [name for name, _ in pairs])
-        self.assertTrue(all(f.get("submenu") == "OMEN LIGHTING" for f in root))
-        self.assertEqual(by_value["omen_lights_enabled"].get("preset"), "switchon")
-        self.assertIn("Purple", [c.get("value") for c in by_value["omen_colour_ram_stick_1"]])
-        self.omen.changed({"omen_lights_enabled": "0", "omen_lights_brightness": "40.000000", "omen_auto_enabled": "auto",
-                           "omen_colour_menus": "Blue", "omen_colour_ram_stick_1": "Purple", "omen_effect_ram": "Rainbow",
-                           "omen_speed": "100", "omen_lcd_fit": "fit", "unrelated": "1"})
+        self.assertTrue(all(f.get("submenu") == "RGB HUB" and f.get("value").startswith("rgbhub_") for f in root))
+        labels = [f.get("name") for f in root]
+        self.assertEqual(labels[:7], ["FOLLOW THE GAME", "PC FOLLOWS THE GAME", "KEYBOARD FOLLOWS THE GAME", "PC LIGHTS",
+                                      "KEYBOARD LIGHTS", "PC LIGHT BRIGHTNESS", "KEYBOARD BRIGHTNESS"])
+        self.assertEqual(labels[-3:], ["KEYBOARD COLOUR", "KEYBOARD EFFECT", "DEFAULT LOOK"])
+        self.assertEqual(by_value["rgbhub_auto_devices_all"].get("preset"), "switchon")
+        self.assertIn("Purple", [c.get("value") for c in by_value["rgbhub_colour_ram_stick_1"]])
+        self.assertIn("Purple", [c.get("value") for c in by_value["rgbhub_colour_iqunix_mg65_all_keys"]])
+        self.assertEqual([c.get("value") for c in by_value["rgbhub_effect_keyboard"]][:3], ["Static", "Effect 2", "Effect 3"])
+        self.assertEqual([c.get("value") for c in by_value["rgbhub_default"]], ["none", "save", "load"])
+
+    def test_choices_in_batoceras_menu_reach_the_lights(self):
+        changed = self.hub.changed
+        changed({"rgbhub_device_enabled_pc": "0", "rgbhub_device_brightness_keyboard": "40.000000",
+                 "rgbhub_auto_devices_all": "0", "rgbhub_auto_devices_keyboard": "1", "rgbhub_lcd_brightness": "auto",
+                 "rgbhub_colour_menus": "Blue", "rgbhub_colour_iqunix_mg65_all_keys": "Purple", "rgbhub_effect_keyboard": "Effect 3",
+                 "rgbhub_speed": "100", "rgbhub_lcd_fit": "fit", "unrelated": "1",
+                 "omen_lights_enabled": "1", "omen_colour_ram_stick_1": "Red"})   # from before the rename: not ours now
         saved = self.saved()
-        self.assertEqual((saved["lights-enabled"], saved["lights-brightness"], saved["auto-idle-colour"]), (False, 40, "#1E5BFF"))
-        self.assertNotIn("auto-enabled", saved)                                  # not chosen: left at its default
-        self.assertEqual(saved["zone-colours"], {"RAM/Stick 1": "#9B30FF"})
-        self.assertEqual((saved["device-modes"]["RAM"], saved["device-speeds"]["RAM"], saved["lcd-fit"]), ("Rainbow", 100, "fit"))
-        self.omen.run(["set", "lights-brightness", "90"])                        # then changed in the Guide menu
-        self.omen.changed({"omen_lights_enabled": "0", "omen_lights_brightness": "40.000000"})   # Batocera's menu says nothing new
-        self.assertEqual(self.saved()["lights-brightness"], 90)
-        self.omen.changed({"omen_lights_brightness": "60"})                      # a new choice there wins again
-        self.assertEqual(self.saved()["lights-brightness"], 60)
+        self.assertEqual((saved["device-enabled"], saved["device-brightness"]), ({"OMEN-PC": False}, {"IQUNIX-KEYBOARD": 40}))
+        self.assertEqual(saved["auto-devices"], {"OMEN-PC": False, "IQUNIX-KEYBOARD": True})   # one device's row after "all"
+        self.assertNotIn("lcd-brightness", saved)                                # not chosen: left at its default
+        self.assertEqual(saved["zone-colours"], {"IQUNIX MG65/All keys": "#9B30FF"})
+        self.assertEqual((saved["device-modes"]["IQUNIX MG65"], saved["device-speeds"]["RAM"], saved["lcd-fit"]), ("Effect 3", 100, "fit"))
+        self.assertEqual(saved["auto-idle-colour"], "#1E5BFF")
+        self.assertFalse(any(name.startswith("omen_") for name in saved["_seen"]))
+        self.hub.run(["set", "device-brightness", "keyboard", "90"])            # then changed in the Guide menu
+        changed({"rgbhub_device_brightness_keyboard": "40.000000"})               # Batocera's menu says nothing new
+        self.assertEqual(self.saved()["device-brightness"]["IQUNIX-KEYBOARD"], 90)
+        changed({"rgbhub_device_brightness_keyboard": "60"})                      # a new choice there wins again
+        self.assertEqual(self.saved()["device-brightness"]["IQUNIX-KEYBOARD"], 60)
+
+    def test_default_look_can_be_saved_again_from_batoceras_menu(self):
+        def picked(action):
+            values = self.saved() if self.hub.FILE.exists() else {}
+            values.pop("default-action", None)                                   # the lights program did it and emptied it
+            self.hub.save(values)
+            self.hub.changed(action)
+            return self.saved().get("default-action", "")
+
+        self.assertEqual(picked({"rgbhub_default": "save"}), "save")
+        self.assertEqual(picked({"rgbhub_default": "save"}), "")                 # nothing new: once only
+        self.assertEqual(picked({"rgbhub_default": "none"}), "")                 # Leave it
+        self.assertEqual(picked({"rgbhub_default": "save"}), "save")             # then Save works again
+        self.assertEqual(picked({}), "")                                         # AUTO: the choice is gone from batocera.conf
+        self.assertEqual(picked({"rgbhub_default": "save"}), "save")
+        self.assertEqual(picked({"rgbhub_default": "load"}), "load")
 
 
 def stream(index, name, corked=False, mute=False, percent=100):

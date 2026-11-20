@@ -4,6 +4,7 @@
 """
 import os
 os.environ["EMUBOX_OFFLINE"] = "1"   # no icons fetched from the network while testing
+import importlib.util
 import io
 import json
 import os
@@ -26,7 +27,7 @@ from installer.target import Target  # noqa: E402
 
 os.environ["EMUBOX_DOWNLOAD_LATER"] = "1"   # the tests never fetch programs from Flathub
 os.environ["EMUBOX_SOUNDS"] = "none"        # nor pick up sound sets that happen to sit beside the repository
-COMPONENT_QUESTIONS = 13   # asked on a PC without the OMEN lights
+COMPONENT_QUESTIONS = 13   # asked on a PC without the OMEN lights or the IQUNIX keyboard
 
 
 def make_drive(root: Path) -> Target:
@@ -327,11 +328,24 @@ class ComponentTests(Drive):
         self.assertEqual((self.root / "roms/apps/gamelist.xml").read_text().count("<game>"), 5)   # the one chosen, and Browser, Claude, Files and Terminal
 
     def test_lights_are_not_offered_without_the_hardware(self):
-        code, out = run(self.root, "--yes", "--with", "omen-lights")
+        code, out = run(self.root, "--yes", "--with", "rgb-hub")
         self.assertEqual(code, 1)
         self.assertIn("Not available here", out)
         _code, out = run(self.root, answers="n\n" * 20)
-        self.assertNotIn("OMEN", out)
+        self.assertNotIn("RGB Hub", out)
+
+    def test_the_lights_program_is_found_beside_emubox_under_either_name(self):
+        spec = importlib.util.spec_from_file_location("rgbhub_component", REPO / "components/rgb-hub/component.py")
+        component = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(component)
+        with tempfile.TemporaryDirectory() as folder:
+            repo = Path(folder) / "Batocera" / "EmuBox"
+            repo.mkdir(parents=True)
+            self.assertIsNone(component._local_checkout(repo, "RGB-Hub"))
+            old = make_file(Path(folder) / "OmenRGB-Controller" / component.INSTALLER)
+            self.assertEqual(component._local_checkout(repo, "RGB-Hub"), old)          # not renamed yet
+            new = make_file(Path(folder) / "RGB-Hub" / component.INSTALLER)
+            self.assertEqual(component._local_checkout(repo, "RGB-Hub"), new)          # the new name first
 
     def test_questions_are_asked_and_answered(self):
         # look n, apple-music n, discord y, seven more n, bios n, games n, go ahead y

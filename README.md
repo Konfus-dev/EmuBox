@@ -63,7 +63,7 @@ there is; `./install --remove <name>` takes something off.
 - **Captures** on the home screen: your screenshots and recordings, in two folders, opened with
   Batocera's own picture and video viewer.
 - **Settings** in Batocera's own menu: Start > Game Settings > EmuBox (menu sounds, apps, and the
-  lights on an HP OMEN PC).
+  lights on an HP OMEN PC and an IQUNIX keyboard).
 - **Menu sounds and music**: sounds for moving, choosing and going back, with your own sound sets
   if you bring some, and menu music you can skip and pause.
 - **Extras**: a ROM-hack patcher, sensible play settings, Wi-Fi and account set-up, Bluetooth

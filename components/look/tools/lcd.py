@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Renders the plasma ball as an animation for the OMEN cooler LCD.
 
-    python3 lcd.py            (writes ../files/theme/omen-lights)
+    python3 lcd.py            (writes ../files/theme/rgb-hub)
 
-OmenRGB-Controller plays any theme's `omen-lights/` folder on the LCD while
+RGB Hub (once OmenRGB-Controller) plays any theme's `rgb-hub/` folder on the LCD while
 Batocera is in its menus: LCD-ready frames (480x480 JPEG) plus a `frame_ms`
 file. This script builds that folder from the same layers the theme uses on
 screen, moving the way theme.xml moves them, with the EmuBox name across the ball.
@@ -22,7 +22,7 @@ import brand
 
 HERE = Path(__file__).resolve().parent
 ART = HERE.parent / "files" / "theme" / "art"
-OUT = HERE.parent / "files" / "theme" / "omen-lights"
+OUT = HERE.parent / "files" / "theme" / "rgb-hub"
 
 LCD = 480  # the screen is 480x480 (and round)
 BALL = 280  # diameter of the orb on the LCD (the claw round it reaches 1.64 times that)

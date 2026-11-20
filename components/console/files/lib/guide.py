@@ -206,9 +206,9 @@ def own(module: str, call: Callable[[object], object]) -> Callable[[], str]:
 def layout(found: list[tuple[str, dict]] | None = None, lights: bool | None = None) -> tuple[list[Tab], list[Row]]:
     """The tabs and the bars along the bottom."""
     found = apps() if found is None else found
-    lights = (HERE / "startmenu_omen.py").is_file() if lights is None else lights
+    lights = (HERE / "startmenu_rgbhub.py").is_file() if lights is None else lights
     a, lib = str(APP), str(HERE)
-    sounds, omen = f"python3 {lib}/menusounds.py", f"python3 {lib}/startmenu_omen.py"
+    sounds, hub = f"python3 {lib}/menusounds.py", f"python3 {lib}/startmenu_rgbhub.py"
     in_menus = lambda: "" if running_game() else "yes"   # noqa: E731
     memo: dict[str, tuple[float, list[str]]] = {}
 
@@ -216,6 +216,14 @@ def layout(found: list[tuple[str, dict]] | None = None, lights: bool | None = No
         if "apps" not in memo or time.monotonic() - memo["apps"][0] > 0.5:
             memo["apps"] = (time.monotonic(), open_apps(found))
         return memo["apps"][1]
+
+    def hub_switch(name: str, which: str) -> Control:   # a setting of the lights program, per device
+        return switch(own("startmenu_rgbhub", lambda m: m.run(["is", name, which])),
+                      f"{hub} set {name} {which} on", f"{hub} set {name} {which} off")
+
+    def hub_stepper(name: str, which: str) -> Control:
+        return stepper(own("startmenu_rgbhub", lambda m: m.run(["get", name, which])),
+                       f"{hub} step {name} {which} -10", f"{hub} step {name} {which} +10")
 
     settings = [
         heading("Sound"),
@@ -230,12 +238,13 @@ def layout(found: list[tuple[str, dict]] | None = None, lights: bool | None = No
     ]
     if lights:
         settings += [
-            heading("OMEN Lighting"),
-            Row("Lights", [switch(own("startmenu_omen", lambda m: m.run(["is", "lights-enabled"])), f"{omen} set lights-enabled on", f"{omen} set lights-enabled off")]),
-            Row("Brightness", [stepper(own("startmenu_omen", lambda m: m.run(["get", "lights-brightness"])), f"{omen} step lights-brightness -10",
-                                       f"{omen} step lights-brightness +10")]),
-            Row("Follow the game", [switch(own("startmenu_omen", lambda m: m.run(["is", "auto-enabled"])), f"{omen} set auto-enabled on",
-                                           f"{omen} set auto-enabled off")]),
+            heading("RGB Hub"),
+            Row("Follow the game", [hub_switch("auto-devices", "all")]),
+            Row("PC lights", [hub_switch("device-enabled", "pc")]),
+            Row("Keyboard lights", [hub_switch("device-enabled", "keyboard")]),
+            Row("PC brightness", [hub_stepper("device-brightness", "pc")]),
+            Row("Keyboard brightness", [hub_stepper("device-brightness", "keyboard")]),
+            Row("Default look", [button("Save look as Default", f"{hub} default save", confirm=True)]),
         ]
     settings += [
         heading("System"),

@@ -1,0 +1,35 @@
+{
+  "title": "RGB Hub",
+  "question": "This PC has HP OMEN case lights or an IQUNIX keyboard. Install RGB Hub (the OMEN PC's cooler screen and lights, and the IQUNIX keyboard's lights, follow the game)?",
+  "default": true,
+  "order": 70,
+  "source": {
+    "sibling": "RGB-Hub",
+    "url": "https://github.com/Konfus-dev/RGB-Hub"
+  },
+  "usb_devices": [
+    "03f0:7397",
+    "103c:84fd",
+    "320f:5055"
+  ],
+  "services": [
+    "rgb_hub"
+  ],
+  "retired_services": [
+    "omen_lights"
+  ],
+  "requires": [
+    "console"
+  ],
+  "files": [
+    {
+      "from": "files/startmenu_rgbhub.py",
+      "to": "system/emubox/lib/startmenu_rgbhub.py"
+    }
+  ],
+  "after": "The lights' settings are in Batocera's menu: Start > Game Settings > RGB HUB. Pictures for the cooler's screen go in system/configs/rgb-hub/pictures.",
+  "replaces": [
+    "system/emubox/lib/menu_omen.py",
+    "system/emubox/lib/startmenu_omen.py"
+  ]
+}

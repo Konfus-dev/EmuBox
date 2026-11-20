@@ -62,7 +62,7 @@ things or update; it only copies what is missing.
 | **RetroAchievements account** | Trophies for older games |
 | **Store** | A Store on the home screen: Batocera's catalogue of free games (browse and install with the controller), Steam, and Heroic for Epic and GOG. Each downloads itself the first time you open it |
 | **Vault** | In the Store: your own list of store pages, browsed with the controller. Downloads are noticed straight away, Vault asks which system to install them to, then moves them into your games. See [Vault](vault.md) |
-| **OMEN lights** | Only offered on an HP OMEN PC that has the lights; fetched from [its own repository](https://github.com/Konfus-dev/OmenRGB-Controller) |
+| **RGB Hub** | The lights program (once OMEN lights): the HP OMEN PC's cooler screen, case and memory lights, and the IQUNIX keyboard's lights follow the game. Only offered on a PC with one of them; fetched from [its own repository](https://github.com/Konfus-dev/RGB-Hub) |
 
 ### Controller buttons in the apps
 
@@ -98,14 +98,17 @@ phone app.)
   pop-up menus alike), choosing, going back and opening the menu.
 - **APPS**: the menu music and whether it waits for your own, music dropping during a call and how
   far, and the ad blocker for web apps.
-- **OMEN LIGHTING** (on a PC with them): on/off, brightness, following the game, a colour per light,
-  effects and their speed, the cooler's screen, its picture and fit.
+- **RGB HUB** (on a PC with the OMEN lights or the IQUNIX keyboard): following the game (both devices,
+  or each on its own), lights on/off and brightness for the PC and the keyboard, a colour per light,
+  effects and their speed, the cooler's screen, its picture and fit, and the **Default look** (what
+  every device shows once Batocera has shut down: save the look now as the Default, or go back to it).
 
 (Batocera's main menu cannot take a new entry of its own, so they sit inside Game Settings.)
 
 **Guide** opens EmuBox's own quick menu, over the menus or a running game:
 
-- **Settings**: the system volume and mute, the menu sound set and its volume, the lights' basics,
+- **Settings**: the system volume and mute, the menu sound set and its volume, the lights' basics
+  (following the game, on/off and brightness for the PC and the keyboard, saving the look as the Default),
   power mode, plane mode, stopping a stuck emulator, and **Open full settings** (Batocera's main menu).
 - **Apps**: open an app or a tool, or hide the apps and go back. **Capture**: take a screenshot (the menu
   closes first, so it is not in the picture) and start or stop a recording. Both are kept under
@@ -113,7 +116,7 @@ phone app.)
   `screenshots` and `recordings` folders).
 - **Running**, while anything is: the emulator Batocera started (resume, its own settings menu,
   quit, force close) and each app that is open (resume, hide, force close).
-- Each tab's rows sit under headings (Sound, OMEN Lighting, System; Apps, Tools).
+- Each tab's rows sit under headings (Sound, RGB Hub, System; Apps, Tools).
 - Along the bottom, a bar for each thing that is live, with its controls: a call (microphone
   switch), your music app (previous, pause, next), or the menus' own music (the same three).
   Under them, the processor load and how full the drive is; along the top, the time and the

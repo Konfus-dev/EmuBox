@@ -167,7 +167,7 @@ def install(env) -> None:     # runs after the files are copied
 ```
 
 `env` gives you `target` (the drive: `copy`, `conf_set`, `enable_service`...), `repo`, `host`, `fetch`
-and `component`. `components/omen-lights` is a complete example.
+and `component`. `components/rgb-hub` is a complete example.
 
 ## Test
 

@@ -32,7 +32,8 @@
     "SplashScreenProgress": false
   },
   "replaces": [
-    "themes/classic-dash"
+    "themes/classic-dash",
+    "themes/emubox/omen-lights"
   ],
   "after": "The look is selected as the theme. To switch back: Main menu > User interface settings > Theme set."
 }
