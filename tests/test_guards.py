@@ -377,3 +377,125 @@ class LabelTests(unittest.TestCase):
         self.assertIn("label must be SHARE", self.merged_warning(True, ""))
         self.assertIn("WARNING", self.merged_warning(False, "autoresize=false\nmergerfs.roms=/media/x\n"))
         self.assertEqual(self.merged_warning(False, "#mergerfs.roms=/media/x\n"), "")
+
+
+# --- nothing made for testing stays on a real drive ------------------------------------------
+
+def install(root: Path, *args: str) -> tuple[int, str]:
+    """Run the installer on the pretend drive, as from a PC without the special hardware."""
+    import io
+    from unittest import mock
+    from installer import cli
+    out = io.StringIO()
+    with mock.patch("sys.stdin", io.StringIO("")), mock.patch("sys.stdout", out), \
+            mock.patch.object(cli.Host, "usb_devices", return_value=set()), \
+            mock.patch.object(cli.Host, "paired_bluetooth_devices", return_value=[]), \
+            mock.patch.dict(os.environ, {"EMUBOX_DOWNLOAD_LATER": "1", "EMUBOX_SOUNDS": "none", "EMUBOX_OFFLINE": "1"}):
+        code = cli.main(["--target", str(root), *args])
+    return code, out.getvalue()
+
+
+class TestLeftoverTests(unittest.TestCase):
+    """Three times things from testing reached a real drive: the VM's pad layout (every face
+    button of the real Xbox pad wrong), temporary root SSH keys, batocera-vm leftovers."""
+
+    VM_LAYOUT = ('\t<inputConfig type="joystick" deviceName="Xbox Wireless Controller" deviceGUID="050000005e040000220b000023050000">\n'
+                 '\t\t<input name="b" type="button" id="107" value="1" code="304" />\n\t</inputConfig>\n')
+    NAMED_LIKE_IT = ('\t<inputConfig type="joystick" deviceName="Xbox Wireless Controller" deviceGUID="0300aaaa">\n'
+                     '\t\t<input name="a" type="button" id="108" value="1" code="305" />\n\t</inputConfig>\n')
+    REAL_PAD = ('\t<inputConfig type="joystick" deviceName="Xbox Wireless Controller" deviceGUID="050000005e040000e002000003090000">\n'
+                '\t\t<input name="b" type="button" id="0" value="1" code="304" />\n\t</inputConfig>\n')
+    MINE = '\t<inputConfig type="keyboard" deviceName="Keyboard" deviceGUID="-1" />\n'
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name) / "SHARE"
+        for folder in ("system/configs/emulationstation", "system/.ssh", "roms/ports"):
+            (self.root / folder).mkdir(parents=True)
+        (self.root / "system/batocera.conf").write_text("")
+        self.pads = self.root / "system/configs/emulationstation/es_input.cfg"
+        self.keys = self.root / "system/.ssh/authorized_keys"
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_the_vms_pad_layout_is_taken_off_after_any_install(self):
+        self.pads.write_text('<?xml version="1.0"?>\n<inputList>\n' + self.MINE + self.VM_LAYOUT + self.REAL_PAD +
+                             self.NAMED_LIKE_IT + "</inputList>\n")
+        code, said = install(self.root, "--yes", "--with", "tweaks")     # not the console tools
+        self.assertEqual(code, 0, said)
+        text = self.pads.read_text()
+        self.assertNotIn("220b000023050000", text)
+        self.assertNotIn('id="108"', text)                               # numbered like the VM's form
+        self.assertIn(self.MINE, text)
+        self.assertIn(self.REAL_PAD, text)                               # the real pad's own entry stays
+        import xml.etree.ElementTree as ET
+        self.assertEqual(len(ET.fromstring(text)), 2)
+        self.assertIn("test VM's controller layout", said)
+
+    def test_inside_the_vm_itself_its_layout_stays(self):
+        from installer import audit
+        from installer.target import Target
+        self.pads.write_text('<inputList>\n' + self.VM_LAYOUT + "</inputList>\n")
+        self.assertEqual(audit.audit(Target(self.root), in_vm=True), [])
+        self.assertIn("220b000023050000", self.pads.read_text())
+
+    def test_ssh_keys_emubox_did_not_put_there_are_set_aside(self):
+        self.keys.write_text("# a comment\nssh-ed25519 AAAAtest root@vm-test\nssh-ed25519 AAAAmine me@pc emubox-keep\n")
+        code, said = install(self.root, "--yes", "--with", "tweaks")
+        self.assertEqual(code, 0, said)
+        self.assertEqual(self.keys.read_text(), "# a comment\nssh-ed25519 AAAAmine me@pc emubox-keep\n")
+        aside = self.root / "system/.ssh/authorized_keys.emubox-removed"
+        self.assertEqual(aside.read_text(), "ssh-ed25519 AAAAtest root@vm-test\n")   # set aside, not lost
+        self.assertEqual(aside.stat().st_mode & 0o777, 0o600)
+        self.keys.write_text("ssh-rsa AAAAother root@vm\n")
+        install(self.root, "--remove", "tweaks")                         # also after taking something off
+        self.assertFalse(self.keys.exists())
+        self.assertEqual(aside.read_text().count("ssh-"), 2)
+
+
+class VmToolTests(unittest.TestCase):
+    """tools/batocera-vm boots the stick in a window: in test mode nothing reaches the stick, and
+    it never starts (or writes) the PC's own disk."""
+
+    VM = REPO / "tools/batocera-vm"
+
+    def test_test_mode_is_the_default_and_only_write_mode_writes(self):
+        text = self.VM.read_text()
+        self.assertIn("\nMODE=test\n", text)
+        self.assertEqual(re.findall(r"MODE=write", text), ["MODE=write"])
+        self.assertIn("--write) MODE=write ;;", text)
+        self.assertIn("\nsnap=on\n", text)
+        self.assertEqual(re.findall(r"snap=off", text), ["snap=off"])
+        self.assertIn('if [ "$MODE" = write ]; then snap=off;', text)
+        self.assertIn("snapshot=$snap", text)
+        self.assertEqual(len(re.findall(r"-drive ", text)), 1)              # the stick is the only disk it is given
+        self.assertIn('need=r; [ "$MODE" = write ] && need=rw', text)       # read access only, unless writing
+
+    def choose(self, *args: str, disks: dict) -> subprocess.CompletedProcess:
+        """Run the part of batocera-vm that picks the drive, against a pretend lsblk."""
+        text = self.VM.read_text()
+        code = text[text.index("\nMODE=test\n"):text.index("# --- (the tests run")]
+        with tempfile.TemporaryDirectory() as folder:
+            stub = Path(folder) / "lsblk"
+            rows = "\n".join(f"/dev/{p} BATOCERA" for disk, (_rm, parts) in disks.items() for p in parts)
+            parents = "".join(f"*/{p}) echo {disk} ;;\n" for disk, (_rm, parts) in disks.items() for p in parts)
+            removable = "".join(f"*/{disk}) echo {rm} ;;\n" for disk, (rm, _parts) in disks.items())
+            stub.write_text(f'#!/bin/bash\ncase "$*" in\n-rno*) printf "%s\\n" "{rows}" ;;\n'
+                            f'-no\\ PKNAME*) case "$3" in\n{parents}esac ;;\n'
+                            f'-dno\\ RM*) case "$3" in\n{removable}esac ;;\nesac\n')
+            stub.chmod(0o755)
+            env = {**os.environ, "PATH": f"{folder}:{os.environ['PATH']}"}
+            script = "set -euo pipefail\n" + code + '\necho "chose $MODE $disk"\n'
+            return subprocess.run(["bash", "-c", script, "batocera-vm", *args], capture_output=True, text=True, env=env)
+
+    def test_the_pcs_own_disk_is_never_chosen(self):
+        both = {"nvme0n1": (0, ["nvme0n1p6"]), "sdb": (1, ["sdb1"])}
+        done = self.choose(disks=both)
+        self.assertEqual(done.stdout.strip(), "chose test /dev/sdb")
+        self.assertEqual(self.choose("--write", disks=both).stdout.strip(), "chose write /dev/sdb")
+        done = self.choose(disks={"nvme0n1": (0, ["nvme0n1p6"])})                # only Batocera on the PC's own disk
+        self.assertNotEqual(done.returncode, 0)
+        self.assertNotIn("chose", done.stdout)
+        self.assertIn("No removable drive", done.stderr)
+        self.assertNotEqual(self.choose("--wrte", disks=both).returncode, 0)    # a typo is not write mode

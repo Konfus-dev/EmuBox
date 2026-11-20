@@ -23,10 +23,17 @@ esac
 
 die() { echo "batocera-vm: $1" >&2; exit 1; }
 
-part=$(lsblk -rno PATH,LABEL | awk '$2 == "BATOCERA" { print $1; exit }')
-[ -n "$part" ] || die "No partition labelled BATOCERA found. Is the stick plugged in?"
+# The stick: a partition labelled BATOCERA on a removable drive. This PC's own disk has one too
+# (Batocera installed beside Ubuntu and Windows); it is passed over, never started or written here.
+part=""
+while read -r p label; do
+    [ "$label" = BATOCERA ] || continue
+    if [ "$(lsblk -dno RM "/dev/$(lsblk -no PKNAME "$p" | head -n1)")" = "1" ]; then part=$p; break; fi
+done < <(lsblk -rno PATH,LABEL)
+[ -n "$part" ] || die "No removable drive with a partition labelled BATOCERA found. Is the stick plugged in?"
 disk="/dev/$(lsblk -no PKNAME "$part" | head -n1)"
 [ "$(lsblk -dno RM "$disk")" = "1" ] || die "$disk is not a removable drive; refusing to use it."
+# --- (the tests run the lines above against a pretend lsblk) ---
 
 run=$(mktemp -d "${XDG_RUNTIME_DIR:-/tmp}/batocera-vm.XXXXXX")
 # Batocera's kernel is started directly (copied off the stick first), which is the way this was tested.

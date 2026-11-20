@@ -18,7 +18,7 @@ import tempfile
 from contextlib import contextmanager
 from pathlib import Path
 
-from . import components, library
+from . import audit, components, library
 from .components import Component, Env
 from .fetch import FetchError, fetch, is_url, without_secrets
 from .host import Host, expand
@@ -464,6 +464,7 @@ def run_install(args, target: Target, ask: Prompts) -> None:
         for title, library_, selection in libraries:
             ask.say(f"Copying {title}...")
             library.install(library_, selection, target, ask.say)
+        audit.audit(target, in_vm=target.live and audit.running_in_vm(), say=ask.say)   # nothing from testing stays
         os.sync()
     finally:
         downloads.clean()
@@ -492,6 +493,7 @@ def run_list(target: Target | None, ask: Prompts) -> None:
 
 
 def run_remove(ids: list[str], target: Target, ask: Prompts) -> None:
+    audit.audit(target, in_vm=target.live and audit.running_in_vm(), say=ask.say)
     for component_id in ids:
         done = components.uninstall(component_id, target)
         ask.say(f"Removed {component_id}." if done else f"{component_id} is not installed.")
