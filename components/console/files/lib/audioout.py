@@ -4,26 +4,45 @@
     audioout.py show              the current output's name
     audioout.py next | previous   switch to the next / previous one, and keep it for the next start
 
-Batocera's own list (batocera-audio list) is used, so every output it knows is offered, Bluetooth
-headphones included once they are connected. The choice is saved as Batocera's audio.device,
+Every output the sound server has is offered (Bluetooth headphones once connected), by the name
+a person would use: the TV's own name for HDMI, the headphones' for Bluetooth. The choice is saved as Batocera's audio.device,
 which Batocera applies at start-up.
 """
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 import sys
 
 
 def outputs() -> list[tuple[str, str]]:
-    """(name, description) of every output, "auto" first."""
-    out = subprocess.run(["batocera-audio", "list"], capture_output=True, text=True, timeout=5).stdout
-    found = []
-    for line in out.splitlines():
-        name, _, desc = line.partition("\t")
-        if name:
-            found.append((name, "Automatic" if name == "auto" else short(desc or name)))
-    return found
+    """(name, friendly name) of every output, "auto" first."""
+    try:
+        sinks = json.loads(subprocess.run(["pactl", "-f", "json", "list", "sinks"], capture_output=True,
+                                          text=True, timeout=5).stdout or "[]")
+    except (OSError, subprocess.SubprocessError, ValueError):
+        sinks = []
+    return [("auto", "Automatic")] + [(s["name"], friendly(s)) for s in sinks if s.get("name")]
+
+
+def friendly(sink: dict) -> str:
+    """What a person calls an output: the TV's own name for HDMI, the headphones' name for
+    Bluetooth, the product for USB; Batocera's long technical description only as a last resort."""
+    props = sink.get("properties", {})
+    name, desc = sink.get("name", ""), sink.get("description", "") or sink.get("name", "")
+    nick = props.get("node.nick", "")
+    port = re.search(r"\((HDMI[^)]*)\)", desc)
+    if props.get("device.bus") == "bluetooth" or name.startswith("bluez_"):
+        return f"{props.get('device.description') or desc} (Bluetooth)"
+    if "hdmi" in name.lower():
+        tv = nick if nick and not nick.upper().startswith("HDMI") else "TV"
+        return f"{tv} ({port.group(1) if port else 'HDMI'})"
+    if props.get("device.bus") == "usb":
+        return nick or short(desc)
+    if "analog" in name.lower():
+        return "Speakers / headphone socket"
+    return short(desc)
 
 
 def short(desc: str) -> str:

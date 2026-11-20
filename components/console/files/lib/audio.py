@@ -30,6 +30,7 @@ import settings
 os.environ.setdefault("XDG_RUNTIME_DIR", "/var/run")
 ROOT = Path(__file__).resolve().parent.parent
 ES_QUIET = Path("/usr/bin/emubox-es")      # Batocera's menu starts without its own music (esquiet.py)
+SEEN_FRONTEND = Path("/userdata/system/configs/emubox/frontend-music.seen")   # FRONTEND MUSIC when last looked
 SCREENSAVER = music.RUN / "screensaver"   # there while Batocera's screensaver shows (scripts/screensaver-*)
 MENU_MUSIC = "emubox menu music"   # our own player (music.py), as the sound server names it
 EVERY_S = 2.0
@@ -127,11 +128,10 @@ def listing(what: str) -> list[dict]:
 
 def look(words: list[str], state: dict) -> list[list[str]]:
     es = music.es_text()
+    follow_frontend_music(es)
     switches = dict(settings.read())
-    # Sound settings > FRONTEND MUSIC. Batocera's own player is kept silent by esquiet.py, which
-    # the drive guard's boot-custom.sh puts in place; without that, Batocera plays the music itself.
-    ours = music.frontend_music(es) and ES_QUIET.exists()
-    switches["music.menu"] = "on" if ours else "off"
+    if not ES_QUIET.exists():   # Batocera's own player is not kept silent here: leave the music to it
+        switches["music.menu"] = "off"
     playing = listing("sink-inputs")
     commands = plan(playing, listing("source-outputs"), words, switches, state)
     for command in commands:
@@ -152,20 +152,36 @@ def look(words: list[str], state: dict) -> list[list[str]]:
     return commands
 
 
+def follow_frontend_music(es: str, seen: Path | None = None) -> bool:
+    """Two switches, one meaning: EmuBox's MENU MUSIC (the Guide's Sound section) decides, and
+    Batocera's Sound settings > FRONTEND MUSIC, when you change it there, is copied onto it.
+    (Batocera's menu keeps its settings in memory and writes them all back, so EmuBox can never
+    safely change FRONTEND MUSIC itself: it only notices when you did.) True when it copied."""
+    seen = SEEN_FRONTEND if seen is None else seen
+    now = "on" if music.frontend_music(es) else "off"
+    try:
+        before = seen.read_text().strip()
+    except OSError:
+        before = ""
+    if before == now:
+        return False
+    try:
+        seen.parent.mkdir(parents=True, exist_ok=True)
+        seen.write_text(now + "\n")
+    except OSError:
+        return False
+    if before:              # first sight (no note yet): nothing was changed, keep MENU MUSIC as it is
+        settings.write("music.menu", now)
+        return True
+    return False
+
+
 def follow_music_settings(es: str, playing: bool, state: dict) -> None:
-    """Batocera's Sound settings, for the music EmuBox plays in its place: MUSIC VOLUME as it
-    changes, and DISPLAY SONG TITLES (for SONG TITLE DISPLAY DURATION seconds) at each new song."""
+    """MUSIC VOLUME from Batocera's Sound settings, applied as it changes."""
     level = music.volume(es)
     if state.get("volume") != level:
         music.ask("set_property", "volume", level)
         state["volume"] = level
-    song = music.title() if playing else ""
-    if song and song != state.get("song"):
-        seconds = music.song_titles(es)
-        if seconds:
-            subprocess.Popen(["python3", str(Path(__file__).with_name("toast.py")), f"Now playing: {song}", str(seconds)],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-        state["song"] = song
 
 
 def main(argv: list[str]) -> int:

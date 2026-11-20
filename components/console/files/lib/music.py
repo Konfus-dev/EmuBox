@@ -67,7 +67,8 @@ def stops_for_screensaver(text: str | None = None) -> bool:
 
 
 def song_titles(text: str | None = None) -> int:
-    """Seconds to show a new song's title (DISPLAY SONG TITLES, SONG TITLE DISPLAY DURATION); 0 = not shown."""
+    """DISPLAY SONG TITLES: 0 when off, else SONG TITLE DISPLAY DURATION in seconds. The Guide's
+    music bar shows the song's name when it is on (instead of a note popping up over the menus)."""
     if es_choice("audio.display_titles", "true", text).lower() == "false":
         return 0
     try:
@@ -129,6 +130,8 @@ def line(sock: Path = SOCKET) -> str:
     name = title(sock)
     if not name or (paused and not HELD.exists()):
         return ""       # paused by the rules (a game, your own music): not ours to show
+    if not song_titles():   # Sound settings > DISPLAY SONG TITLES off: the bar says only that music plays
+        return "Paused" if paused else "Playing"
     name = name if len(name) <= 40 else name[:38] + "..."
     return f"{'Paused' if paused else 'Playing'}: {name}"
 

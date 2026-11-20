@@ -233,10 +233,21 @@ def layout(found: list[tuple[str, dict]] | None = None, lights: bool | None = No
                             "batocera-audio setSystemVolume unmute")]),
         Row("Sound output", [chooser(f"python3 {lib}/audioout.py show",
                                      f"python3 {lib}/audioout.py previous", f"python3 {lib}/audioout.py next")]),
+        Row("Menu music", [switch(own("settings", lambda m: "true" if m.on("music.menu") else ""),
+                                  f"python3 {lib}/settings.py set music.menu on",
+                                  f"python3 {lib}/settings.py set music.menu off")]),
         Row("Menu sounds", [chooser(own("menusounds", lambda m: m.chosen_set(m.settings.get("ui.sound_set"), m.sets(m.es_text()))),
                                     f"{sounds} previous", f"{sounds} next")]),
         Row("Menu sound volume", [stepper(own("settings", lambda m: m.get("ui.sound_volume")),
                                           f"{sounds} volume -10", f"{sounds} volume +10")]),
+    ]
+    pair = (f"python3 {lib}/notice.py 'Pairing: hold the pair button on the controller until its light flashes "
+            f"(B stops looking)' -- python3 {lib}/btstatus.py pair")
+    settings += [
+        heading("Bluetooth"),
+        Row("Adapter", [text(own("btstatus", lambda m: m.adapter()))]),
+        Row("Controllers", [text(own("btstatus", lambda m: m.pads()))]),
+        Row("Pair a controller", [button("Pair", pair, close=True)]),
     ]
     if lights:
         settings += [

@@ -40,7 +40,7 @@ class GuideTests(unittest.TestCase):
     def test_the_tabs_and_what_is_in_them(self):
         self.assertEqual([t.title for t in self.tabs], ["Running", "Settings", "Apps", "Capture"])
         settings = {row.label: row.controls for row in self.tabs[1].rows}
-        self.assertEqual(list(settings), ["Sound", "Volume", "Mute", "Sound output", "Menu sounds", "Menu sound volume",
+        self.assertEqual(list(settings), ["Sound", "Volume", "Mute", "Sound output", "Menu music", "Menu sounds", "Menu sound volume", "Bluetooth", "Adapter", "Controllers", "Pair a controller",
                                           "RGB Hub", "Follow the game", "PC lights", "Keyboard lights", "PC brightness",
                                           "Keyboard brightness", "Default look",
                                           "System", "Power", "Plane mode", "Stuck emulator?", "Everything else"])
@@ -841,13 +841,37 @@ class FrontendMusicTests(unittest.TestCase):
         self.assertEqual(music.song_titles('<bool name="audio.display_titles" value="false" />'), 0)
         self.assertEqual(music.song_titles('<int name="audio.display_titles_time" value="4" />'), 4)
 
-    def test_music_volume_and_song_titles_follow_as_they_change(self):
-        said, shown, state = [], [], {}
-        with mock.patch.object(music, "ask", lambda *a, **k: said.append(a)), \
-             mock.patch.object(music, "title", lambda: "Song A"), \
-             mock.patch.object(audio.subprocess, "Popen", lambda cmd, **k: shown.append(cmd[-2:])):
-            audio.follow_music_settings('<int name="MusicVolume" value="30" />', True, state)
-            audio.follow_music_settings('<int name="MusicVolume" value="30" />', True, state)
-            audio.follow_music_settings('<int name="MusicVolume" value="50" />', True, state)
+    def test_music_volume_follows_as_it_changes(self):
+        said, state = [], {}
+        with mock.patch.object(music, "ask", lambda *a, **k: said.append(a)):
+            for level in ("30", "30", "50"):
+                audio.follow_music_settings(f'<int name="MusicVolume" value="{level}" />', True, state)
         self.assertEqual(said, [("set_property", "volume", 30), ("set_property", "volume", 50)])
-        self.assertEqual(shown, [["Now playing: Song A", "10"]])                 # once per song
+
+    def test_frontend_music_changes_are_copied_onto_the_guides_switch(self):
+        on, off = '<bool name="audio.bgmusic" value="true" />', '<bool name="audio.bgmusic" value="false" />'
+        with tempfile.TemporaryDirectory() as folder:
+            seen, conf = Path(folder) / "seen", Path(folder) / "settings.conf"
+            with mock.patch.object(settings, "FILE", conf), mock.patch.object(settings, "BATOCERA", Path(folder) / "none"):
+                settings.write("music.menu", "off")                         # switched off in the Guide
+                self.assertFalse(audio.follow_frontend_music(on, seen))      # first look: nothing changed
+                self.assertFalse(audio.follow_frontend_music(on, seen))      # Batocera writes its old value back
+                self.assertEqual(settings.get("music.menu"), "off")          # the Guide's choice stays
+                self.assertTrue(audio.follow_frontend_music(off, seen))      # changed in Batocera's menu
+                self.assertTrue(audio.follow_frontend_music(on, seen))
+                self.assertEqual(settings.get("music.menu"), "on")           # copied onto the Guide's switch
+
+
+class PadCheckTests(unittest.TestCase):
+    def test_a_controller_known_only_by_name_is_noticed(self):
+        import padcheck
+        self.assertEqual(padcheck.guid(0x5, 0x45e, 0xb22, 0x523), "050000005e040000220b000023050000")
+        known = [("Xbox Wireless Controller", "050000005e040000220b000023050000")]
+        real_pad = padcheck.guid(0x5, 0x45e, 0x28e, 0x1130)
+        self.assertTrue(padcheck.guessed("Xbox Wireless Controller", real_pad, known))      # borrowed by name
+        self.assertFalse(padcheck.guessed("Xbox Wireless Controller", known[0][1], known))  # its own entry
+        self.assertFalse(padcheck.guessed("Some Other Pad", real_pad, known))               # nothing to borrow
+        with tempfile.TemporaryDirectory() as folder:
+            cfg = Path(folder) / "es_input.cfg"
+            cfg.write_text('<inputList>\n\t<inputConfig type="joystick" deviceName="Pad" deviceGUID="ABC">\n</inputList>\n')
+            self.assertEqual(padcheck.entries([cfg, Path(folder) / "none"]), [("Pad", "abc")])

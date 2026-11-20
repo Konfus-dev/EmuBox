@@ -108,10 +108,10 @@ phone app.)
 **Batocera's own Sound settings work as they say**, although EmuBox plays the menu music and the
 menu sounds itself:
 
-- **FRONTEND MUSIC** turns the menu music on and off (Batocera's own player is kept from finding
-  the songs, so only one ever plays), **MUSIC VOLUME** sets how loud it is, **STOP MUSIC ON
-  SCREENSAVER** pauses it while the screensaver shows, and **DISPLAY SONG TITLES** (with **SONG
-  TITLE DISPLAY DURATION**) shows each new song's name at the top of the screen.
+- **FRONTEND MUSIC** turns the menu music on and off, like the Guide's **Menu music** switch:
+  changing either one counts (Batocera's own player is kept from finding the songs, so only one
+  ever plays). **MUSIC VOLUME** sets how loud it is, **STOP MUSIC ON SCREENSAVER** pauses it while
+  the screensaver shows, and **DISPLAY SONG TITLES** puts the song's name in the Guide's music bar.
 - **ENABLE NAVIGATION SOUNDS** turns every menu sound off, EmuBox's included.
 - Not followed yet: **PLAY SYSTEM-SPECIFIC MUSIC** and **LOWER MUSIC WHEN PLAYING VIDEO**.
 
@@ -121,8 +121,11 @@ menus stays, also when you run the installer again.
 
 **Guide** opens EmuBox's own quick menu, over the menus or a running game:
 
-- **Settings**: the system volume and mute, the **sound output** (TV, speakers, headphones: every
-  output Batocera knows, kept for the next start), the menu sound set and its volume, the lights' basics
+- **Settings**: the system volume and mute, the **sound output** (by the names you know them by:
+  the TV's own name, your headphones'; kept for the next start), the **menu music** on or off, the
+  menu sound set and its volume, **Bluetooth** (is the adapter working, which controllers are
+  connected and their battery, and **Pair a controller**: hold the controller's pair button, B
+  stops looking), the lights' basics
   (following the game, on/off and brightness for the PC and the keyboard, saving the look as the Default),
   power mode, plane mode, stopping a stuck emulator, and **Open full settings** (Batocera's main menu).
 - **Apps**: open an app or a tool, or hide the apps and go back. **Capture**: take a screenshot (the menu
@@ -212,7 +215,9 @@ See [docs/extending.md](extending.md).
   minute after start-up it notes the connected controllers and the Bluetooth adapter's state (is it
   there and powered, what is paired): the place to look when a controller has odd buttons or will
   not connect.
-- If a controller's buttons all do the wrong thing, look in `system/configs/emulationstation/es_input.cfg`
+- When Batocera has no layout of a controller's own but borrows one by its name, a note on screen
+  says its buttons may be wrong and where to set them up (Start > Controller settings > Controller
+  mapping). If a controller's buttons all do the wrong thing, also look in `system/configs/emulationstation/es_input.cfg`
   for an entry with the controller's name but another id: Batocera falls back to an entry with the
   same name when it has no exact one, and uses that entry's button numbers. (The test VM's layout
   for the Xbox pad did that once; it is now only added inside the VM, by `lib/vmpads.py`.)

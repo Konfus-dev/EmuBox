@@ -360,6 +360,9 @@ def listen() -> int:
                     ours = "EmuBox" in device.name or "hotkeys" in device.name   # pretend devices: never real presses
                     if (SOUTH in keys or (ENTER in keys and ESCAPE in keys)) and not ours:
                         pads[path] = device
+                        # Is Batocera only guessing this controller's buttons? (padcheck.py says so on screen)
+                        subprocess.Popen(["python3", str(Path(__file__).with_name("padcheck.py")), path],
+                                         stdout=subprocess.DEVNULL, stderr=sys.stderr, start_new_session=True)
                         selector.register(device, selectors.EVENT_READ)
                     else:
                         device.close()
