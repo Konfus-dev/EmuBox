@@ -54,8 +54,5 @@
       "path": "system/configs/emulationstation/es_features_emubox.cfg",
       "contains": "written by EmuBox"
     }
-  ],
-  "es_settings": {
-    "audio.bgmusic": false
-  }
+  ]
 }

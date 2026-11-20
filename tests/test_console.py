@@ -826,3 +826,10 @@ class AppsOpenThroughTheMenu(unittest.TestCase):
         script = (REPO / "components/console/files/bin/emubox-app").read_text()
         self.assertIn("NO GAME RUNNING", script)          # the menu is asked only when it is free
         self.assertIn('http://127.0.0.1:1234/launch', script)
+
+
+class FrontendMusicTests(unittest.TestCase):
+    def test_batoceras_frontend_music_switch_turns_emuboxs_music_on_and_off(self):
+        self.assertTrue(music.frontend_music('<config>\n</config>'))            # on when never set
+        self.assertFalse(music.frontend_music('\t<bool name="audio.bgmusic" value="false" />'))
+        self.assertTrue(music.frontend_music('\t<bool name="audio.bgmusic" value="true" />'))

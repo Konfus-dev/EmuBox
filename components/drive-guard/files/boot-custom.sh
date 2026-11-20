@@ -83,6 +83,23 @@ exit 0
 PADS
     chmod 755 /etc/init.d/S30emuboxpads
 
+    # --- FRONTEND MUSIC switches EmuBox's music (added 2026-11-19) ---
+    # EmuBox plays the menus' music itself. Batocera's menu program is started through emubox-es,
+    # which hides the music folders from it (lib/esquiet.py), so its own player stays silent and
+    # its FRONTEND MUSIC switch only turns EmuBox's music on and off (lib/audio.py).
+    cat > /usr/bin/emubox-es <<'ES'
+#!/bin/sh
+# EMUBOX (written by /boot/boot-custom.sh): start the menu program without its own music.
+f=/userdata/system/emubox/lib/esquiet.py
+[ -f "$f" ] && exec python3 "$f" "$@"
+exec "$@"
+ES
+    chmod 755 /usr/bin/emubox-es
+    E=/usr/bin/emulationstation-standalone
+    if [ -f "$E" ] && ! grep -q "emubox-es emulationstation" "$E"; then
+        sed -i 's/dbus-run-session -- emulationstation /dbus-run-session -- emubox-es emulationstation /' "$E"
+    fi
+
     # --- EmuBox's look from the first moment (added 2026-11-19) ---
     # Batocera's logo is the first thing on screen (S03system-splash, just after this file runs).
     # EmuBox's own loading picture takes its place, in memory only: the boot guard keeps a copy on

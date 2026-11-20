@@ -322,6 +322,15 @@ class ComponentTests(Drive):
         import xml.etree.ElementTree as ET
         self.assertEqual(len(ET.fromstring(text)), 1)
 
+    def test_frontend_music_becomes_emuboxs_music_switch_once(self):
+        es = self.root / "system/configs/emulationstation/es_settings.cfg"
+        run(self.root, "--yes", "--with", "discord")
+        self.assertIn('name="audio.bgmusic" value="true"', es.read_text())   # was forced off before
+        text = es.read_text().replace('name="audio.bgmusic" value="true"', 'name="audio.bgmusic" value="false"')
+        es.write_text(text)                                                  # you turn it off
+        run(self.root, "--yes", "--with", "discord")
+        self.assertIn('name="audio.bgmusic" value="false"', es.read_text())  # and it stays off
+
     @staticmethod
     def repo_vmpads():
         import importlib.util

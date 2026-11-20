@@ -124,7 +124,8 @@ def listing(what: str) -> list[dict]:
 
 
 def look(words: list[str], state: dict) -> list[list[str]]:
-    switches = settings.read()
+    switches = dict(settings.read())
+    switches["music.menu"] = "on" if music.frontend_music() else "off"   # Sound settings > FRONTEND MUSIC
     playing = listing("sink-inputs")
     commands = plan(playing, listing("source-outputs"), words, switches, state)
     for command in commands:

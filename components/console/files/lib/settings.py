@@ -30,7 +30,8 @@ KNOWN = {
     "ui.sound.select": ("on", "CHOOSING", "switch", "A sound when you choose something."),
     "ui.sound.back": ("on", "GOING BACK", "switch", "A sound when you go back."),
     "ui.sound.menuopen": ("on", "OPENING THE MENU", "switch", "A sound when the main menu opens."),
-    "music.menu": ("on", "MENU MUSIC", "switch", "Background music in the menus (Batocera's songs, or yours in the music folder)."),
+    # Menu music on/off is Batocera's own Sound settings > FRONTEND MUSIC switch now (audio.py).
+    "music.menu": ("on", "MENU MUSIC", "", "Background music in the menus (Batocera's songs, or yours in the music folder)."),
     "music.quiet_menu": ("on", "PAUSE IT WHILE MY MUSIC PLAYS", "switch", "While a music app plays, the menu music waits."),
     "call.lower_music": ("on", "TURN MUSIC DOWN DURING A CALL", "switch", "While an app uses the microphone, music and menus drop in volume."),
     "call.music_volume": ("20", "MUSIC VOLUME DURING A CALL", "slider", "How loud music stays during a call."),

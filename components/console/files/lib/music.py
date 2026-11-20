@@ -40,6 +40,19 @@ def songs(folders=FOLDERS) -> list[str]:
     return found
 
 
+def frontend_music(text: str | None = None) -> bool:
+    """Batocera's Sound settings > FRONTEND MUSIC switch, which turns this music on and off
+    (Batocera's own player finds no songs: esquiet.py). On when never set, like Batocera."""
+    import re
+    if text is None:
+        try:
+            text = ES_SETTINGS.read_text(errors="replace")
+        except OSError:
+            text = ""
+    found = re.search(r'name="audio\.bgmusic" value="(\w+)"', text)
+    return found is None or found.group(1).lower() in ("true", "1", "on")
+
+
 def volume(text: str | None = None) -> int:
     """The music volume chosen in Batocera's sound settings (65 when never set)."""
     import re
