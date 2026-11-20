@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- EmuBox's game-start screen, in place of Batocera's: the game's own picture under a dark green
+     veil, its name in the menus' lettering, and the orb's holder turning while the game loads. -->
+<theme>
+  <formatVersion>7</formatVersion>
+  <view name="splash">
+    <splash name="splash">
+      <backgroundColor>000000FF</backgroundColor>
+    </splash>
+    <image name="background">
+      <pos>0.5 0.5</pos>
+      <origin>0.5 0.5</origin>
+      <minSize>1 1</minSize>
+      <linearSmooth>true</linearSmooth>
+      <color>707870FF</color>
+    </image>
+    <image name="veil" extra="true">
+      <path>./art/white.png</path>
+      <pos>0 0</pos>
+      <origin>0 0</origin>
+      <size>1 1</size>
+      <color>01140170</color>
+      <zIndex>5</zIndex>
+    </image>
+    <image name="darken" extra="true">
+      <path>./art/white.png</path>
+      <pos>0 0.6</pos>
+      <origin>0 0</origin>
+      <size>1 0.4</size>
+      <color>00000000</color>
+      <colorEnd>000800F0</colorEnd>
+      <zIndex>8</zIndex>
+    </image>
+    <image name="holder" extra="true">
+      <path>./art/rings_a.png</path>
+      <pos>0.925 0.86</pos>
+      <origin>0.5 0.5</origin>
+      <maxSize>0.12 0.2</maxSize>
+      <linearSmooth>true</linearSmooth>
+      <zIndex>10</zIndex>
+      <storyboard>
+        <animation property="rotation" from="0" to="360" duration="2400" mode="linear" repeat="forever"/>
+      </storyboard>
+    </image>
+    <image name="orb" extra="true">
+      <path>./art/plasma_outer.png</path>
+      <pos>0.925 0.86</pos>
+      <origin>0.5 0.5</origin>
+      <maxSize>0.073 0.122</maxSize>
+      <linearSmooth>true</linearSmooth>
+      <zIndex>11</zIndex>
+    </image>
+    <image name="orbShine" extra="true">
+      <path>./art/shell.png</path>
+      <pos>0.925 0.86</pos>
+      <origin>0.5 0.5</origin>
+      <maxSize>0.073 0.122</maxSize>
+      <linearSmooth>true</linearSmooth>
+      <zIndex>12</zIndex>
+    </image>
+    <text name="brand" extra="true">
+      <text>EMUBOX</text>
+      <fontPath>./art/fonts/Michroma-Regular.ttf</fontPath>
+      <fontSize>0.026</fontSize>
+      <color>c8f03cFF</color>
+      <pos>0.986 0.037</pos>
+      <origin>1 0.5</origin>
+      <size>0.3 0.05</size>
+      <alignment>right</alignment>
+      <zIndex>20</zIndex>
+    </text>
+    <text name="label">
+      <fontPath>./art/fonts/Michroma-Regular.ttf</fontPath>
+      <fontSize>0.04</fontSize>
+      <color>d6f9b8FF</color>
+      <pos>0.04 0.80</pos>
+      <size>0.78 0.12</size>
+      <alignment>left</alignment>
+      <forceUppercase>1</forceUppercase>
+      <glowColor>2f7d1e60</glowColor>
+      <glowSize>3</glowSize>
+      <zIndex>20</zIndex>
+    </text>
+  </view>
+</theme>

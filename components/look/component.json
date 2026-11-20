@@ -23,13 +23,18 @@
     {
       "from": "files/splash/emubox.mp4",
       "to": "system/emubox/splash/emubox.mp4"
+    },
+    {
+      "from": "files/boot/boot-logo.png",
+      "to": "system/emubox/boot/boot-logo.png"
     }
   ],
   "es_settings": {
     "ThemeSet": "emubox",
     "EnableSounds": true,
     "SplashScreen": false,
-    "SplashScreenProgress": false
+    "SplashScreenProgress": false,
+    "HideWindow": false
   },
   "replaces": [
     "themes/classic-dash",

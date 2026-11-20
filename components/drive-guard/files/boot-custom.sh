@@ -67,6 +67,31 @@ exec /etc/init.d/.S28splash.batocera "$@"
 SPLASH
         chmod 755 "$S"
     fi
+
+    # --- EmuBox's look from the first moment (added 2026-11-19) ---
+    # Batocera's logo is the first thing on screen (S03system-splash, just after this file runs).
+    # EmuBox's own loading picture takes its place, in memory only: the boot guard keeps a copy on
+    # this partition as /boot/emubox-boot-logo.png.
+    if [ -f /boot/emubox-boot-logo.png ]; then
+        for f in /usr/share/batocera/splash/boot-logo.png /usr/share/batocera/splash/boot-logo-4x3.png; do
+            [ -e "$f" ] && cp /boot/emubox-boot-logo.png "$f"
+        done
+    fi
+    # The boot menu on this drive stays hidden (Esc still shows it) and does not print
+    # "Booting Batocera.linux...". Only this drive's own grub.cfg is changed, and again after an
+    # update puts Batocera's back.
+    for g in /boot/EFI/BOOT/grub.cfg /boot/EFI/batocera/grub.cfg; do
+        [ -f "$g" ] || continue
+        if grep -q '^[[:space:]]*echo Booting Batocera' "$g" || ! grep -q '^set timeout_style=hidden' "$g"; then
+            if mount -o remount,rw /boot; then
+                sed -i -e '/^[[:space:]]*echo Booting Batocera/d' -e '/^set timeout=/{n;/^set timeout_style=hidden/!i set timeout_style=hidden
+}' "$g"
+                sync
+                mount -o remount,ro /boot
+                echo "$(date '+%F %T') boot menu: hid it and its message in $g" >> /var/log/emubox-boot.log
+            fi
+        fi
+    done
     exit 0
 fi
 
@@ -75,9 +100,9 @@ fi
 # them at the next start, which would remove this file. Shutdown (the reboot after an update
 # included) takes it off that list. EmuBox's emubox_bootguard service and the EmuBox boot loader
 # also put it back when it is missing.
-if [ "$1" = "stop" ] && [ -f /boot/boot.stale ] && grep -q '^boot-custom' /boot/boot.stale; then
+if [ "$1" = "stop" ] && [ -f /boot/boot.stale ] && grep -q -e '^boot-custom' -e '^emubox-boot-logo' /boot/boot.stale; then
     if mount -o remount,rw /boot; then
-        grep -v '^boot-custom' /boot/boot.stale > /tmp/boot.stale.kept
+        grep -v -e '^boot-custom' -e '^emubox-boot-logo' /boot/boot.stale > /tmp/boot.stale.kept
         cat /tmp/boot.stale.kept > /boot/boot.stale
         sync
         mount -o remount,ro /boot

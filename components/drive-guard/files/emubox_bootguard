@@ -19,6 +19,16 @@ if [ -f "$SRC" ] && ! cmp -s "$SRC" "$DST"; then
     fi
 fi
 
+# EmuBox's start-up picture (from the look), which /boot/boot-custom.sh shows instead of
+# Batocera's logo. It has to be on /boot: the games partition is not there yet when it is shown.
+LOGO=/userdata/system/emubox/boot/boot-logo.png
+if [ -f "$LOGO" ] && ! cmp -s "$LOGO" /boot/emubox-boot-logo.png; then
+    if mount -o remount,rw /boot; then
+        cp "$LOGO" /boot/emubox-boot-logo.png && sync && say "put EmuBox's start-up picture on /boot"
+        mount -o remount,ro /boot
+    fi
+fi
+
 # Anything mounted under /media from a disk that is not on USB came from the PC's own disks
 # (Windows, another Linux) while the guard was missing: let go of it.
 for mp in /media/*; do

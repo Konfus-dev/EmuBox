@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- EmuBox's loading screen, in place of Batocera's: shown when the menus load, reload, shut down
+     or restart. The same picture as the very first one at start-up (tools/loading.py). -->
+<theme>
+  <formatVersion>7</formatVersion>
+  <view name="splash">
+    <splash name="splash">
+      <backgroundColor>000000FF</backgroundColor>
+    </splash>
+    <image name="background">
+      <path>./art/loading.png</path>
+      <pos>0.5 0.5</pos>
+      <origin>0.5 0.5</origin>
+      <size>1 1</size>
+      <linearSmooth>true</linearSmooth>
+    </image>
+    <text name="label">
+      <fontPath>./art/fonts/Michroma-Regular.ttf</fontPath>
+      <fontSize>0.022</fontSize>
+      <color>8fc878FF</color>
+      <pos>0 0.865</pos>
+      <size>1 0.04</size>
+      <alignment>center</alignment>
+      <forceUppercase>1</forceUppercase>
+      <glowColor>00000000</glowColor>
+      <glowSize>0</glowSize>
+    </text>
+    <image name="progressbar">
+      <origin>0 0</origin>
+      <pos>0.4 0.92</pos>
+      <size>0.2 0.006</size>
+      <color>124a10FF</color>
+      <colorEnd>124a10FF</colorEnd>
+      <roundCorners>0</roundCorners>
+    </image>
+    <image name="progressbar:active">
+      <path>./art/white.png</path>
+      <color>c8f03cFF</color>
+      <colorEnd>8fdc28FF</colorEnd>
+    </image>
+  </view>
+</theme>

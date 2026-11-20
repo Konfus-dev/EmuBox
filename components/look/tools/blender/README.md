@@ -7,6 +7,8 @@
 - `rings_a.png`: what holds the orb (drawn behind it; rendered solid, then faded as one piece so overlaps never double up): a thick ring with four loop clips, and four curved, see-through
   shell arms that leave the clips, reach the orb's edge and curl over its front, gripping it. The theme turns it a quarter
   turn on each move, so all four quarters are alike and it is lit evenly.
+- `film` (not run by default): the start-up film's moving tunnel, one JPEG per frame; `tools/splash.py`
+  runs it and lays the orb, holder and name over it.
 - `row_arm.png`: the small metal arm joining each menu row's pod to its bar, seen from the side
   (`art.py` builds the rows from it, so render this first).
 

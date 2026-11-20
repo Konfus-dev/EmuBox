@@ -321,7 +321,7 @@ def row_arm(scene, width=300, height=160):
     bpy.ops.render.render(write_still=True)
 
 
-def wall(scene, name, brightness, centre=(0.0, 0.0)):
+def wall(scene, name, brightness, centre=(0.0, 0.0), render=True):
     """The tunnel of cells: the inside of a globe covered in the cell tile, glowing green, dark
     straight ahead and brighter towards the sides, seen from near its middle towards a pole."""
     scene.render.resolution_x, scene.render.resolution_y = 1920, 1080
@@ -392,10 +392,35 @@ def wall(scene, name, brightness, centre=(0.0, 0.0)):
     bpy.context.collection.objects.link(obj)
     scene.camera = obj
     scene.cycles.samples = 24
+    if not render:
+        return obj
     scene.render.filepath = str(OUT / name)
     bpy.ops.render.render(write_still=True)
+    return obj
 
 
+def film_tunnel(scene, seconds=5.4, fps=30):
+    """The start-up film's moving tunnel (tools/splash.py lays the orb and the name over it): the
+    camera starts deep down the tunnel looking straight along it, and backs out to where the home
+    screen's picture is taken from, turning to it, slowing as it arrives. One JPEG per frame."""
+    cam = wall(scene, "", 0.45, centre=(25, -2), render=False)
+    scene.render.resolution_x, scene.render.resolution_y = 1280, 720
+    scene.render.image_settings.quality = 90
+    scene.cycles.samples = 16
+    end_rot = cam.rotation_euler.copy()
+    count = int(seconds * fps)
+    arrive = int(3.4 * fps)                                  # at rest from here (the flare and the name follow)
+    for f in range(count):
+        t = min(1.0, f / arrive)
+        e = 1 - (1 - t) ** 3                                 # fast at first, easing in to rest
+        cam.location = (0, 0, 330 * (1 - e) - 4.67 * e)
+        cam.rotation_euler = (math.radians(180) + (end_rot.x - math.radians(180)) * e, end_rot.y * e, 0)
+        scene.render.filepath = str(OUT / f"t{f:04d}.jpg")
+        bpy.ops.render.render(write_still=True)
+
+
+if "film" in WANTED:
+    film_tunnel(fresh())
 if "claw" in WANTED:
     claw(fresh())
 if "rowarm" in WANTED:
