@@ -9,6 +9,9 @@
 """
 import argparse, getpass, os, re, shutil, subprocess, sys
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+from installer.target import verified_copy  # noqa: E402
+
 PATCH_EXTS = (".ips", ".bps", ".ups")
 # File types that mean one console in practice even though several folders accept them.
 PREFER = {".sfc": "snes", ".smc": "snes", ".nes": "nes", ".gb": "gb", ".gbc": "gbc", ".gba": "gba",
@@ -56,6 +59,20 @@ def pick_system(path, forced, exts):
     return None, "'%s' files fit several consoles (%s) - add  -s <console>" % (e, shown)
 
 
+def copy_checked(source, dest):
+    """Copy a game (a file, or a folder of them) onto the drive. Each file is checked (size and
+    checksum, read back from the drive) before it takes its place, so a game already there is
+    replaced (--force) only by a good copy, and the source is only ever read."""
+    if not os.path.isdir(source):
+        verified_copy(source, dest)
+        return
+    for root, _, names in os.walk(source):
+        there = os.path.join(dest, os.path.relpath(root, source))
+        os.makedirs(there, exist_ok=True)
+        for n in sorted(names):
+            verified_copy(os.path.join(root, n), os.path.join(there, n))
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("paths", nargs="*", help="game files, folders, or patch files")
@@ -91,7 +108,7 @@ def main():
         name = os.path.basename(os.path.normpath(f))
         if name.lower().endswith(PATCH_EXTS) and not a.system:
             os.makedirs(os.path.join(drive, "patches"), exist_ok=True)
-            shutil.copy2(f, os.path.join(drive, "patches", name))
+            verified_copy(f, os.path.join(drive, "patches", name))
             patches += 1
             continue
         system, why = pick_system(f, a.system, exts)
@@ -111,12 +128,13 @@ def main():
             skipped += 1
             continue
         try:
-            if os.path.isdir(f):
-                shutil.copytree(f, dest, dirs_exist_ok=True)
-            else:
-                shutil.copy2(f, dest)
+            copy_checked(f, dest)
         except PermissionError:
             sys.exit("No permission to write to %s" % os.path.dirname(dest))
+        except OSError as problem:   # the copy did not check out: what was on the drive is as it was
+            print("FAILED %s: %s" % (name, problem))
+            skipped += 1
+            continue
         print("ADDED %s -> roms/%s" % (name, system))
         added += 1
     if patches or added:

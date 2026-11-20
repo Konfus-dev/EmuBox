@@ -6,6 +6,7 @@ is the part Batocera's own updates leave alone.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -108,6 +109,45 @@ def label_problem(folder: Path, parts: list[dict] | None = None) -> str:
     return (f"{part['path']} holds Batocera's data but is {label}, not {DATA_LABEL}. Batocera then takes it for "
             f"a second drive and moves every game out of sight (into .roms_base). Nothing was changed. "
             f"Its label has to be {DATA_LABEL} again before EmuBox works on it.")
+
+
+def _sha256_of(path: Path) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as file:
+        while chunk := file.read(1 << 20):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def verified_copy(source: Path, destination: Path) -> None:
+    """Copy a file so that nothing is lost on the way: it is written beside the destination under a
+    temporary name, flushed to the drive and read back from it (not from memory: a drive that only
+    pretends to be large hands back other data), and only when size and checksum match the
+    original does it take the destination's place. Until then a file already there is untouched,
+    and the source is only ever read. Raises OSError when the copy does not check out."""
+    source, destination = Path(source), Path(destination)
+    part = destination.with_name(f".{destination.name}.emubox-part")
+    digest, size = hashlib.sha256(), 0
+    try:
+        with open(source, "rb") as reading, open(part, "wb") as writing:
+            while chunk := reading.read(1 << 20):
+                digest.update(chunk)
+                size += len(chunk)
+                writing.write(chunk)
+            writing.flush()
+            os.fsync(writing.fileno())
+            if hasattr(os, "posix_fadvise"):   # forget the cached copy, so it is read back from the drive
+                os.posix_fadvise(writing.fileno(), 0, 0, os.POSIX_FADV_DONTNEED)
+        if part.stat().st_size != size or _sha256_of(part) != digest.hexdigest():
+            raise OSError(f"{destination.name}: the copy did not match the original (the drive may be failing); "
+                          "nothing was replaced")
+        try:
+            shutil.copystat(source, part)       # its date, as a plain copy keeps it
+        except OSError:
+            pass
+        os.replace(part, destination)
+    finally:
+        part.unlink(missing_ok=True)
 
 
 def main_drive() -> str:
@@ -223,6 +263,15 @@ class Target:
         self.make_dir(destination.parent)
         shutil.copyfile(source, destination)
         os.chmod(destination, mode if mode is not None else 0o644)
+        self._adopt(destination)
+        return relative
+
+    def copy_verified(self, source: Path, relative: str) -> str:
+        """Copy one of your files in (a game, a BIOS file): checked before it replaces anything."""
+        destination = self.path(relative)
+        self.make_dir(destination.parent)
+        verified_copy(source, destination)
+        os.chmod(destination, 0o644)
         self._adopt(destination)
         return relative
 

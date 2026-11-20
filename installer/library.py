@@ -10,13 +10,12 @@ from __future__ import annotations
 
 import hashlib
 import re
-import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
 from . import gamelist, systems
-from .target import Target
+from .target import Target, verified_copy
 
 MEDIA_FOLDERS = ("images", "videos", "manuals")
 NOT_CONTENT = {"_info.txt", "gamelist.xml", "MANIFEST.tsv", "README.md", "README.txt", "LICENSE", *MEDIA_FOLDERS}
@@ -133,9 +132,7 @@ def _copy(source: Path, relative: str, target: Target, say: Callable[[str], None
     if _already_there(source, target.path(relative)):
         return
     say(f"    {source.name} ({human(source.stat().st_size)})")
-    target.copy_file(source, relative)
-    if not _already_there(source, target.path(relative)):
-        raise OSError(f"{relative} did not copy completely")
+    target.copy_verified(source, relative)   # a game already there is replaced only by a checked copy
 
 
 def install(library: Library, selection: Selection, target: Target, say: Callable[[str], None]) -> None:
@@ -189,7 +186,7 @@ def backup(selection: Selection, destination: Path, say: Callable[[str], None]) 
                 continue
             say(f"    {inside} ({human(file.stat().st_size)})")
             copy_to.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(file, copy_to)
+            verified_copy(file, copy_to)
     write_index(destination, say)
 
 

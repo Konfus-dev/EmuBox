@@ -3,7 +3,11 @@
 #   batocera-backup [data folder]     (default: found by batocera-drive)
 DRIVE=$("$(dirname "$(readlink -f "$0")")/batocera-drive" ${1:+"$1"}) || exit 1
 DEST="$HOME/Batocera-Backups/$(date +%Y-%m-%d_%H%M)"
-mkdir -p "$DEST/system" || exit 1
+# Always a new folder: an earlier backup is never written over. Nothing is ever deleted, on the
+# drive or here (no --delete), and rsync checks each file's checksum as it copies it.
+mkdir -p "$(dirname "$DEST")" || exit 1
+mkdir "$DEST" 2>/dev/null || { echo "A backup from this minute is already in $DEST; try again in a minute." >&2; exit 1; }
+mkdir "$DEST/system" || exit 1
 # flatpak holds installed launchers/games, not save files worth copying
 rsync -a --exclude='flatpak/' "$DRIVE/saves" "$DRIVE/screenshots" "$DEST/" || exit 1
 rsync -a "$DRIVE/system/batocera.conf" "$DEST/system/" || exit 1

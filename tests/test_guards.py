@@ -499,3 +499,123 @@ class VmToolTests(unittest.TestCase):
         self.assertNotIn("chose", done.stdout)
         self.assertIn("No removable drive", done.stderr)
         self.assertNotEqual(self.choose("--wrte", disks=both).returncode, 0)    # a typo is not write mode
+
+
+# --- a file of yours is replaced only by a checked copy ---------------------------------------
+
+class CopyTests(unittest.TestCase):
+    """Games, BIOS files and backups: nothing is deleted or replaced until its copy is checked
+    (size and checksum, read back from the drive), and a source is only ever read."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.folder = Path(self.tmp.name)
+        self.source = self.folder / "library/snes/Game.sfc"
+        self.source.parent.mkdir(parents=True)
+        self.source.write_bytes(b"the new, longer version of the game")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def corrupted(self):
+        """The drive hands back something else than was written (failing, or a fake-capacity stick)."""
+        from unittest import mock
+        from installer import target as target_module
+        real = target_module._sha256_of
+        return mock.patch.object(target_module, "_sha256_of",
+                                 side_effect=lambda path: "0" * 64 if ".emubox-part" in Path(path).name else real(path))
+
+    def leftovers(self) -> list[str]:
+        return [p.name for p in self.folder.rglob("*.emubox-part")]
+
+    def test_a_bad_copy_never_replaces_what_was_there(self):
+        from installer.target import verified_copy
+        destination = self.folder / "drive/Game.sfc"
+        destination.parent.mkdir()
+        destination.write_bytes(b"old game")
+        with self.corrupted(), self.assertRaises(OSError):
+            verified_copy(self.source, destination)
+        self.assertEqual(destination.read_bytes(), b"old game")
+        self.assertEqual(self.source.read_bytes(), b"the new, longer version of the game")
+        self.assertEqual(self.leftovers(), [])
+        verified_copy(self.source, destination)                       # a good copy does replace it
+        self.assertEqual(destination.read_bytes(), self.source.read_bytes())
+        self.assertEqual(self.leftovers(), [])
+
+    def test_installing_games_and_backing_them_up_check_every_copy(self):
+        from installer import library
+        from installer.target import Target
+        drive = self.folder / "drive"
+        for part in ("system", "roms/snes"):
+            (drive / part).mkdir(parents=True)
+        (drive / "system/batocera.conf").write_text("")
+        (drive / "roms/snes/Game.sfc").write_bytes(b"old game")      # another size: it would be replaced
+        games = library.Library(self.folder / "library", "games")
+        selection = [(system, system.items) for system in games.systems()]
+        with self.corrupted(), self.assertRaises(OSError):
+            library.install(games, selection, Target(drive), lambda _line: None)
+        self.assertEqual((drive / "roms/snes/Game.sfc").read_bytes(), b"old game")
+        backup = self.folder / "backup"
+        (backup / "snes").mkdir(parents=True)
+        (backup / "snes/Game.sfc").write_bytes(b"an older backup")
+        on_drive = library.Library(drive, "games")
+        with self.corrupted(), self.assertRaises(OSError):
+            library.backup([(s, s.items) for s in on_drive.systems()], backup, lambda _line: None)
+        self.assertEqual((backup / "snes/Game.sfc").read_bytes(), b"an older backup")
+        self.assertEqual(self.leftovers(), [])
+
+    def test_batocera_add_replaces_a_game_only_with_a_checked_copy(self):
+        import importlib.machinery
+        import importlib.util
+        import io
+        from unittest import mock
+        loader = importlib.machinery.SourceFileLoader("batocera_add", str(REPO / "tools/batocera-add"))
+        spec = importlib.util.spec_from_loader("batocera_add", loader)
+        tool = importlib.util.module_from_spec(spec)
+        loader.exec_module(tool)
+        drive = self.folder / "drive"
+        (drive / "roms/snes").mkdir(parents=True)
+        (drive / "roms/snes/Game.sfc").write_bytes(b"old game")
+        folder_game = self.folder / "library/psx/Big Game"
+        folder_game.mkdir(parents=True)
+        (folder_game / "disc.bin").write_bytes(b"disc")
+        args = ["batocera-add", "--force", "-s", "snes", str(self.source)]
+        with mock.patch.object(tool, "find_drive", return_value=str(drive)), mock.patch("sys.stdout", io.StringIO()) as out:
+            with self.corrupted(), mock.patch("sys.argv", args):
+                tool.main()
+            self.assertIn("FAILED Game.sfc", out.getvalue())
+            self.assertEqual((drive / "roms/snes/Game.sfc").read_bytes(), b"old game")
+            with mock.patch("sys.argv", args):
+                tool.main()
+            self.assertEqual((drive / "roms/snes/Game.sfc").read_bytes(), self.source.read_bytes())
+            with mock.patch("sys.argv", ["batocera-add", "-s", "snes", str(folder_game)]):
+                tool.main()                                             # a game that is a folder
+            self.assertEqual((drive / "roms/snes/Big Game/disc.bin").read_bytes(), b"disc")
+        self.assertTrue(self.source.exists() and (folder_game / "disc.bin").exists())   # sources stay
+        self.assertEqual(self.leftovers(), [])
+
+    def test_batocera_backup_never_deletes_and_never_writes_over_a_backup(self):
+        script = "\n".join(line for line in (REPO / "tools/batocera-backup").read_text().splitlines()
+                           if not line.lstrip().startswith("#"))
+        for never in ("--delete", "--remove-source-files", "rm ", "rmdir", "mv "):
+            self.assertNotIn(never, script)
+        import datetime
+        drive = self.folder / "drive"
+        for part in ("system/configs", "roms", "saves", "screenshots"):
+            (drive / part).mkdir(parents=True)
+        (drive / "system/batocera.conf").write_text("")
+        (drive / "saves/game.srm").write_text("my save")
+        home = self.folder / "home"
+        now = datetime.datetime.now()
+        earlier = []
+        for moment in (now, now + datetime.timedelta(minutes=1)):     # whichever minute it runs in
+            backup = home / "Batocera-Backups" / moment.strftime("%Y-%m-%d_%H%M")
+            (backup / "saves").mkdir(parents=True, exist_ok=True)
+            (backup / "saves/game.srm").write_text("an earlier save")
+            earlier.append(backup / "saves/game.srm")
+        done = subprocess.run(["bash", str(REPO / "tools/batocera-backup"), str(drive)], capture_output=True, text=True,
+                              env={**os.environ, "HOME": str(home)})
+        self.assertNotEqual(done.returncode, 0)
+        self.assertIn("already", done.stderr)
+        self.assertEqual([p.read_text() for p in earlier], ["an earlier save"] * 2)
+        self.assertEqual((drive / "saves/game.srm").read_text(), "my save")
