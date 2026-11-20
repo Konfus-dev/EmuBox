@@ -17,6 +17,7 @@ from __future__ import annotations
 import glob
 import json
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -40,33 +41,28 @@ def songs(folders=FOLDERS) -> list[str]:
     return found
 
 
-def frontend_music(text: str | None = None) -> bool:
-    """Batocera's Sound settings > FRONTEND MUSIC switch, which turns this music on and off
-    (Batocera's own player finds no songs: esquiet.py). On when never set, like Batocera."""
-    import re
-    if text is None:
-        try:
-            text = ES_SETTINGS.read_text(errors="replace")
-        except OSError:
-            text = ""
-    found = re.search(r'name="audio\.bgmusic" value="(\w+)"', text)
-    return found is None or found.group(1).lower() in ("true", "1", "on")
+def es_text() -> str:
+    """Batocera's menu settings file (es_settings.cfg), or nothing when it cannot be read."""
+    try:
+        return ES_SETTINGS.read_text(errors="replace")
+    except OSError:
+        return ""
 
 
 def es_choice(name: str, default: str, text: str | None = None) -> str:
-    """A setting of Batocera's menu program, as es_settings.cfg has it."""
-    import re
-    if text is None:
-        try:
-            text = ES_SETTINGS.read_text(errors="replace")
-        except OSError:
-            text = ""
-    found = re.search(rf'name="{re.escape(name)}" value="([^"]*)"', text)
+    """One setting of Batocera's menu program, as es_settings.cfg has it."""
+    found = re.search(rf'name="{re.escape(name)}" value="([^"]*)"', es_text() if text is None else text)
     return found.group(1) if found else default
 
 
+def frontend_music(text: str | None = None) -> bool:
+    """Batocera's Sound settings > FRONTEND MUSIC switch, which turns this music on and off
+    (Batocera's own player finds no songs: esquiet.py). On when never set, like Batocera."""
+    return es_choice("audio.bgmusic", "true", text).lower() in ("true", "1", "on")
+
+
 def stops_for_screensaver(text: str | None = None) -> bool:
-    """Sound settings... STOP MUSIC ON SCREENSAVER (on unless turned off, like Batocera)."""
+    """STOP MUSIC ON SCREENSAVER (on unless turned off, like Batocera)."""
     return es_choice("StopMusicOnScreenSaver", "true", text).lower() != "false"
 
 
@@ -81,15 +77,11 @@ def song_titles(text: str | None = None) -> int:
 
 
 def volume(text: str | None = None) -> int:
-    """The music volume chosen in Batocera's sound settings (65 when never set)."""
-    import re
-    if text is None:
-        try:
-            text = ES_SETTINGS.read_text(errors="replace")
-        except OSError:
-            text = ""
-    found = re.search(r'name="MusicVolume" value="(\d+)"', text)
-    return max(0, min(100, int(found.group(1)))) if found else 65
+    """MUSIC VOLUME in Batocera's sound settings (65 when never set)."""
+    try:
+        return max(0, min(100, int(float(es_choice("MusicVolume", "65", text)))))
+    except ValueError:
+        return 65
 
 
 def ask(*command, sock: Path = SOCKET):

@@ -9,7 +9,6 @@ import importlib.util
 from pathlib import Path
 
 FILE = "system/configs/emulationstation/es_input.cfg"
-ES_SETTINGS = "system/configs/emulationstation/es_settings.cfg"
 MUSIC_MOVED = "system/emubox/music-switch-moved"   # the switch below was moved once already
 EMUBOX_SETTINGS = "system/configs/emubox/settings.conf"
 

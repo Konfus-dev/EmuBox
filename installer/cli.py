@@ -474,7 +474,7 @@ def run_install(args, target: Target, ask: Prompts) -> None:
             raise Stop("Nothing was changed.")
 
         ask.say()
-        with menu_paused(target, any(c.spec.get("es_settings") for c in chosen), ask.say):
+        with menu_paused(target, any(components.changes_menu_settings(c) for c in chosen), ask.say):
             before = components.retire_old_names(target)
             if before:
                 ask.say(f"This drive had RetroBox, EmuBox's old name. Taken off: {', '.join(sorted(before))}.")

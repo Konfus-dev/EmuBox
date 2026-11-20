@@ -12,6 +12,7 @@ from __future__ import annotations
 import io
 import re
 import tarfile
+import time
 from pathlib import Path
 
 HOST_PAIRINGS = Path("/var/lib/bluetooth")
@@ -72,7 +73,7 @@ def install(env) -> None:
         def add_folder(name: str, mode: int = 0o700) -> None:
             if name not in names:
                 folder = tarfile.TarInfo(name)
-                folder.type, folder.mode = tarfile.DIRTYPE, mode
+                folder.type, folder.mode, folder.mtime = tarfile.DIRTYPE, mode, time.time()
                 new.addfile(folder)
                 names.add(name)
 
@@ -89,7 +90,8 @@ def install(env) -> None:
                     text = source.read_text()
                 data = text.encode()
                 entry = tarfile.TarInfo(f"bluetooth/{device.parent.name}/{device.name}/{file_name}")
-                entry.size, entry.mode = len(data), 0o600
+                # the pairing's own date, so a tool comparing copies (bt-share) knows how new it is
+                entry.size, entry.mode, entry.mtime = len(data), 0o600, source.stat().st_mtime if source.exists() else time.time()
                 new.addfile(entry, io.BytesIO(data))
             env.say(f"  {_name(info)}")   # the name only; the keys are never shown
     archive_path.chmod(0o600)

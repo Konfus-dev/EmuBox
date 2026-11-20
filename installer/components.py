@@ -33,6 +33,7 @@ component.json:
     services       Batocera services to switch on
     batocera_conf  {"key": "value"} settings for batocera.conf
     es_settings    {"name": "value"} settings of the menu program
+    changes_es_settings  true when the component's own install step changes them
     batocera_defaults, es_defaults
                    the same, but only set when the component is first put on a drive: they
                    are starting choices the user can change in Batocera's menus, and a later
@@ -237,6 +238,13 @@ def _fill(value, typed: dict[str, str]):
     return value
 
 
+def changes_menu_settings(component: Component) -> bool:
+    """Does installing this change es_settings.cfg? (Batocera's menu must be stopped for that.)
+    A component's own install step can change them too: it says so with "changes_es_settings"."""
+    spec = component.spec
+    return bool(spec.get("es_settings") or spec.get("es_defaults") or spec.get("changes_es_settings"))
+
+
 def install(component: Component, env: Env) -> Record:
     target, spec, record = env.target, component.spec, Record()
     env.component = component
@@ -265,8 +273,8 @@ def install(component: Component, env: Env) -> Record:
         target.conf_set(key, _fill(value, typed))
     for name, value in spec.get("es_settings", {}).items():
         target.es_setting(name, _fill(value, typed))
-    first_time = component.id not in target.manifest()["components"] and \
-        not any(old in target.manifest()["components"] for old in spec.get("renamed_from", []))
+    installed = target.manifest()["components"]
+    first_time = not any(name in installed for name in [component.id, *spec.get("renamed_from", [])])
     if first_time:   # starting choices only: what you change in Batocera's menus afterwards stays
         for key, value in spec.get("batocera_defaults", {}).items():
             target.conf_set(key, _fill(value, typed))

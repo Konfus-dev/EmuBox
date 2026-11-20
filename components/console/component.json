@@ -1,6 +1,7 @@
 {
   "title": "Console tools",
   "hidden": true,
+  "changes_es_settings": true,
   "files": [
     {
       "from": "files/bin",

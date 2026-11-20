@@ -29,6 +29,7 @@ import settings
 
 os.environ.setdefault("XDG_RUNTIME_DIR", "/var/run")
 ROOT = Path(__file__).resolve().parent.parent
+SCREENSAVER = music.RUN / "screensaver"   # there while Batocera's screensaver shows (scripts/screensaver-*)
 MENU_MUSIC = "emubox menu music"   # our own player (music.py), as the sound server names it
 EVERY_S = 2.0
 
@@ -124,14 +125,14 @@ def listing(what: str) -> list[dict]:
 
 
 def look(words: list[str], state: dict) -> list[list[str]]:
+    es = music.es_text()
     switches = dict(settings.read())
-    switches["music.menu"] = "on" if music.frontend_music() else "off"   # Sound settings > FRONTEND MUSIC
+    switches["music.menu"] = "on" if music.frontend_music(es) else "off"   # Sound settings > FRONTEND MUSIC
     playing = listing("sink-inputs")
     commands = plan(playing, listing("source-outputs"), words, switches, state)
     for command in commands:
         pactl(*command)
     # The menus' own music: start the player the first time it is wanted, then pause and resume it.
-    es = _es_text()
     in_menus = menusounds.game_running() is False
     if SCREENSAVER.exists() and music.stops_for_screensaver(es):    # STOP MUSIC ON SCREENSAVER
         in_menus = False
@@ -145,16 +146,6 @@ def look(words: list[str], state: dict) -> list[list[str]]:
     if paused is not None:
         follow_music_settings(es, wanted, state)
     return commands
-
-
-SCREENSAVER = music.RUN / "screensaver"   # there while Batocera's screensaver shows (scripts/screensaver-*)
-
-
-def _es_text() -> str:
-    try:
-        return music.ES_SETTINGS.read_text(errors="replace")
-    except OSError:
-        return ""
 
 
 def follow_music_settings(es: str, playing: bool, state: dict) -> None:
