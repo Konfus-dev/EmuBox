@@ -33,6 +33,10 @@ component.json:
     services       Batocera services to switch on
     batocera_conf  {"key": "value"} settings for batocera.conf
     es_settings    {"name": "value"} settings of the menu program
+    batocera_defaults, es_defaults
+                   the same, but only set when the component is first put on a drive: they
+                   are starting choices the user can change in Batocera's menus, and a later
+                   install must not undo that
     renamed_from   ids this component had in older versions
     generated      files the component creates on Batocera while running, to remove with it:
                    [{"path": "...", "contains": "text that proves the file is ours"}]
@@ -261,6 +265,13 @@ def install(component: Component, env: Env) -> Record:
         target.conf_set(key, _fill(value, typed))
     for name, value in spec.get("es_settings", {}).items():
         target.es_setting(name, _fill(value, typed))
+    first_time = component.id not in target.manifest()["components"] and \
+        not any(old in target.manifest()["components"] for old in spec.get("renamed_from", []))
+    if first_time:   # starting choices only: what you change in Batocera's menus afterwards stays
+        for key, value in spec.get("batocera_defaults", {}).items():
+            target.conf_set(key, _fill(value, typed))
+        for name, value in spec.get("es_defaults", {}).items():
+            target.es_setting(name, _fill(value, typed))
 
     run = getattr(component.hooks, "install", None)
     if run:

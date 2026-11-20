@@ -13,7 +13,7 @@
     "Clips": {"system": "captures", "title": "Recordings", "image": "files/recordings.png",
                    "description": "Videos of the screen, made with Recording in the Guide menu's Capture tab."}
   },
-  "es_settings": {
+  "es_defaults": {
     "captures.FolderViewMode": "always"
   },
   "services": ["emubox_captures"]

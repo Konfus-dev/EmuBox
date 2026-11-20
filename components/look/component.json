@@ -30,8 +30,6 @@
     }
   ],
   "es_settings": {
-    "ThemeSet": "emubox",
-    "EnableSounds": true,
     "SplashScreen": false,
     "SplashScreenProgress": false,
     "HideWindow": false
@@ -40,5 +38,9 @@
     "themes/classic-dash",
     "themes/emubox/omen-lights"
   ],
-  "after": "The look is selected as the theme. To switch back: Main menu > User interface settings > Theme set."
+  "after": "The look is selected as the theme. To switch back: Main menu > User interface settings > Theme set.",
+  "es_defaults": {
+    "EnableSounds": true,
+    "ThemeSet": "emubox"
+  }
 }

@@ -331,6 +331,18 @@ class ComponentTests(Drive):
         run(self.root, "--yes", "--with", "discord")
         self.assertIn('name="audio.bgmusic" value="false"', es.read_text())  # and it stays off
 
+    def test_starting_choices_are_set_once_and_your_changes_stay(self):
+        es = self.root / "system/configs/emulationstation/es_settings.cfg"
+        conf = self.root / "system/batocera.conf"
+        run(self.root, "--yes", "--with", "look,tweaks")
+        self.assertIn('name="EnableSounds" value="true"', es.read_text())
+        self.assertIn("global.autosave=1", conf.read_text())
+        es.write_text(es.read_text().replace('name="EnableSounds" value="true"', 'name="EnableSounds" value="false"'))
+        conf.write_text(conf.read_text().replace("global.autosave=1", "global.autosave=0"))
+        run(self.root, "--yes", "--with", "look,tweaks")
+        self.assertIn('name="EnableSounds" value="false"', es.read_text())
+        self.assertIn("global.autosave=0", conf.read_text())
+
     @staticmethod
     def repo_vmpads():
         import importlib.util

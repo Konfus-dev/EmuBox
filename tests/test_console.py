@@ -833,3 +833,24 @@ class FrontendMusicTests(unittest.TestCase):
         self.assertTrue(music.frontend_music('<config>\n</config>'))            # on when never set
         self.assertFalse(music.frontend_music('\t<bool name="audio.bgmusic" value="false" />'))
         self.assertTrue(music.frontend_music('\t<bool name="audio.bgmusic" value="true" />'))
+
+    def test_batoceras_other_sound_settings_are_followed(self):
+        off = '<bool name="EnableSounds" value="false" />'
+        self.assertFalse(menusounds.should_play("select", {}, True, off))       # ENABLE NAVIGATION SOUNDS
+        self.assertTrue(menusounds.should_play("select", {}, True, ""))
+        self.assertTrue(music.stops_for_screensaver(""))
+        self.assertFalse(music.stops_for_screensaver('<bool name="StopMusicOnScreenSaver" value="false" />'))
+        self.assertEqual(music.song_titles(""), 10)
+        self.assertEqual(music.song_titles('<bool name="audio.display_titles" value="false" />'), 0)
+        self.assertEqual(music.song_titles('<int name="audio.display_titles_time" value="4" />'), 4)
+
+    def test_music_volume_and_song_titles_follow_as_they_change(self):
+        said, shown, state = [], [], {}
+        with mock.patch.object(music, "ask", lambda *a, **k: said.append(a)), \
+             mock.patch.object(music, "title", lambda: "Song A"), \
+             mock.patch.object(audio.subprocess, "Popen", lambda cmd, **k: shown.append(cmd[-2:])):
+            audio.follow_music_settings('<int name="MusicVolume" value="30" />', True, state)
+            audio.follow_music_settings('<int name="MusicVolume" value="30" />', True, state)
+            audio.follow_music_settings('<int name="MusicVolume" value="50" />', True, state)
+        self.assertEqual(said, [("set_property", "volume", 30), ("set_property", "volume", 50)])
+        self.assertEqual(shown, [["Now playing: Song A", "10"]])                 # once per song

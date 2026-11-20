@@ -73,9 +73,6 @@
     "roms/store/Flathub.sh"
   ],
   "after": "Store is a new entry on the home screen.",
-  "es_settings": {
-    "store.FolderViewMode": "always"
-  },
   "folders": {
     "Games": {
       "system": "store",
@@ -89,5 +86,8 @@
       "icon": "apps",
       "description": "Add apps to the Apps section: web apps, streaming, anything on Flathub."
     }
+  },
+  "es_defaults": {
+    "store.FolderViewMode": "always"
   }
 }

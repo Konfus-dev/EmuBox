@@ -131,15 +131,46 @@ def look(words: list[str], state: dict) -> list[list[str]]:
     for command in commands:
         pactl(*command)
     # The menus' own music: start the player the first time it is wanted, then pause and resume it.
-    wanted = menu_music_wanted(switches, menusounds.game_running() is False, music_sounding(playing, words),
-                               music.HELD.exists())
+    es = _es_text()
+    in_menus = menusounds.game_running() is False
+    if SCREENSAVER.exists() and music.stops_for_screensaver(es):    # STOP MUSIC ON SCREENSAVER
+        in_menus = False
+    wanted = menu_music_wanted(switches, in_menus, music_sounding(playing, words), music.HELD.exists())
     paused = music.ask("get_property", "pause")
     player = state.get("player")
     if paused is None and wanted and (player is None or player.poll() is not None):   # never started, or it died
         state["player"] = music.start()
     elif paused is not None and paused == wanted:
         music.ask("set_property", "pause", not wanted)
+    if paused is not None:
+        follow_music_settings(es, wanted, state)
     return commands
+
+
+SCREENSAVER = music.RUN / "screensaver"   # there while Batocera's screensaver shows (scripts/screensaver-*)
+
+
+def _es_text() -> str:
+    try:
+        return music.ES_SETTINGS.read_text(errors="replace")
+    except OSError:
+        return ""
+
+
+def follow_music_settings(es: str, playing: bool, state: dict) -> None:
+    """Batocera's Sound settings, for the music EmuBox plays in its place: MUSIC VOLUME as it
+    changes, and DISPLAY SONG TITLES (for SONG TITLE DISPLAY DURATION seconds) at each new song."""
+    level = music.volume(es)
+    if state.get("volume") != level:
+        music.ask("set_property", "volume", level)
+        state["volume"] = level
+    song = music.title() if playing else ""
+    if song and song != state.get("song"):
+        seconds = music.song_titles(es)
+        if seconds:
+            subprocess.Popen(["python3", str(Path(__file__).with_name("toast.py")), f"Now playing: {song}", str(seconds)],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        state["song"] = song
 
 
 def main(argv: list[str]) -> int:

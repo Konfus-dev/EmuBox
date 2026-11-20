@@ -95,7 +95,11 @@ def sound_for(code: int, inverted: bool) -> str:
             ENTER: "select", ESCAPE: "back", SPACE: "menuopen"}.get(code, "")
 
 
-def should_play(kind: str, switches: dict[str, str], in_menus: bool) -> bool:
+def should_play(kind: str, switches: dict[str, str], in_menus: bool, es: str = "") -> bool:
+    """Batocera's Sound settings > ENABLE NAVIGATION SOUNDS (EnableSounds) silences them all,
+    like it silences the menu program's own scroll sound; EmuBox's switches pick among them."""
+    if es_setting("EnableSounds", es).lower() == "false":
+        return False
     return switches.get(f"ui.sound.{kind}", "on").lower() in settings.ON and in_menus
 
 
@@ -326,7 +330,7 @@ def listen() -> int:
 
     def play(kind: str) -> None:
         switches = settings.read()
-        if kind not in files or not should_play(kind, switches, in_menus):
+        if kind not in files or not should_play(kind, switches, in_menus, es_text()):
             return
         level = volume(switches)
         began = time.monotonic()

@@ -4,10 +4,16 @@
   "default": true,
   "order": 50,
   "files": [
-    {"from": "files/tidy_folders", "to": "system/services/tidy_folders", "mode": "755"}
+    {
+      "from": "files/tidy_folders",
+      "to": "system/services/tidy_folders",
+      "mode": "755"
+    }
   ],
-  "services": ["tidy_folders"],
-  "batocera_conf": {
+  "services": [
+    "tidy_folders"
+  ],
+  "batocera_defaults": {
     "global.autosave": "1",
     "global.bezel": "default",
     "global.shaderset": "zfast",

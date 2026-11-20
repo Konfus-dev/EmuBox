@@ -53,6 +53,33 @@ def frontend_music(text: str | None = None) -> bool:
     return found is None or found.group(1).lower() in ("true", "1", "on")
 
 
+def es_choice(name: str, default: str, text: str | None = None) -> str:
+    """A setting of Batocera's menu program, as es_settings.cfg has it."""
+    import re
+    if text is None:
+        try:
+            text = ES_SETTINGS.read_text(errors="replace")
+        except OSError:
+            text = ""
+    found = re.search(rf'name="{re.escape(name)}" value="([^"]*)"', text)
+    return found.group(1) if found else default
+
+
+def stops_for_screensaver(text: str | None = None) -> bool:
+    """Sound settings... STOP MUSIC ON SCREENSAVER (on unless turned off, like Batocera)."""
+    return es_choice("StopMusicOnScreenSaver", "true", text).lower() != "false"
+
+
+def song_titles(text: str | None = None) -> int:
+    """Seconds to show a new song's title (DISPLAY SONG TITLES, SONG TITLE DISPLAY DURATION); 0 = not shown."""
+    if es_choice("audio.display_titles", "true", text).lower() == "false":
+        return 0
+    try:
+        return max(1, int(float(es_choice("audio.display_titles_time", "10", text))))
+    except ValueError:
+        return 10
+
+
 def volume(text: str | None = None) -> int:
     """The music volume chosen in Batocera's sound settings (65 when never set)."""
     import re

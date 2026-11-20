@@ -27,6 +27,16 @@
     {
       "from": "files/es_systems_apps.cfg",
       "to": "system/configs/emulationstation/es_systems_apps.cfg"
+    },
+    {
+      "from": "files/es-scripts/emubox-screensaver.sh",
+      "to": "system/configs/emulationstation/scripts/screensaver-start/emubox-screensaver.sh",
+      "mode": "755"
+    },
+    {
+      "from": "files/es-scripts/emubox-screensaver.sh",
+      "to": "system/configs/emulationstation/scripts/screensaver-stop/emubox-screensaver.sh",
+      "mode": "755"
     }
   ],
   "services": [
