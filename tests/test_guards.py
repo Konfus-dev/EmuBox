@@ -179,3 +179,95 @@ class LintTests(unittest.TestCase):
                 checked += 1
                 self.assertTrue(safe(pattern), f"{path.relative_to(REPO)}: pkill/pgrep -f {pattern!r} can match itself")
         self.assertGreater(checked, 5)
+
+
+# --- Batocera never touches the PC's other disks ------------------------------------------
+
+class DriveGuardTests(unittest.TestCase):
+    """The near-miss: booted from the PC's own disk, Batocera mounted Ubuntu read-write and ran
+    ntfsfix on Windows. boot-custom.sh puts a guard in front of Batocera's storage helper; this runs
+    that guard against a pretend PC (its /sys, lsblk and blkid) and watches what gets through."""
+
+    PCI = "devices/pci0000:00"
+    DISKS = {   # disk -> where the kernel has it, and its partitions' labels
+        "nvme0n1": (f"{PCI}/0000:00:1d.0/0000:03:00.0/nvme/nvme0/nvme0n1", {"nvme0n1p2": "", "nvme0n1p6": "BATOCERA", "nvme0n1p7": "SHARE"}),
+        "sda": (f"{PCI}/0000:00:17.0/ata1/host0/target0:0:0/0:0:0:0/block/sda", {"sda1": "Windows"}),
+        "sdb": (f"{PCI}/0000:00:14.0/usb2/2-1/2-1:1.0/host6/target6:0:0/6:0:0:0/block/sdb", {"sdb1": "GAMES"}),
+        "sdc": (f"{PCI}/0000:00:14.0/usb2/2-2/2-2:1.0/host7/target7:0:0/7:0:0:0/block/sdc", {"sdc1": "BATOCERA", "sdc2": "SHARE"}),
+    }
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(prefix="guardtest")
+        self.root = Path(self.tmp.name)
+        self.assertNotIn("usb", str(self.root))           # the guard looks for "usb" in the path
+        stubs = self.root / "bin"
+        stubs.mkdir()
+        labels = self.root / "labels"
+        labels.mkdir()
+        for disk, (where, parts) in self.DISKS.items():
+            (self.root / "sys/block").mkdir(parents=True, exist_ok=True)
+            (self.root / "sys/class/block").mkdir(parents=True, exist_ok=True)
+            (self.root / where).mkdir(parents=True)
+            os.symlink(self.root / where, self.root / f"sys/block/{disk}")
+            os.symlink(self.root / where, self.root / f"sys/class/block/{disk}")
+            (labels / disk).write_text("".join(f"{label}\n" for label in parts.values()))   # lsblk lists them all
+            for part, label in parts.items():
+                (self.root / where / part).mkdir()
+                (self.root / where / part / "partition").write_text("1\n")
+                os.symlink(self.root / where / part, self.root / f"sys/class/block/{part}")
+                (labels / part).write_text(f"{label}\n")
+        for tool in ("lsblk", "blkid"):                  # each prints the labels of the device it is given
+            (stubs / tool).write_text(f'#!/bin/sh\nfor a; do last=$a; done\ncat "{labels}/$(basename "$last")" 2>/dev/null\n')
+            (stubs / tool).chmod(0o755)
+        (stubs / "real").write_text(f'#!/bin/sh\necho "$@" >> "{self.root}/passed"\n')
+        (stubs / "real").chmod(0o755)
+        guard = block("cat > \"$H\" <<'GUARD'", "GUARD").splitlines()[1:-1]
+        text = "\n".join(guard)
+        for real, fake in (("/usr/bin/batocera-storage-udev.real", str(stubs / "real")),
+                           ("/sys/class/block/", f"{self.root}/sys/class/block/"),
+                           ("/sys/block/", f"{self.root}/sys/block/"),
+                           ("/var/log/emubox-drive-guard.log", f"{self.root}/guard.log")):
+            self.assertIn(real, text)
+            text = text.replace(real, fake)
+        self.assertEqual(re.findall(r"(?<![\w.-])/(?:sys|usr|var)/", text.replace(str(self.root), "FAKE")), [])   # nothing real
+        self.guard = self.root / "guard"
+        self.guard.write_text(text + "\n")
+        self.guard.chmod(0o755)
+        self.env = {**os.environ, "PATH": f"{stubs}:{os.environ['PATH']}"}
+        self.env.pop("ID_FS_LABEL", None)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def offer(self, device: str, action: str = "add", **env) -> bool:
+        """Batocera's udev rule offering a device to its storage helper: did it get through?"""
+        passed = self.root / "passed"
+        passed.unlink(missing_ok=True)
+        subprocess.run(["bash", str(self.guard), action, device], env={**self.env, **env}, check=True,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return passed.exists() and passed.read_text().split() == [action, device]
+
+    def test_the_pcs_own_disks_are_left_alone(self):
+        for device in ("nvme0n1", "nvme0n1p2", "nvme0n1p6", "nvme0n1p7", "sda", "sda1"):
+            self.assertFalse(self.offer(device), device)
+        self.assertIn("left alone: sda1 (not a USB drive", (self.root / "guard.log").read_text())
+
+    def test_other_batocera_drives_on_usb_are_left_alone(self):
+        for device in ("sdc", "sdc1", "sdc2"):
+            self.assertFalse(self.offer(device), device)
+        self.assertFalse(self.offer("sdb1", ID_FS_LABEL="SHARE"))       # told by udev itself
+
+    def test_a_plain_usb_drive_is_passed_on(self):
+        self.assertTrue(self.offer("sdb1"))
+        self.assertTrue(self.offer("sdb"))
+        self.assertTrue(self.offer("nvme0n1p2", action="remove"))       # only adding is guarded
+
+    def test_batoceras_own_helper_is_kept_once_however_often_the_guard_is_written(self):
+        start = block('H=/usr/bin/batocera-storage-udev', "GUARD")
+        helper = self.root / "helper"
+        helper.write_text("batocera's own\n")
+        script = start.replace("H=/usr/bin/batocera-storage-udev", f"H={helper}", 1)
+        for _ in range(2):
+            subprocess.run(["bash", "-c", script], check=True)
+        self.assertEqual((self.root / "helper.real").read_text(), "batocera's own\n")
+        self.assertIn("EmuBox drive guard", helper.read_text())
