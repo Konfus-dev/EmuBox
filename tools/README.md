@@ -7,14 +7,14 @@ Commands for looking after a Batocera drive from a Linux PC. `./install` links t
 | --- | --- |
 | `batocera-drive` | prints where Batocera's data is (a USB stick, an internal disk, or the folder you name with `--drive` or `BATOCERA_DRIVE`); the others find the drive with it. `--list` shows every Batocera drive, `--main N` sets the one used when there are several |
 | `batocera-add` | copy games and ROM-hack patches onto the drive, into the right folders |
-| `batocera-backup` | back up saves, screenshots and settings |
+| `batocera-backup` | back up saves, screenshots and settings (into a new folder each time; nothing is deleted) |
 | `batocera-wifi` | set the drive's Wi-Fi network |
 | `batocera-names` | tidy the names the menus show for games (`--dry-run` to look first), or give one game a name of your own: `--set SYSTEM FILE NAME`. Files are never renamed |
 | `batocera-vault` | set Vault's pages and install command on the drive |
 | `batocera-scraper`, `batocera-achievements` | set the ScreenScraper / RetroAchievements account |
 | `batocera-vm` | boot the drive in a window (QEMU), without restarting the PC. Test mode (the default) writes nothing to the drive and takes back the access it gave you to the drive and the controllers when the window closes; `--write` keeps changes |
 | `batocera-preview` | preview a theme in a window (needs a `~/batocera-preview` folder with Batocera's files) |
-| `dualboot/build-loader` | builds the boot loader for Batocera on the PC's own disk (a GRUB EFI program for the boot menu). It starts Batocera from its partition by filesystem id and puts `/boot/boot-custom.sh` back before Batocera starts when an update removed it |
+| `dualboot/build-loader` | builds the boot loader for Batocera on the PC's own disk (a GRUB EFI program for the boot menu). It starts Batocera from its partition by filesystem id and puts `/boot/boot-custom.sh` back before Batocera starts when an update removed it. It writes into the PC's EFI partition only with a backup of the disk's partition table and room to spare (see its top) |
 
 `dev/` holds helpers for working on EmuBox itself:
 

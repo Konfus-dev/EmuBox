@@ -175,6 +175,8 @@ class LintTests(unittest.TestCase):
         self.assertFalse(safe("/usr/bin/wsdd"))
         checked = 0
         for path, text in repo_texts():
+            if path.suffix == ".md":                            # words about them, not commands
+                continue
             for pattern in process_patterns(text):
                 checked += 1
                 self.assertTrue(safe(pattern), f"{path.relative_to(REPO)}: pkill/pgrep -f {pattern!r} can match itself")

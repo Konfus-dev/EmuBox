@@ -222,6 +222,33 @@ See [docs/extending.md](extending.md).
   same name when it has no exact one, and uses that entry's button numbers. (The test VM's layout
   for the Xbox pad did that once; it is now only added inside the VM, by `lib/vmpads.py`.)
 
+## Safety
+
+The worst that could happen is a wiped or corrupted drive, a drive or PC that cannot start, or
+Batocera touching the PC's other disks. Each guard below exists because something went wrong
+once (or nearly did), and each has a test in `tests/` that fails without it (mostly
+`tests/test_guards.py`).
+
+| Guard | Where | Protects against |
+| --- | --- | --- |
+| Batocera's storage helper only sees USB drives that are not Batocera drives | `boot-custom.sh` (drive guard) | Batocera mounting Ubuntu read-write and running ntfsfix on Windows; tested against a pretend `/sys`, `lsblk` and `blkid` |
+| Partitions of the PC's own disks mounted while the guard was missing are let go | `emubox_bootguard` | the same, after an update removed `boot-custom.sh` |
+| The boot menu is edited as a copy and used only when it still has every entry | `boot-custom.sh` | a drive that cannot start |
+| The data partition must be labelled SHARE; the installer and every `batocera-*` tool refuse otherwise, and nothing ever renames or relabels a partition (lint) | `installer/target.py` `label_problem`, `tools/batocera-drive` | Batocera merging `/userdata` and moving every game into `.roms_base` |
+| A loud warning at start-up when `/userdata/.roms_base` exists or `batocera-boot.conf` has `mergerfs.roms=` | `emubox_bootguard`, in `logs/emubox.log` | games out of sight going unnoticed |
+| Games, saves, BIOS, the drive itself and each system's games folder are never removed whole | `installer/target.py` `Target.remove` | a wiped drive |
+| Games, BIOS files and backups are replaced only by a copy checked by size and SHA-256, read back from the drive | `installer/target.py` `verified_copy` (installer, `backup-games`, `batocera-add`) | a game lost to a copy that went wrong |
+| `batocera-backup` makes a new folder each time and deletes nothing | `tools/batocera-backup` | an earlier backup written over |
+| The installer stops at a drive whose filesystem is larger than its partition, or whose partition is larger than its disk | `installer/target.py` `size_problem` | data written where there is nothing (a fake-capacity stick, a drive copied from a larger one) |
+| After every install (and `--remove`) the test VM's pad layout and SSH keys EmuBox did not put there are taken off (keys are set aside in `authorized_keys.emubox-removed`; end a key's line with `emubox-keep` to keep it) | `installer/audit.py` | every face button of the real pad wrong; temporary root keys left on a drive |
+| `batocera-vm` writes nothing to the stick unless given `--write`, and never uses a drive that is not removable | `tools/batocera-vm` | the VM changing the stick, or starting the PC's own Batocera |
+| The EFI partition is written only with a partition-table backup, on an EFI system partition, in its EFI folder, with twice the loader's size free, and the old loader is replaced whole | `tools/dualboot/build-loader` | a PC that cannot start |
+| The Bluetooth archive is never replaced by one without pairings, nor half-written | `components/bluetooth` | every controller having to be paired again |
+| The Guide opens on the press and its let-go does not close it; one reading starts at most 12 programs; every label is plain and present; one footer | `lib/guide.py` `GuideButton`, `lib/startmenu.py` `plain_feature` | a Guide that never seems to open, is slow, or is rejected or crashes |
+| Every key an app's controller mapper or the typer presses is let go; nothing runs `batocera-mouse`, and `wtype` only types a character the typer's own keyboard has no key for | `lib/pad.py`, `lib/typer.py` | a dead pointer or controller in apps, keys repeating |
+| `pkill -f` / `pgrep -f` patterns are bracketed (`[w]sdd`) or anchored (lint) | everywhere | killing the wrong programs |
+| The menus start even when EmuBox's music helper is broken | `boot-custom.sh` (`emubox-es`) | a TV with nothing on it |
+
 Licence: GPL-3.0-or-later. Fonts: SIL Open Font Licence (see `components/look/files/fonts`).
 EmuBox is not affiliated with Microsoft, Discord or Apple; it ships none of their artwork or software.
 A tile's icon is the app's own: taken from the program once it is on the drive, or asked of Flathub or
