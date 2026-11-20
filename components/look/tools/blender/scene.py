@@ -401,9 +401,9 @@ def wall(scene, name, brightness, centre=(0.0, 0.0), render=True):
 
 def film_tunnel(scene, seconds=5.4, fps=30):
     """The start-up film's moving tunnel (tools/splash.py lays the orb and the name over it): the
-    camera starts deep down the tunnel looking straight along it, and backs out to where the home
-    screen's picture is taken from, turning to it, slowing as it arrives. One JPEG per frame."""
-    cam = wall(scene, "", 0.45, centre=(25, -2), render=False)
+    camera starts deep down the tunnel looking straight along it and backs out, slowing as it
+    arrives, the tunnel's dark far end staying behind the orb in the middle. One JPEG per frame."""
+    cam = wall(scene, "", 0.45, centre=(0, 3), render=False)
     scene.render.resolution_x, scene.render.resolution_y = 1280, 720
     scene.render.image_settings.quality = 90
     scene.cycles.samples = 16

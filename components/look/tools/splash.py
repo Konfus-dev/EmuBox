@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Draws the start-up film: backing out of the green tunnel while the plasma wakes, a flare, and
-the orb in its holder coming to rest where the home screen has it, with the EmuBox name beside it.
+"""Draws the start-up film: backing out of the green tunnel while the plasma wakes, a flare, the
+orb in its holder locking in, the EmuBox name beneath, and the tunnel fading away.
 
     python3 splash.py [output.mp4]      (default: ../files/splash/emubox.mp4)
     python3 splash.py --sound my.wav output.mp4      the same film with a sound of your own
@@ -9,7 +9,8 @@ the orb in its holder coming to rest where the home screen has it, with the EmuB
 Batocera plays an .mp4 found in /userdata/splash while it starts. Everything in the film is
 EmuBox's own: the tunnel is rendered by tools/blender/scene.py ("film"), the orb and holder are
 the theme's own art, and the sound is synthesised with the recipes' building blocks in sounds.py.
-The last frames match the home screen's layout, so the menus take over from the same picture.
+It ends on exactly the loading picture (tools/loading.py), which the menus' loading screen and
+the very first picture at start-up also show, so start-up runs on without a jump or a black gap.
 Needs Blender, Pillow and GStreamer (gst-launch-1.0 with x264enc, mp4mux and an AAC encoder).
 """
 import math
@@ -28,8 +29,8 @@ ART = HERE.parent / "files" / "theme" / "art"
 W, H, FPS, SECONDS = 1280, 720, 30, 5.4
 WAKE, FLARE, FADE = 0.25, 2.6, 4.8  # seconds: the tunnel starts to light, the plasma flares, everything fades
 LAND = FLARE + 0.3                  # the orb is there (the sound's chord lands with it)
-ORB = (0.27 * W, 0.485 * H)         # where the home screen has the orb
-ORB_SIZE = 0.58 * H                 # and how big
+ORB = (0.5 * W, 0.44 * H)           # where the loading picture has the orb (tools/loading.py)
+ORB_SIZE = 0.40 * H                 # and how big
 
 
 def ease(x: float) -> float:
@@ -72,8 +73,9 @@ def frames(folder: Path) -> int:
     holder = layer("rings_a", 1.638)
     glow = layer("plasma_glow", 1.79)
     orb = [layer(name, 1.0) for name in ("plasma_outer", "plasma_mid", "plasma_core", "plasma_spot", "shell")]
-    text, behind = brand.wordmark(int(W * 0.6), 220, 70, 10)
-    name_at = (int(W * 0.72 - text.width / 2), int(ORB[1] - text.height / 2))
+    text, behind = brand.wordmark(W, 107, 43, 7)                   # as in the loading picture, at this size
+    name_at = (0, int(ORB[1] + ORB_SIZE * 0.82))
+    ending = Image.open(ART / "loading.png").convert("RGBA").resize((W, H), Image.LANCZOS)
     count = int(SECONDS * FPS)
     for n in range(count):
         t = n / FPS
@@ -95,13 +97,13 @@ def frames(folder: Path) -> int:
             white = max(0.0, 1 - abs(flare - 0.12) / 0.26) * 0.75
             if white > 0:
                 frame = Image.blend(frame, Image.new("RGBA", (W, H), (225, 255, 200, 255)), white)
-            # The name, beside the orb where the menu will be, while the orb settles.
+            # The name, beneath the orb, there to stay.
             if flare > 0.3:
-                show = ease((flare - 0.3) / 0.5) * (1 - ease((t - (FADE - 0.5)) / 0.5))
+                show = ease((flare - 0.3) / 0.5)
                 frame.alpha_composite(faded(behind, 0.95 * show), name_at)
                 frame.alpha_composite(faded(text, show), name_at)
-        if t > FADE:
-            frame = Image.blend(frame, Image.new("RGBA", (W, H), (0, 0, 0, 255)), ease((t - FADE) / (SECONDS - FADE - 0.1)))
+        if t > FADE - 0.6:                                           # the tunnel fades away: the loading picture is left
+            frame = Image.blend(frame, ending, ease((t - (FADE - 0.6)) / (SECONDS - FADE + 0.4)))
         frame.convert("RGB").save(folder / f"f{n:04d}.png", compress_level=1)
     return count
 
