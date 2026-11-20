@@ -42,4 +42,21 @@ for mp in /media/*; do
         say "unmounted $src from $mp (the PC's own disk)"
     fi
 done
+
+# --- the data partition's label (added 2026-11-19) ---
+# Renamed from SHARE (it happened once), Batocera took the data partition for a second drive: it
+# merged /userdata over it, moved every game into /userdata/.roms_base and wrote mergerfs.roms= into
+# batocera-boot.conf, and the menus showed no games. Nothing is moved or renamed here (putting it
+# back is for a person to do, with the games in mind); it is said as loudly as a log can.
+ROMS_BASE=/userdata/.roms_base
+BOOT_CONF=/boot/batocera-boot.conf
+if [ -e "$ROMS_BASE" ] || grep -q '^[[:space:]]*mergerfs\.roms=' "$BOOT_CONF" 2>/dev/null; then
+    for line in "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" \
+                "WARNING: Batocera has merged its games folder (/userdata/.roms_base or mergerfs.roms= in $BOOT_CONF)." \
+                "The data partition was probably renamed: its label must be SHARE. Games may be out of sight, not lost." \
+                "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"; do
+        say "$line"
+        echo "$(date '+%F %T') $line" >> /var/log/emubox-boot.log
+    done
+fi
 exit 0

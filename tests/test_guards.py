@@ -180,6 +180,15 @@ class LintTests(unittest.TestCase):
                 self.assertTrue(safe(pattern), f"{path.relative_to(REPO)}: pkill/pgrep -f {pattern!r} can match itself")
         self.assertGreater(checked, 5)
 
+    def test_nothing_renames_or_relabels_a_partition(self):
+        """A data partition renamed from SHARE hid every game; EmuBox never changes a label."""
+        relabel = re.compile(r"\b(e2label|tune2fs\s[^\n]*-L|fatlabel|dosfslabel|exfatlabel|ntfslabel|mlabel|swaplabel|"
+                             r"btrfs\s+filesystem\s+label|set-label|sgdisk\s[^\n]*(-c|--change-name)|parted\s[^\n]*\bname\b)")
+        for path, text in repo_texts():
+            for number, line in enumerate(text.splitlines(), 1):
+                code = line.split("#")[0] if path.suffix != ".md" else ""
+                self.assertIsNone(relabel.search(code), f"{path.relative_to(REPO)}:{number}: {line.strip()}")
+
 
 # --- Batocera never touches the PC's other disks ------------------------------------------
 
@@ -271,3 +280,100 @@ class DriveGuardTests(unittest.TestCase):
             subprocess.run(["bash", "-c", script], check=True)
         self.assertEqual((self.root / "helper.real").read_text(), "batocera's own\n")
         self.assertIn("EmuBox drive guard", helper.read_text())
+
+
+# --- the data partition keeps its label SHARE -----------------------------------------------
+
+class LabelTests(unittest.TestCase):
+    """The worst day: the data partition was renamed from SHARE, Batocera took it for a second
+    drive, merged /userdata over it and moved every game into .roms_base."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name) / "drive"
+        for folder in ("system", "roms/snes"):
+            (self.root / folder).mkdir(parents=True)
+        self.conf = "audio.volume=45\n"
+        (self.root / "system/batocera.conf").write_text(self.conf)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def parts(self, label: str) -> list[dict]:
+        return [{"path": "/dev/sdz2", "uuid": "u", "label": label, "fstype": "ext4", "size": "20G",
+                 "removable": True, "mounts": [str(self.root)]},
+                {"path": "/dev/sdz1", "uuid": "b", "label": "BATOCERA", "fstype": "vfat", "size": "8G",
+                 "removable": True, "mounts": []}]
+
+    def test_only_a_partition_labelled_share_is_worked_on(self):
+        from installer.target import label_problem
+        self.assertEqual(label_problem(self.root, self.parts("SHARE")), "")
+        self.assertIn("not SHARE", label_problem(self.root, self.parts("GAMES")))
+        self.assertIn("without a label", label_problem(self.root, self.parts("")))
+        self.assertEqual(label_problem(self.root / "roms", self.parts("GAMES")), "")   # a folder inside, not the drive
+        self.assertEqual(label_problem(self.root, []), "")                               # a plain folder
+
+    def test_the_installer_refuses_a_renamed_data_partition_and_changes_nothing(self):
+        import io
+        from unittest import mock
+        from installer import cli, target as target_module
+        out = io.StringIO()
+        with mock.patch.object(target_module, "partitions", return_value=self.parts("GAMES")), \
+                mock.patch("sys.stdout", out), mock.patch("sys.stdin", io.StringIO("")):
+            code = cli.main(["--target", str(self.root), "--yes", "--with", "tweaks"])
+        self.assertEqual(code, 1)
+        self.assertIn("not SHARE", out.getvalue())
+        self.assertEqual((self.root / "system/batocera.conf").read_text(), self.conf)
+        self.assertEqual(sorted(p.name for p in (self.root / "system").iterdir()), ["batocera.conf"])
+
+    def test_batocera_drive_refuses_it_too(self):
+        stubs = Path(self.tmp.name) / "bin"
+        stubs.mkdir()
+        listing = {"blockdevices": [{"path": "/dev/sdz", "rm": True, "children": [
+            {"path": "/dev/sdz2", "uuid": "u", "label": "GAMES", "fstype": "ext4", "size": "20G", "rm": True,
+             "mountpoints": [str(self.root)]}]}]}
+        import json
+        (stubs / "lsblk").write_text(f"#!/bin/sh\ncat <<'END'\n{json.dumps(listing)}\nEND\n")
+        (stubs / "lsblk").chmod(0o755)
+        env = {**os.environ, "PATH": f"{stubs}:{os.environ['PATH']}"}
+        env.pop("BATOCERA_DRIVE", None)
+        done = subprocess.run([sys.executable, str(REPO / "tools/batocera-drive"), str(self.root)],
+                              capture_output=True, text=True, env=env)
+        self.assertNotEqual(done.returncode, 0)
+        self.assertIn("not SHARE", done.stderr)
+        listing["blockdevices"][0]["children"][0]["label"] = "SHARE"
+        (stubs / "lsblk").write_text(f"#!/bin/sh\ncat <<'END'\n{json.dumps(listing)}\nEND\n")
+        done = subprocess.run([sys.executable, str(REPO / "tools/batocera-drive"), str(self.root)],
+                              capture_output=True, text=True, env=env)
+        self.assertEqual((done.returncode, done.stdout.strip()), (0, str(self.root)))
+
+    def merged_warning(self, roms_base: bool, boot_conf: str) -> str:
+        """Run the boot guard's label check against a pretend /userdata and /boot; what it logged."""
+        text = (REPO / "components/drive-guard/files/emubox_bootguard").read_text()
+        start = text.index("# --- the data partition's label")
+        code = text[start:text.index("\nexit 0", start)]
+        folder = Path(self.tmp.name)
+        for real, fake in (("/userdata/.roms_base", folder / "userdata/.roms_base"),
+                           ("/boot/batocera-boot.conf", folder / "batocera-boot.conf"),
+                           ("/var/log/emubox-boot.log", folder / "boot.log")):
+            self.assertIn(real, code)
+            code = code.replace(real, str(fake))
+        (folder / "userdata").mkdir(exist_ok=True)
+        if roms_base:
+            (folder / "userdata/.roms_base").mkdir(exist_ok=True)
+        elif (folder / "userdata/.roms_base").exists():
+            (folder / "userdata/.roms_base").rmdir()
+        (folder / "batocera-boot.conf").write_text(boot_conf)
+        for log in ("emubox.log", "boot.log"):
+            (folder / log).unlink(missing_ok=True)
+        script = f'LOG={folder}/emubox.log\nsay() {{ echo "$*" >> "$LOG"; }}\n{code}\n'
+        subprocess.run(["bash", "-c", script], check=True)
+        logged = [(folder / log).read_text() if (folder / log).exists() else "" for log in ("emubox.log", "boot.log")]
+        self.assertEqual("WARNING" in logged[0], "WARNING" in logged[1])
+        return logged[0]
+
+    def test_a_merged_games_folder_is_warned_about_loudly_at_start_up(self):
+        self.assertEqual(self.merged_warning(False, "autoresize=false\n"), "")
+        self.assertIn("label must be SHARE", self.merged_warning(True, ""))
+        self.assertIn("WARNING", self.merged_warning(False, "autoresize=false\nmergerfs.roms=/media/x\n"))
+        self.assertEqual(self.merged_warning(False, "#mergerfs.roms=/media/x\n"), "")

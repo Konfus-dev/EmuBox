@@ -78,6 +78,38 @@ def partitions() -> list[dict]:
     return found
 
 
+# Batocera finds its data partition by this label. Renamed (it happened once, to "GAMES"), it
+# took the partition for a second drive: it merged /userdata over it, moved every game into
+# .roms_base and wrote mergerfs.roms into batocera-boot.conf, and the menus showed no games.
+# EmuBox never renames or relabels anything; it refuses to work on a data partition so labelled.
+DATA_LABEL = "SHARE"
+
+
+def backing_partition(folder: Path, parts: list[dict] | None = None) -> dict | None:
+    """The partition mounted exactly at this folder (the drive itself, not a folder inside one);
+    None for a plain folder or when lsblk cannot say."""
+    try:
+        folder = Path(folder).resolve()
+    except OSError:
+        return None
+    for part in partitions() if parts is None else parts:
+        if any(Path(m).resolve() == folder for m in part["mounts"]):
+            return part
+    return None
+
+
+def label_problem(folder: Path, parts: list[dict] | None = None) -> str:
+    """Why this Batocera data folder must not be used, when its partition is not labelled SHARE;
+    '' when it is fine, or a plain folder whose label cannot be seen."""
+    part = backing_partition(folder, parts)
+    if part is None or part["label"] == DATA_LABEL:
+        return ""
+    label = f"labelled {part['label']}" if part["label"] else "without a label"
+    return (f"{part['path']} holds Batocera's data but is {label}, not {DATA_LABEL}. Batocera then takes it for "
+            f"a second drive and moves every game out of sight (into .roms_base). Nothing was changed. "
+            f"Its label has to be {DATA_LABEL} again before EmuBox works on it.")
+
+
 def main_drive() -> str:
     """The filesystem id set as the main drive, or ''."""
     try:

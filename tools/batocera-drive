@@ -18,10 +18,20 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from installer.target import Target, drives, main_drive, set_main_drive  # noqa: E402
+from installer.target import Target, drives, label_problem, main_drive, set_main_drive  # noqa: E402
 
 
 def find(named: str = "") -> Path:
+    """The data folder, refused when its partition is not labelled SHARE (see installer/target.py):
+    every batocera-* tool finds the drive through here, so none of them writes to such a drive."""
+    folder = locate(named)
+    problem = label_problem(folder)
+    if problem:
+        sys.exit(problem)
+    return folder
+
+
+def locate(named: str = "") -> Path:
     named = named or os.environ.get("BATOCERA_DRIVE", "")
     if named:
         folder = Path(named).expanduser()
