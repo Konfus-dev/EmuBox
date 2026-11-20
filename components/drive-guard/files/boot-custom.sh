@@ -90,8 +90,12 @@ PADS
     cat > /usr/bin/emubox-es <<'ES'
 #!/bin/sh
 # EMUBOX (written by /boot/boot-custom.sh): start the menu program without its own music.
+# Only when the helper is there and sound: a missing Python or a damaged file must never keep the
+# menus from starting (it would leave the TV with nothing to use), so then they start as usual.
 f=/userdata/system/emubox/lib/esquiet.py
-[ -f "$f" ] && exec python3 "$f" "$@"
+if [ -f "$f" ] && command -v python3 >/dev/null 2>&1 && python3 -m py_compile "$f" 2>/dev/null; then
+    exec python3 "$f" "$@"
+fi
 exec "$@"
 ES
     chmod 755 /usr/bin/emubox-es
@@ -116,11 +120,26 @@ ES
         [ -f "$g" ] || continue
         if grep -q '^[[:space:]]*echo Booting Batocera' "$g" || ! grep -q '^set timeout_style=hidden' "$g"; then
             if mount -o remount,rw /boot; then
-                sed -i -e '/^[[:space:]]*echo Booting Batocera/d' -e '/^set timeout=/{n;/^set timeout_style=hidden/!i set timeout_style=hidden
-}' "$g"
+                # Edited as a copy, which replaces the boot menu only when it still has every entry
+                # and its start command: a damaged grub.cfg would leave this drive unable to start.
+                sed -e '/^[[:space:]]*echo Booting Batocera/d' -e '/^set timeout=/{n;/^set timeout_style=hidden/!i set timeout_style=hidden
+}' "$g" > "$g.emubox-new"
+                # The new file must be exactly the old one without the message lines and with the
+                # one hiding line: anything else (a lost brace, a lost entry) and it is not used.
+                grep -v -e '^[[:space:]]*echo Booting Batocera' -e '^set timeout_style=hidden' "$g" > "$g.emubox-want"
+                grep -v -e '^set timeout_style=hidden' "$g.emubox-new" > "$g.emubox-got"
+                if [ -s "$g.emubox-new" ] && cmp -s "$g.emubox-want" "$g.emubox-got" \
+                   && grep -q '^set timeout_style=hidden' "$g.emubox-new"; then
+                    cp -p "$g" "$g.emubox-before" 2>/dev/null
+                    mv "$g.emubox-new" "$g"
+                    echo "$(date '+%F %T') boot menu: hid it and its message in $g" >> /var/log/emubox-boot.log
+                else
+                    rm -f "$g.emubox-new"
+                    echo "$(date '+%F %T') boot menu: edit did not check out, left as it was: $g" >> /var/log/emubox-boot.log
+                fi
+                rm -f "$g.emubox-want" "$g.emubox-got"
                 sync
                 mount -o remount,ro /boot
-                echo "$(date '+%F %T') boot menu: hid it and its message in $g" >> /var/log/emubox-boot.log
             fi
         fi
     done

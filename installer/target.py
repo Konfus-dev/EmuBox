@@ -212,8 +212,23 @@ class Target:
         self._adopt(destination)
         return relative
 
+    # Folders that hold what a person cannot get back (games, saves, BIOS files, their own media),
+    # and the drive itself: never removed whole, whatever a component's record says.
+    PROTECTED = ("roms", "saves", "bios", "system", "music", "screenshots", "recordings", "themes",
+                 "splash", "cheats", "decorations", "kodi", "library", "shaders", "patches")
+
+    def protected(self, path: Path) -> bool:
+        """Is this the drive itself, one of the PROTECTED folders, a whole system's games folder
+        (roms/<system>), or a folder that holds one of them?"""
+        keep = [self.root] + [self.root / name for name in self.PROTECTED]
+        if (self.root / "roms").is_dir():
+            keep += [p for p in (self.root / "roms").iterdir() if p.is_dir()]
+        return any(path == k or path in k.parents for k in keep)
+
     def remove(self, relative: str) -> bool:
         path = self.path(relative)
+        if path.is_dir() and not path.is_symlink() and self.protected(path):
+            raise ValueError(f"refusing to remove {relative or 'the whole drive'}: it holds games or other things of yours")
         if path.is_dir() and not path.is_symlink():
             shutil.rmtree(path)
         elif path.exists() or path.is_symlink():
