@@ -135,7 +135,7 @@ art/logos and art/badges hold EmuBox's own for systems that theme does not know 
   <view name="system">
     <!-- The console's name, top right of the home screen. -->
     <text name="brand" extra="static">
-      <text>EMUBOX V1</text>
+      <text>EMUBOX V1.1</text>
       <fontPath>${fontTitle}</fontPath>
       <fontSize>0.026</fontSize>
       <color>c8f03cff</color>
