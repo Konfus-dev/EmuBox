@@ -64,8 +64,10 @@ focused() { local w; w=$(window "$1"); [ -n "$w" ] && wlrctl toplevel find "app_
 # An app is a Flathub program ("flatpak") or a program Batocera already has ("command").
 local_app() { [ -z "$(conf "$1" '.flatpak // empty')" ]; }
 web_app() { [ -n "$(conf "$1" '.web // empty')" ]; }
+# pgrep/pkill -f patterns are written "[w]ebview.py": the brackets keep them from matching their
+# own command line (or the shell running them), which once killed the wrong programs.
 running() {
-    if web_app "$1"; then pgrep -f -- "webview.py .*--id $1\$" >/dev/null; return; fi
+    if web_app "$1"; then pgrep -f -- "[w]ebview.py .*--id $1\$" >/dev/null; return; fi
     [ -e "$RUN/$1.started" ] || return 1
     if local_app "$1"; then kill -0 "$(cat "$RUN/$1.pid" 2>/dev/null)" 2>/dev/null
     else flatpak ps --columns=application 2>/dev/null | grep -qx "$(conf "$1" .flatpak)"; fi
@@ -248,7 +250,7 @@ mic() {
 }
 
 close_app() {
-    if web_app "$1"; then pkill -f -- "webview.py .*--id $1\$"; return 0; fi
+    if web_app "$1"; then pkill -f -- "[w]ebview.py .*--id $1\$"; return 0; fi
     [ -e "$RUN/mic.muted" ] && mic unmute
     if local_app "$1"; then
         [ -e "$RUN/$1.pid" ] && kill -- "-$(cat "$RUN/$1.pid")" 2>/dev/null   # it leads its own group
@@ -258,7 +260,7 @@ close_app() {
     rm -f "$RUN/$1.started" "$RUN/$1.pid"
     [ -e "$RUN/$1.pad.pid" ] && kill "$(cat "$RUN/$1.pad.pid")" 2>/dev/null
     rm -f "$RUN/$1.pad.pid"
-    pkill -f -- "hints.py $ROOT/apps/$1/app.json" 2>/dev/null   # its row of hints, should the mapper not have got to it
+    pkill -f -- "[h]ints.py $ROOT/apps/$1/app.json" 2>/dev/null   # its row of hints, should the mapper not have got to it
 }
 
 players() {

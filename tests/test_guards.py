@@ -117,3 +117,65 @@ class BootTests(unittest.TestCase):
                     helper.write_text(broken)
                 out = subprocess.run(["sh", str(script), "echo", "menus started"], capture_output=True, text=True)
                 self.assertEqual(out.stdout.strip(), "menus started")
+
+
+# --- lint: rules every file in the repository keeps ---------------------------------------
+
+def repo_texts():
+    """(path, text) of every text file in the repository, the tests left out (they quote the
+    very things the rules forbid)."""
+    for path in sorted(REPO.rglob("*")):
+        parts = path.relative_to(REPO).parts
+        if not path.is_file() or parts[0] in (".git", "tests") or "__pycache__" in parts:
+            continue
+        try:
+            yield path, path.read_text()
+        except (UnicodeDecodeError, OSError):
+            continue
+
+
+def process_patterns(text: str) -> list[str]:
+    """The pattern of every `pkill -f` / `pgrep -f` in a file, shell or Python."""
+    import shlex
+    found = []
+    for line in text.splitlines():
+        for match in re.finditer(r"""(["']?)\b(pkill|pgrep)\b\1""", line):
+            before = line[:match.start()]
+            if before.lstrip().startswith("#") or " # " in before:   # a comment about them
+                continue
+            rest = line[match.end():]
+            if match.group(1):                                  # Python: ["pkill", "-f", pattern]
+                words = [a or b for a, b in re.findall(r'"([^"]*)"|\'([^\']*)\'', rest.split("]")[0])]
+            else:
+                try:
+                    words = shlex.split(rest, comments=True)
+                except ValueError:
+                    words = rest.split()
+            options, pattern = [], None
+            for word in words:
+                if word == "--" or not word.startswith("-"):
+                    if word != "--":
+                        pattern = word
+                        break
+                    continue
+                options.append(word)
+            if any(o.startswith("-") and not o.startswith("--") and "f" in o for o in options) or "--full" in options:
+                found.append(pattern or "")
+    return found
+
+
+class LintTests(unittest.TestCase):
+    def test_process_patterns_cannot_match_their_own_command_line(self):
+        """`pkill -f wsdd` also matches the shell running it (and an editor or a log line holding
+        the word): it killed the wrong programs five times. Anchored (^...) or one bracketed
+        letter ([w]sdd) and it can only match the program meant."""
+        safe = lambda pattern: pattern.startswith("^") or re.search(r"\[[^\]]\]", pattern)   # noqa: E731
+        self.assertEqual(process_patterns('pkill -f -- "[w]ebview.py .*--id $1"\npgrep -f ^qemu x'), ["[w]ebview.py .*--id $1", "^qemu"])
+        self.assertEqual(process_patterns('subprocess.run(["pkill", "-9", "-f", "mpv --x"])'), ["mpv --x"])
+        self.assertFalse(safe("/usr/bin/wsdd"))
+        checked = 0
+        for path, text in repo_texts():
+            for pattern in process_patterns(text):
+                checked += 1
+                self.assertTrue(safe(pattern), f"{path.relative_to(REPO)}: pkill/pgrep -f {pattern!r} can match itself")
+        self.assertGreater(checked, 5)

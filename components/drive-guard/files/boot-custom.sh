@@ -58,7 +58,7 @@ GUARD
 # EMUBOX: wait for Batocera's sound set-up to finish, then start the film (see /boot/boot-custom.sh).
 if [ "$1" = "start" ]; then
     n=0
-    while [ $n -lt 20 ] && pgrep -f /etc/init.d/S27audioconfig >/dev/null 2>&1; do
+    while [ $n -lt 20 ] && pgrep -f '/etc/init.d/[S]27audioconfig' >/dev/null 2>&1; do
         sleep 0.5; n=$((n + 1))
     done
     [ $n -gt 0 ] && echo "$(date '+%F %T') film waited $((n / 2)) s for the sound set-up" >> /var/log/emubox-boot.log
@@ -179,10 +179,11 @@ say() { echo "$(date '+%F %T') $*" >> "$L"; sync; }
 say "=== shutdown reached the last step (runlevel: $(runlevel 2>/dev/null | cut -d' ' -f2))"
 # Batocera's network-discovery helper (wsdd) is told to stop but is still running when the drives
 # are unmounted, so the games partition is never cleanly unmounted. Stop it properly and wait.
-if pgrep -f /usr/bin/wsdd >/dev/null 2>&1; then
-    pkill -f /usr/bin/wsdd
-    for i in 1 2 3 4 5 6; do pgrep -f /usr/bin/wsdd >/dev/null 2>&1 || break; sleep 0.5; done
-    pgrep -f /usr/bin/wsdd >/dev/null 2>&1 && pkill -9 -f /usr/bin/wsdd
+# ([w]sdd: the brackets keep the pattern from matching its own command line.)
+if pgrep -f '/usr/bin/[w]sdd' >/dev/null 2>&1; then
+    pkill -f '/usr/bin/[w]sdd'
+    for i in 1 2 3 4 5 6; do pgrep -f '/usr/bin/[w]sdd' >/dev/null 2>&1 || break; sleep 0.5; done
+    pgrep -f '/usr/bin/[w]sdd' >/dev/null 2>&1 && pkill -9 -f '/usr/bin/[w]sdd'
     say "stopped leftover wsdd"
 fi
 for p in $(fuser -m /userdata 2>/dev/null); do
