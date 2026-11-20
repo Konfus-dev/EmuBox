@@ -7,10 +7,19 @@
 # Needs grub-mkstandalone and the x86_64-efi modules: GRUB_MODULES=/path (default: the
 # grub-efi-amd64-bin package's /usr/lib/grub/x86_64-efi). The loader is placed in the PC's EFI
 # partition (EFI/batocera/grubx64.efi) and listed in the boot menu (loader/entries/batocera.conf).
+#
+# OUT straight in the EFI partition is refused unless that disk's partition table is backed up
+# (sudo sfdisk --dump /dev/nvme0n1 > ~/.config/emubox/partition-table-nvme0n1.sfdisk, or name the
+# file with EMUBOX_PT_BACKUP), the partition really is an EFI system partition, OUT is in its EFI
+# folder, and it has twice the loader's size free. The loader is built elsewhere first and replaces
+# an old one whole or not at all. (A record of how EmuBox was set up on the OMEN desktop; the boot
+# entry itself was added by hand.)
 set -euo pipefail
-[ $# -ge 2 ] || { sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
+[ $# -ge 2 ] || { sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
+die() { echo "build-loader: $*" >&2; exit 1; }
 here=$(dirname "$(readlink -f "$0")"); repo=$(dirname "$(dirname "$here")")
 uuid=$1 out=$2; shift 2
+[[ $uuid =~ ^[0-9A-Fa-f-]+$ ]] || die "'$uuid' is not a filesystem id (lsblk -no UUID /dev/nvme0n1p6)."
 modules=${GRUB_MODULES:-/usr/lib/grub/x86_64-efi}
 [ -d "$modules" ] || { echo "No GRUB EFI modules at $modules (set GRUB_MODULES)." >&2; exit 1; }
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
@@ -20,7 +29,36 @@ install -m 755 "$here/initrd/emubox-init" "$here/initrd/emubox-hook" "$work/cpio
 install -m 755 "$repo/components/drive-guard/files/boot-custom.sh" "$work/cpio/emubox/boot-custom.sh"
 (cd "$work/cpio" && find . | cpio -o -H newc -R 0:0 --quiet) > "$work/emubox.cpio"
 sed -e "s/@BOOT_UUID@/$uuid/g" -e "s|@EXTRA_ARGS@|$*|" "$here/grub.cfg" > "$work/grub.cfg"
-grub-mkstandalone --directory="$modules" -O x86_64-efi -o "$out" \
+grub-mkstandalone --directory="$modules" -O x86_64-efi -o "$work/loader.efi" \
     --modules="part_gpt part_msdos fat search search_fs_uuid linux echo sleep test normal all_video efi_gop gfxterm memdisk" \
     --locales="" --fonts="" --themes="" "boot/grub/grub.cfg=$work/grub.cfg" "emubox.cpio=$work/emubox.cpio"
+[ -s "$work/loader.efi" ] || die "grub-mkstandalone made no loader; nothing was written."
+
+# --- putting it in place ----------------------------------------------------------------------
+# Writing into the PC's EFI partition is what can leave the PC unable to start (a full partition,
+# a half-written loader, the wrong partition), so there it is done only when all of this holds.
+ESP_TYPE=c12a7328-f81f-11d2-ba4b-00a0c93ec93b
+dir=$(dirname "$out")
+[ -d "$dir" ] || die "$dir does not exist."
+fstype=$(findmnt -no FSTYPE -T "$dir" 2>/dev/null | head -n1)
+[ -n "$fstype" ] || die "Cannot tell which filesystem $dir is on; nothing was written."
+if [ "$fstype" = vfat ]; then
+    src=$(findmnt -no SOURCE -T "$dir" | head -n1)
+    mnt=$(findmnt -no TARGET -T "$dir" | head -n1)
+    disk=$(lsblk -no PKNAME "$src" 2>/dev/null | head -n1)
+    [ -n "$disk" ] || die "Cannot tell which disk $src is on; nothing was written."
+    [ "$(lsblk -no PARTTYPE "$src" | head -n1)" = "$ESP_TYPE" ] || die "$src is not an EFI system partition; nothing was written."
+    case "$(readlink -f "$dir")/" in "$(readlink -f "$mnt")/EFI/"*) ;; *) die "$out is not inside $mnt/EFI/; nothing was written." ;; esac
+    backup=${EMUBOX_PT_BACKUP:-$HOME/.config/emubox/partition-table-$disk.sfdisk}
+    grep -q '^label:' "$backup" 2>/dev/null && grep -q "^device: /dev/$disk\$" "$backup" ||
+        die "No backup of /dev/$disk's partition table at $backup (sudo sfdisk --dump /dev/$disk > $backup); nothing was written."
+    size=$(stat -c %s "$work/loader.efi")
+    free=$(df -B1 --output=avail "$dir" | tail -n1 | tr -d ' ')
+    [ "$free" -ge $((2 * size)) ] 2>/dev/null || die "$mnt has $free bytes free; the loader needs twice its $size bytes. Nothing was written."
+fi
+# Beside the old one first, then moved over it: the old loader is replaced whole or not at all.
+cp "$work/loader.efi" "$out.emubox-new" && cmp -s "$work/loader.efi" "$out.emubox-new" ||
+    { rm -f "$out.emubox-new"; die "Copying the loader to $dir did not check out; the old one is as it was."; }
+mv "$out.emubox-new" "$out"
+sync
 echo "Built $out"

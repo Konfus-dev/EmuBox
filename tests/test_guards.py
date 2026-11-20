@@ -655,3 +655,82 @@ class BluetoothArchiveTests(unittest.TestCase):
             self.assertEqual(bt.pairings(path.read_bytes()), 2)
             self.assertEqual(path.stat().st_mode & 0o777, 0o600)
             self.assertEqual(sorted(p.name for p in Path(folder).iterdir()), ["bluetooth.tar"])   # nothing half-written
+
+
+# --- the PC's own boot: the EFI partition is written only when it is safe --------------------
+
+class BootLoaderTests(unittest.TestCase):
+    """tools/dualboot/build-loader puts EmuBox's boot loader in the PC's EFI partition. A full
+    partition, a half-written loader or the wrong partition would leave the PC unable to start;
+    it is run here against a pretend PC (findmnt, lsblk, df and grub-mkstandalone)."""
+
+    ESP = "c12a7328-f81f-11d2-ba4b-00a0c93ec93b"
+    LOADER_BYTES = 4096
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.esp = self.root / "esp"
+        (self.esp / "EFI/batocera").mkdir(parents=True)
+        self.out = self.esp / "EFI/batocera/grubx64.efi"
+        self.out.write_bytes(b"the old loader")
+        (self.root / "modules").mkdir()
+        self.backup = self.root / "nvme0n1.sfdisk"
+        self.backup.write_text("label: gpt\ndevice: /dev/nvme0n1\nunit: sectors\n\n/dev/nvme0n1p1 : start=2048\n")
+        stubs = self.root / "bin"
+        stubs.mkdir()
+        self.fake = {"FSTYPE": "vfat", "SOURCE": "/dev/nvme0n1p1", "TARGET": str(self.esp),
+                     "PARTTYPE": self.ESP, "PKNAME": "nvme0n1", "FREE": str(10 * self.LOADER_BYTES)}
+        scripts = {
+            "findmnt": 'case "$2" in FSTYPE) echo "$FAKE_FSTYPE";; SOURCE) echo "$FAKE_SOURCE";; TARGET) echo "$FAKE_TARGET";; esac',
+            "lsblk": 'case "$2" in PARTTYPE) echo "$FAKE_PARTTYPE";; PKNAME) echo "$FAKE_PKNAME";; esac',
+            "df": 'printf "  Avail\\n%s\\n" "$FAKE_FREE"',
+            "grub-mkstandalone": f'for a; do case "$prev" in -o) head -c {self.LOADER_BYTES} /dev/zero > "$a";; esac; prev=$a; done',
+        }
+        for name, body in scripts.items():
+            (stubs / name).write_text(f"#!/bin/bash\n{body}\n")
+            (stubs / name).chmod(0o755)
+        self.path = f"{stubs}:{os.environ['PATH']}"
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def build(self, **changes) -> subprocess.CompletedProcess:
+        fake = {**self.fake, **changes}
+        env = {**os.environ, "PATH": self.path, "GRUB_MODULES": str(self.root / "modules"),
+               "EMUBOX_PT_BACKUP": str(self.backup), "HOME": str(self.root),
+               **{f"FAKE_{k}": v for k, v in fake.items()}}
+        return subprocess.run(["bash", str(REPO / "tools/dualboot/build-loader"), "ABCD-1234", str(self.out)],
+                              capture_output=True, text=True, env=env)
+
+    def assertUntouched(self, done: subprocess.CompletedProcess, why: str):
+        self.assertNotEqual(done.returncode, 0, done.stdout)
+        self.assertIn(why, done.stderr)
+        self.assertEqual(self.out.read_bytes(), b"the old loader")
+        self.assertEqual(sorted(p.name for p in self.out.parent.iterdir()), ["grubx64.efi"])
+
+    def test_with_everything_in_order_the_loader_is_put_in_place(self):
+        done = self.build()
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(self.out.read_bytes(), b"\0" * self.LOADER_BYTES)
+        self.assertEqual(sorted(p.name for p in self.out.parent.iterdir()), ["grubx64.efi"])
+
+    def test_no_partition_table_backup_no_write(self):
+        self.backup.unlink()
+        self.assertUntouched(self.build(), "No backup of /dev/nvme0n1's partition table")
+        self.backup.write_text("label: gpt\ndevice: /dev/sda\n")                   # another disk's
+        self.assertUntouched(self.build(), "No backup")
+
+    def test_only_the_efi_folder_of_an_efi_system_partition(self):
+        self.assertUntouched(self.build(PARTTYPE="0fc63daf-8483-4772-8e79-3d69d8477de4"), "not an EFI system partition")
+        self.assertUntouched(self.build(TARGET=str(self.esp / "EFI/batocera/elsewhere")), "is not inside")
+        self.assertUntouched(self.build(FSTYPE=""), "Cannot tell which filesystem")
+
+    def test_a_nearly_full_efi_partition_is_not_written(self):
+        self.assertUntouched(self.build(FREE=str(2 * self.LOADER_BYTES - 1)), "needs twice")
+        self.assertEqual(self.build(FREE=str(2 * self.LOADER_BYTES)).returncode, 0)
+
+    def test_a_loader_built_into_an_ordinary_folder_needs_none_of_it(self):
+        self.backup.unlink()
+        done = self.build(FSTYPE="ext4", PARTTYPE="", FREE="0")
+        self.assertEqual(done.returncode, 0, done.stderr)
