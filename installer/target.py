@@ -111,6 +111,42 @@ def label_problem(folder: Path, parts: list[dict] | None = None) -> str:
             f"Its label has to be {DATA_LABEL} again before EmuBox works on it.")
 
 
+def device_bytes(device: str) -> int:
+    """The size the kernel gives a disk or partition, in bytes; 0 when it cannot be told."""
+    try:
+        listed = subprocess.run(["lsblk", "-bdno", "SIZE", device], capture_output=True, text=True).stdout
+        return int(listed.split()[0])
+    except (OSError, ValueError, IndexError):
+        return 0
+
+
+def size_problem(folder: Path, parts: list[dict] | None = None) -> str:
+    """Why the drive's sizes cannot be trusted, or ''. A filesystem larger than its partition, or a
+    partition reaching past the end of its disk, means writes land where there is nothing (a drive
+    copied from a larger one, or a fake-capacity stick, which nearly cost data once): files then
+    come back damaged. Whether a stick only pretends to be large cannot be told without writing it
+    full; this catches the cases where the numbers disagree."""
+    part = backing_partition(folder, parts)
+    if part is None:
+        return ""
+    part_bytes = device_bytes(part["path"])
+    try:
+        info = os.statvfs(folder)
+        fs_bytes = info.f_blocks * info.f_frsize
+    except OSError:
+        fs_bytes = 0
+    if part_bytes and fs_bytes > part_bytes * 1.01:
+        return (f"The filesystem on {part['path']} says it is {fs_bytes // 2**20} MB, but the partition is only "
+                f"{part_bytes // 2**20} MB: what is written past the end is lost.")
+    disk = subprocess.run(["lsblk", "-no", "PKNAME", part["path"]], capture_output=True, text=True).stdout.split() \
+        if part["path"] else []
+    disk_bytes = device_bytes(f"/dev/{disk[0]}") if disk else 0
+    if disk_bytes and part_bytes > disk_bytes:
+        return (f"{part['path']} is {part_bytes // 2**20} MB, more than its whole disk ({disk_bytes // 2**20} MB): "
+                f"what is written past the end is lost.")
+    return ""
+
+
 def _sha256_of(path: Path) -> str:
     digest = hashlib.sha256()
     with open(path, "rb") as file:

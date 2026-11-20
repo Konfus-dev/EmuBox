@@ -24,7 +24,7 @@ from .fetch import FetchError, fetch, is_url, without_secrets
 from .host import Host, expand
 from .library import Library, Selection
 from .prompts import NoAnswer, Prompts
-from .target import LIVE_ROOT, Target, label_problem, main_drive
+from .target import LIVE_ROOT, Target, label_problem, main_drive, size_problem
 from .target import drives as target_drives
 
 REPO = Path(__file__).resolve().parent.parent
@@ -535,6 +535,11 @@ def main(argv: list[str] | None = None) -> int:
         problem = label_problem(target.root)   # never write to a data partition Batocera would not find
         if problem:
             raise Stop(problem)
+        problem = size_problem(target.root)    # a drive whose sizes disagree damages what is written to it
+        if problem:
+            ask.say(f"\nWarning: {problem} Copy what matters off this drive and check it (for example with f3) first.")
+            if not ask.yes_no("Go on anyway?", False):
+                raise Stop("Nothing was changed.")
         become_root_if_needed(target, argv, ask)
         if args.remove:
             run_remove(args.remove, target, ask)

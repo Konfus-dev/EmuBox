@@ -734,3 +734,51 @@ class BootLoaderTests(unittest.TestCase):
         self.backup.unlink()
         done = self.build(FSTYPE="ext4", PARTTYPE="", FREE="0")
         self.assertEqual(done.returncode, 0, done.stderr)
+
+
+# --- a drive whose sizes disagree ------------------------------------------------------------
+
+class SizeTests(unittest.TestCase):
+    """A fake-capacity stick nearly corrupted data. Whether a stick only pretends to be large
+    cannot be told without writing it full, but sizes that disagree can be seen."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name) / "drive"
+        for folder in ("system", "roms"):
+            (self.root / folder).mkdir(parents=True)
+        (self.root / "system/batocera.conf").write_text("")
+        self.parts = [{"path": "/dev/sdz2", "uuid": "u", "label": "SHARE", "fstype": "ext4", "size": "1M",
+                       "removable": True, "mounts": [str(self.root)]}]
+        info = os.statvfs(self.root)
+        self.fs_bytes = info.f_blocks * info.f_frsize
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def problem(self, partition: int, disk: int) -> str:
+        from unittest import mock
+        from installer import target as target_module
+        sizes = {"/dev/sdz2": partition, "/dev/sdz": disk}
+        listed = subprocess.CompletedProcess([], 0, "sdz\n", "")
+        with mock.patch.object(target_module, "device_bytes", side_effect=lambda device: sizes.get(device, 0)), \
+                mock.patch.object(target_module.subprocess, "run", return_value=listed):
+            return target_module.size_problem(self.root, self.parts)
+
+    def test_sizes_that_disagree_are_noticed(self):
+        self.assertEqual(self.problem(self.fs_bytes, self.fs_bytes * 2), "")
+        self.assertIn("the partition is only", self.problem(self.fs_bytes // 2, self.fs_bytes * 2))
+        self.assertIn("more than its whole disk", self.problem(self.fs_bytes, self.fs_bytes // 2))
+
+    def test_the_installer_stops_unless_told_to_go_on(self):
+        import io
+        from unittest import mock
+        from installer import cli, target as target_module
+        out = io.StringIO()
+        with mock.patch.object(target_module, "partitions", return_value=self.parts), \
+                mock.patch.object(target_module, "device_bytes", return_value=1024 * 1024), \
+                mock.patch("sys.stdout", out), mock.patch("sys.stdin", io.StringIO("")):
+            code = cli.main(["--target", str(self.root), "--yes", "--with", "tweaks"])
+        self.assertEqual(code, 1)
+        self.assertIn("Warning:", out.getvalue())
+        self.assertEqual(sorted(p.name for p in (self.root / "system").iterdir()), ["batocera.conf"])
