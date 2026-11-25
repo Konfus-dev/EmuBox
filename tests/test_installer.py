@@ -360,6 +360,19 @@ class ComponentTests(Drive):
         self.assertEqual((other / "padto.keys").read_text(), "mine")
         self.assertFalse((other / "mkxp.json").exists())                   # RPG Maker's own player
         self.assertFalse((self.root / "roms/windows/Not RPG Maker.pc/padto.keys").exists())
+        # A game with its own mkxp.json (comments, a soundfont): only full screen is switched on.
+        third = self.root / "roms/windows/Third.pc"
+        make_file(third / "Game.ini").write_text("[Game]\nLibrary=RGSS104E.dll\n")
+        make_file(third / "Game.exe").write_bytes(b"MZ mkxp.json")
+        original = '{\n    // comment\n    // "fullscreen": false,\n    "midiSoundFont": "soundfont.sf2",\n}\n'
+        make_file(third / "mkxp.json").write_text(original)
+        run(self.root, "--yes", "--with", "discord")
+        text = (third / "mkxp.json").read_text()
+        self.assertIn('"fullscreen": true', text)
+        self.assertIn('"midiSoundFont": "soundfont.sf2"', text)
+        self.assertEqual((third / "mkxp.json.before-emubox").read_text(), original)
+        run(self.root, "--yes", "--with", "discord")
+        self.assertEqual((third / "mkxp.json").read_text(), text)         # once
 
     @staticmethod
     def repo_vmpads():

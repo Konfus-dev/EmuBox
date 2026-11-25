@@ -82,6 +82,24 @@ def set_up_rpg_maker_games(env) -> None:
         if not (game / "padto.keys").exists():
             env.target.write_text(f"{relative}/padto.keys", RPG_MAKER_KEYS.read_text())
             env.say(f"  {game.name}: controller set up (A confirm, B back, X run)")
-        if runs_on_mkxp(game) and not (game / "mkxp.json").exists():
-            env.target.write_text(f"{relative}/mkxp.json", json.dumps(MKXP_FULL_SCREEN, indent=4) + "\n")
-            env.say(f"  {game.name}: starts full screen")
+        if runs_on_mkxp(game):
+            own = game / "mkxp.json"
+            if not own.exists():
+                env.target.write_text(f"{relative}/mkxp.json", json.dumps(MKXP_FULL_SCREEN, indent=4) + "\n")
+                env.say(f"  {game.name}: starts full screen")
+            else:
+                text = own.read_text(errors="replace")
+                changed = with_full_screen(text)
+                if changed != text:
+                    if not (game / "mkxp.json.before-emubox").exists():
+                        env.target.write_text(f"{relative}/mkxp.json.before-emubox", text)
+                    env.target.write_text(f"{relative}/mkxp.json", changed)
+                    env.say(f"  {game.name}: starts full screen (its own mkxp.json, original kept beside it)")
+
+
+def with_full_screen(text: str) -> str:
+    """A game's own mkxp.json (JSON with // comments) with full screen switched on, everything
+    else (its soundfont, its keys) kept. One that already says "fullscreen" itself is left alone."""
+    if re.search(r'^\s*"fullscreen"\s*:', text, re.M):
+        return text
+    return re.sub(r"\{", '{\n    "fullscreen": true,', text, count=1)
