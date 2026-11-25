@@ -798,14 +798,17 @@ class AudioTests(unittest.TestCase):
             self.assertEqual([menusounds.neighbour("EmuBox", names, True), menusounds.neighbour("My Set", names, True),
                               menusounds.neighbour("EmuBox", names, False), menusounds.neighbour("gone", names, True)],
                              ["My Set", "EmuBox", "My Set", "My Set"])
-            # the start-up film is always EmuBox's own: a set's old film is replaced by it
+            # a set with its own start-up film brings it along; going back restores EmuBox's own
             splash, own = Path(folder) / "splash", Path(folder) / "own.mp4"
             splash.mkdir()
             own.write_text("emubox film")
-            (splash / "emubox.mp4").write_text("my set's film")
-            self.assertTrue(menusounds.start_up_film(splash, own))
+            (splash / "emubox.mp4").write_text("emubox film")
+            (mine / "My Set" / "boot.mp4").write_text("my film")
+            self.assertTrue(menusounds.start_up_film("My Set", mine, splash, own))
+            self.assertEqual((splash / "emubox.mp4").read_text(), "my film")
+            self.assertFalse(menusounds.start_up_film("My Set", mine, splash, own))    # already in place
+            self.assertTrue(menusounds.start_up_film("EmuBox", mine, splash, own))
             self.assertEqual((splash / "emubox.mp4").read_text(), "emubox film")
-            self.assertFalse(menusounds.start_up_film(splash, own))                   # already in place
 
     def test_a_setting_written_is_the_setting_read(self):
         with tempfile.TemporaryDirectory() as folder:

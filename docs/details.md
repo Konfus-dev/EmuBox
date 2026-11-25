@@ -162,7 +162,9 @@ press instead of being read from the drive each time.
 EmuBox's own set is synthesised and is what you get unless you bring your own: the installer asks
 for a folder of sound sets (or take `--sounds FOLDER`), one sub-folder per set, named as it should
 be listed. What a file does is told by its name: `scroll.wav`, `select.wav`, `back.wav`,
-and `menuopen.wav`. A set changes the sounds only: the start-up film is always EmuBox's own. A sound a set lacks is taken from EmuBox's. Until you choose a set in the menu, one with "xbox" in its name is used when there is one. Such sets are yours and
+`menuopen.wav`, `boot.mp4` (a ready-made start-up film, played at start while the set is chosen) and
+`boot.wav` for the start-up film's sound (the installer makes that set's film from it with EmuBox's
+pictures; it needs GStreamer). A sound a set lacks is taken from EmuBox's. Until you choose a set in the menu, one with "xbox" in its name is used when there is one. Such sets are yours and
 stay out of the repository.
 
 ## Your BIOS files and games

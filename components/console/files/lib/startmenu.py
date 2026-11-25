@@ -151,7 +151,7 @@ class Watch:
             except Exception as error:   # noqa: BLE001
                 print(f"startmenu: {module.__name__}: {error}", file=sys.stderr)
         if not first:
-            menusounds.apply()   # the sound set may have changed
+            menusounds.apply()   # the sound set may have changed: its start-up film goes with it
         return True
 
 

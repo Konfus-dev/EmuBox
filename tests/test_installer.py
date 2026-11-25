@@ -224,15 +224,26 @@ class ComponentTests(Drive):
         with tempfile.TemporaryDirectory() as folder:
             mine = Path(folder) / "Sounds"
             make_file(mine / "My Set" / "select.wav")
-            make_file(mine / "My Set" / "boot.wav")      # sets no longer bring a start-up film
+            make_file(mine / "My Set" / "boot.wav")
             make_file(mine / "My Set" / "notes.txt")
             (mine / "Empty").mkdir()
-            self.assertEqual(cli.copy_sound_sets(self.target, mine), [])   # nothing there to play them yet
+            films = []
+
+            def make_film(sound, out):
+                films.append(sound.name)
+                out.write_text("film")
+                return True
+            self.assertEqual(cli.copy_sound_sets(self.target, mine, make_film=make_film), [])   # nothing there to play them yet
             make_file(self.root / "system/emubox/lib/menusounds.py")
+            self.assertEqual(cli.copy_sound_sets(self.target, mine, make_film=make_film), ["My Set"])
             on_drive = self.root / "system/configs/emubox/sounds/My Set"
-            make_file(on_drive / "boot.mp4")                  # left by an earlier version
-            self.assertEqual(cli.copy_sound_sets(self.target, mine), ["My Set"])
-            self.assertEqual(sorted(p.name for p in on_drive.iterdir()), ["select.wav"])
+            self.assertEqual(sorted(p.name for p in on_drive.iterdir()), ["boot.mp4", "select.wav"])   # the film is made from boot.wav
+            cli.copy_sound_sets(self.target, mine, make_film=make_film)
+            self.assertEqual(films, ["boot.wav"])                         # and not made again while the sound is unchanged
+            said = []
+            (on_drive / "boot.mp4").unlink()
+            cli.copy_sound_sets(self.target, mine, said.append, make_film=lambda sound, out: False)
+            self.assertIn("keeps EmuBox's own film", said[-1])
 
     def test_a_setup_file_answers_everything(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -269,13 +280,17 @@ class ComponentTests(Drive):
             self.assertEqual(code, 1)
             self.assertIn("not understood: wiht", out)
 
-    def test_emuboxs_own_film_is_put_back_at_install(self):
+    def test_the_chosen_sets_film_is_put_in_place_at_install(self):
         from installer import cli
-        make_file(self.root / "splash/emubox.mp4").write_bytes(b"a sound set's film")    # from an earlier version
+        make_file(self.root / "splash/emubox.mp4").write_bytes(b"emubox's own")
         make_file(self.root / "system/emubox/splash/emubox.mp4").write_bytes(b"emubox's own")
-        self.assertTrue(cli.put_start_up_film(self.target))
+        make_file(self.root / "system/configs/emubox/sounds/OG Xbox/boot.mp4").write_bytes(b"the set's own")
+        make_file(self.root / "system/configs/emubox/sounds/Other/select.wav")
+        self.assertTrue(cli.put_start_up_film(self.target))         # nothing chosen: the Xbox set
+        self.assertEqual((self.root / "splash/emubox.mp4").read_bytes(), b"the set's own")
+        make_file(self.root / "system/configs/emubox/settings.conf").write_text("ui.sound_set=EmuBox\n")
+        self.assertTrue(cli.put_start_up_film(self.target))         # EmuBox's own chosen: back it goes
         self.assertEqual((self.root / "splash/emubox.mp4").read_bytes(), b"emubox's own")
-        self.assertFalse(cli.put_start_up_film(self.target))         # already in place
 
     def test_the_installer_asks_for_your_sounds_and_remembers_the_folder(self):
         with tempfile.TemporaryDirectory() as folder, mock.patch.dict("os.environ", {"EMUBOX_SOUNDS": ""}), \
