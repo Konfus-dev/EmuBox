@@ -169,6 +169,14 @@ class Pad:
     def grab(self) -> bool:
         """Take the pads. False when somebody else is holding one (keyboard, Control Center)."""
         self._open_pads()
+        # Not while a button is still held (the A that opened the app, the Guide that opened a
+        # menu): its release would reach only us, and the program underneath would think it held
+        # for ever. The caller tries again a moment later.
+        try:
+            if any(device.active_keys() for device in self.devices):
+                return False
+        except OSError:
+            pass
         taken = []
         for device in list(self.devices):
             try:

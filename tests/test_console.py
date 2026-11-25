@@ -1145,3 +1145,47 @@ class SoundOutputTests(unittest.TestCase):
                 "profiles": {"off": {}, "output:hdmi-stereo-extra1": {"available": False},
                              "output:hdmi-stereo": {"available": True}}}]
         self.assertEqual(audioout.outputs([], off)[1], ("card:alsa_card.pci-0000_02_00.1:output:hdmi-stereo", "TV (HDMI)"))
+
+
+class PadTakingTests(unittest.TestCase):
+    def test_a_controller_is_taken_only_once_its_buttons_are_let_go(self):
+        # The Guide opens on the Guide button's press. Taking the controller then would keep the
+        # release from a game underneath (RetroArch's hotkey would stay "held" and its menus would
+        # ignore the controller): it is taken once nothing is held.
+        import padinput
+        from evdev import ecodes as e
+
+        class FakePad:
+            def __init__(self, held):
+                self.held, self.grabbed, self.fd = list(held), False, 99
+            def capabilities(self):
+                return {e.EV_KEY: [e.BTN_SOUTH, e.BTN_MODE]}
+            def active_keys(self):
+                return self.held
+            def grab(self):
+                self.grabbed = True
+            def ungrab(self):
+                self.grabbed = False
+            def close(self):
+                pass
+            def read(self):
+                return []
+
+        held, free = FakePad([e.BTN_MODE]), FakePad([])
+        pads_by_path = {"/dev/input/event1": held, "/dev/input/event2": free}
+        with mock.patch.object(padinput.evdev, "InputDevice", lambda path: pads_by_path[path]), \
+             mock.patch.object(padinput.GLib, "io_add_watch", lambda *a: 1), \
+             mock.patch.object(padinput.GLib, "timeout_add", lambda *a: 1):
+            pads = padinput.Pads(lambda name: None, list(pads_by_path))
+            self.assertFalse(held.grabbed)               # Guide still down: not taken yet
+            self.assertTrue(free.grabbed)
+            pads._on_events(None, None, held)
+            self.assertFalse(held.grabbed)               # still held
+            held.held = []                               # Guide let go (everyone saw it)
+            pads._on_events(None, None, held)
+            self.assertTrue(held.grabbed)
+            stuck = FakePad([e.BTN_SOUTH])
+            pads_by_path["/dev/input/event3"] = stuck
+            later = padinput.Pads(lambda name: None, ["/dev/input/event3"])
+            later._grab_rest()                           # held for seconds: taken anyway
+            self.assertTrue(stuck.grabbed)

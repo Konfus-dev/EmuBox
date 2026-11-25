@@ -16,6 +16,7 @@ from evdev import ecodes as e
 from gi.repository import GLib
 
 REPEAT_DELAY_MS, REPEAT_EVERY_MS = 380, 95
+GRAB_ANYWAY_MS = 3000          # a controller with a button held this long is taken anyway
 STICK_THRESHOLD = 0.6
 
 # xpad reports the X button as BTN_NORTH and Y as BTN_WEST; we follow the labels.
@@ -35,21 +36,51 @@ class Pads:
         self.devices: list[evdev.InputDevice] = []
         self.timers: dict[str, int] = {}
         self.stick = {"x": 0, "y": 0}
+        # A controller is taken only once nothing on it is held. The button that opened this
+        # screen (Guide) is usually still down: taken now, its release would reach only us, and a
+        # game underneath would think it held for ever. In RetroArch, Guide is the hotkey button,
+        # and while the hotkey is held its menus ignore the controller (2026-11-24).
+        self.not_yet: set[evdev.InputDevice] = set()
         for path in paths or evdev.list_devices():
             try:
                 device = evdev.InputDevice(path)
                 if e.BTN_SOUTH not in device.capabilities().get(e.EV_KEY, []):
                     device.close()
                     continue
-                device.grab()
+                if device.active_keys():
+                    self.not_yet.add(device)
+                else:
+                    device.grab()
             except OSError:
                 continue
             self.devices.append(device)
             GLib.io_add_watch(device.fd, GLib.IO_IN, self._on_events, device)
+        if self.not_yet:
+            GLib.timeout_add(GRAB_ANYWAY_MS, self._grab_rest)
+
+    def _grab_when_let_go(self, device) -> None:
+        if device in self.not_yet:
+            try:
+                if not device.active_keys():
+                    device.grab()
+                    self.not_yet.discard(device)
+            except OSError:
+                self.not_yet.discard(device)
+
+    def _grab_rest(self) -> bool:
+        """Something held for long (a stuck button): take the controller anyway."""
+        for device in list(self.not_yet):
+            try:
+                device.grab()
+            except OSError:
+                pass
+        self.not_yet.clear()
+        return False
 
     def release(self) -> None:
         for name in list(self.timers):
             self._stop(name)
+        self.not_yet.clear()
         for device in self.devices:
             try:
                 device.ungrab()
@@ -89,6 +120,7 @@ class Pads:
             return True
         except OSError:
             return False  # unplugged
+        self._grab_when_let_go(device)
         for event in events:
             if event.type == e.EV_KEY and event.code in BUTTONS:
                 name = BUTTONS[event.code]
