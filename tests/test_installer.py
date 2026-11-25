@@ -27,7 +27,7 @@ from installer.target import Target  # noqa: E402
 
 os.environ["EMUBOX_DOWNLOAD_LATER"] = "1"   # the tests never fetch programs from Flathub
 os.environ["EMUBOX_SOUNDS"] = "none"        # nor pick up sound sets that happen to sit beside the repository
-COMPONENT_QUESTIONS = 13   # asked on a PC without the OMEN lights or the IQUNIX keyboard
+COMPONENT_QUESTIONS = 14   # asked on a PC without the OMEN lights or the IQUNIX keyboard
 
 
 def make_drive(root: Path) -> Target:
@@ -297,7 +297,7 @@ class ComponentTests(Drive):
              mock.patch.object(cli, "SOUNDS_BESIDE", Path(folder) / "nowhere"):
             make_file(Path(folder) / "mine" / "Arcade" / "scroll.wav")
             # look n, apple-music n, discord y, seven more n, bios n, games n, sounds y + folder, go ahead y
-            code, out = run(self.root, answers="n\nn\ny\n" + "n\n" * 10 + "n\nn\ny\n" + f"{folder}/mine\ny\n")
+            code, out = run(self.root, answers="n\nn\ny\n" + "n\n" * 11 + "n\nn\ny\n" + f"{folder}/mine\ny\n")
             self.assertEqual(code, 0, out)
             self.assertIn("scroll.wav", out)      # the names are explained when asked
             self.assertIn("Arcade", out)
@@ -374,6 +374,19 @@ class ComponentTests(Drive):
         run(self.root, "--yes", "--with", "discord")
         self.assertEqual((third / "mkxp.json").read_text(), text)         # once
 
+    def test_xbox_labels_in_nintendo_games(self):
+        conf = self.root / "system/batocera.conf"
+        run(self.root, "--yes", "--with", "button-labels")
+        text = conf.read_text()
+        # Xbox A (Batocera binds it as the RetroPad's B) reaches a Game Boy game as A (id 8)
+        self.assertIn("gb.retroarch.input_player1_btn_b=8", text)
+        self.assertIn("gba.retroarch.input_player1_btn_a=0", text)
+        self.assertIn("snes.retroarch.input_player4_btn_y=9", text)
+        self.assertNotIn("psx.retroarch", text)                     # PlayStation stays by position
+        conf.write_text(text.replace("gb.retroarch.input_player1_btn_b=8", "gb.retroarch.input_player1_btn_b=0"))
+        run(self.root, "--yes", "--with", "button-labels")
+        self.assertIn("gb.retroarch.input_player1_btn_b=0", conf.read_text())   # your change stays
+
     @staticmethod
     def repo_vmpads():
         import importlib.util
@@ -412,7 +425,7 @@ class ComponentTests(Drive):
 
     def test_questions_are_asked_and_answered(self):
         # look n, apple-music n, discord y, seven more n, bios n, games n, go ahead y
-        code, out = run(self.root, answers="n\nn\ny\n" + "n\n" * 10 + "n\nn\ny\n")
+        code, out = run(self.root, answers="n\nn\ny\n" + "n\n" * 11 + "n\nn\ny\n")
         self.assertEqual(code, 0, out)
         self.assertTrue((self.root / "roms/apps/Discord.sh").exists())
         self.assertFalse((self.root / "themes/emubox").exists())
@@ -421,7 +434,7 @@ class ComponentTests(Drive):
 class TypedAnswerTests(Drive):
     def test_wifi_is_asked_for_and_written(self):
         # look, apple-music, discord, store, vault n; wifi y + name + password; four more n; bios n, games n; go ahead y
-        code, out = run(self.root, answers="n\nn\nn\nn\nn\ny\nHome Net\np@ss {word}\n" + "n\n" * 7 + "n\nn\ny\n")
+        code, out = run(self.root, answers="n\nn\nn\nn\nn\ny\nHome Net\np@ss {word}\n" + "n\n" * 8 + "n\nn\ny\n")
         self.assertEqual(code, 0, out)
         self.assertEqual(self.target.conf_get("wifi.ssid"), "Home Net")
         self.assertEqual(self.target.conf_get("wifi.key"), "p@ss {word}")
