@@ -23,6 +23,7 @@ import sys
 import time
 from pathlib import Path
 
+import audioout
 import menusounds
 import music
 import settings
@@ -126,7 +127,18 @@ def listing(what: str) -> list[dict]:
     return found if isinstance(found, list) else []
 
 
+def chosen_output(conf: Path = Path("/userdata/system/batocera.conf")) -> str:
+    """audio.device in batocera.conf ("auto" when not set)."""
+    import re
+    try:
+        found = re.search(r"^audio\.device=(.*)$", conf.read_text(errors="replace"), re.M)
+    except OSError:
+        return "auto"
+    return found.group(1).strip() if found else "auto"
+
+
 def look(words: list[str], state: dict) -> list[list[str]]:
+    audioout.prefer_headphones(chosen_output())   # "Automatic": headphones when connected, else HDMI
     es = music.es_text()
     follow_frontend_music(es)
     switches = dict(settings.read())

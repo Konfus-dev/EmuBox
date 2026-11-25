@@ -1138,7 +1138,7 @@ class SoundOutputTests(unittest.TestCase):
         sinks = [{"name": "alsa_output.pci-0000_02_00.1.hdmi-stereo", "description": "GB203 Digital Stereo (HDMI)",
                   "properties": {"node.nick": "LG TV SSCR2", "device.bus": "pci"}},
                  {"name": "bluez_output.88_C9.1", "description": "WH-1000XM5", "properties": {"device.bus": "bluetooth"}}]
-        self.assertEqual(audioout.outputs(sinks, []), [("auto", "Automatic"),
+        self.assertEqual(audioout.outputs(sinks, []), [("auto", "Automatic (headphones first)"),
                                                        ("alsa_output.pci-0000_02_00.1.hdmi-stereo", "LG TV SSCR2 (HDMI)"),
                                                        ("bluez_output.88_C9.1", "WH-1000XM5 (Bluetooth)")])
         off = [{"name": "alsa_card.pci-0000_02_00.1", "active_profile": "off", "properties": {"device.bus": "pci"},
@@ -1192,3 +1192,27 @@ class PadTakingTests(unittest.TestCase):
             later = padinput.Pads(lambda name: None, ["/dev/input/event3"])
             later._grab_rest()                           # held for seconds: taken anyway
             self.assertTrue(stuck.grabbed)
+
+
+class HeadphonesFirstTests(unittest.TestCase):
+    def test_automatic_prefers_headphones_then_hdmi_and_leaves_a_chosen_output_alone(self):
+        import audioout
+        tv = {"name": "alsa_output.pci-0000_02_00.1.hdmi-stereo", "properties": {"device.bus": "pci"}}
+        speakers = {"name": "alsa_output.pci-0000_00_1f.3.analog-stereo", "active_port": "analog-output-lineout",
+                    "properties": {"device.bus": "pci"}}
+        jack = {"name": "alsa_output.pci-0000_00_1f.3.analog-stereo", "active_port": "analog-output-headphones",
+                "properties": {"device.bus": "pci"}}
+        headset = {"name": "alsa_output.usb-Razer_Inc_BlackShark-00.analog-stereo", "properties": {"device.bus": "usb"}}
+        buds = {"name": "bluez_output.88_C9.1", "properties": {"device.bus": "bluetooth"}}
+        self.assertEqual(audioout.preferred([tv, speakers]), tv["name"])          # HDMI over speakers
+        self.assertEqual(audioout.preferred([tv, jack]), jack["name"])             # headphones in the socket
+        self.assertEqual(audioout.preferred([tv, headset]), headset["name"])       # a USB headset
+        self.assertEqual(audioout.preferred([buds, tv]), buds["name"])             # Bluetooth headphones
+        ran = []
+        with mock.patch.object(audioout.subprocess, "run", lambda cmd, **k: ran.append(cmd)), \
+             mock.patch.object(audioout, "move_playing", lambda sink: ran.append(["moved", sink])):
+            self.assertEqual(audioout.prefer_headphones("auto", [tv, headset], default=tv["name"]), headset["name"])
+            self.assertEqual(audioout.prefer_headphones("auto", [tv, headset], default=headset["name"]), "")   # already there
+            self.assertEqual(audioout.prefer_headphones(tv["name"], [tv, headset], default=tv["name"]), "")  # your choice stays
+        self.assertIn(["pactl", "set-default-sink", headset["name"]], ran)
+        self.assertIn(["moved", headset["name"]], ran)

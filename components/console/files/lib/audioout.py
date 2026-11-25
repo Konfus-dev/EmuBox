@@ -32,7 +32,7 @@ def outputs(sinks: list[dict] | None = None, cards: list[dict] | None = None) ->
     its best plugged-in output profile, and switched on when chosen."""
     sinks = _pactl_json("sinks") if sinks is None else sinks
     cards = _pactl_json("cards") if cards is None else cards
-    found = [("auto", "Automatic")] + [(s["name"], friendly(s)) for s in sinks if s.get("name")]
+    found = [("auto", "Automatic (headphones first)")] + [(s["name"], friendly(s)) for s in sinks if s.get("name")]
     for card in cards:
         if card.get("active_profile") != "off":
             continue
@@ -109,6 +109,44 @@ def step(by: int) -> None:
     if subprocess.run(["batocera-audio", "set", target]).returncode == 0:
         subprocess.run(["batocera-settings-set", "audio.device", target])
         move_playing(target)
+
+
+def rank(sink: dict) -> int:
+    """How much "Automatic" wants an output: headphones (Bluetooth, a USB headset, the headphone
+    socket with something in it) over HDMI, HDMI over anything else (speakers that may be off)."""
+    props = sink.get("properties", {})
+    name = sink.get("name", "").lower()
+    if props.get("device.bus") in ("bluetooth", "usb") or name.startswith("bluez_"):
+        return 3
+    if "headphone" in str(sink.get("active_port", "")).lower():
+        return 2
+    if "hdmi" in name or "displayport" in name:
+        return 1
+    return 0
+
+
+def preferred(sinks: list[dict]) -> str:
+    """The output "Automatic" should use now ("" when there is nothing better than nothing)."""
+    best = max(sinks, key=rank, default=None)
+    return best["name"] if best and rank(best) > 0 else ""
+
+
+def prefer_headphones(chosen: str, sinks: list[dict] | None = None, default: str | None = None) -> str:
+    """With "Automatic" chosen, put sound on the best output there is now: headphones when any are
+    connected, else HDMI. Batocera's own "auto" only prefers Bluetooth and otherwise leaves it to
+    chance. A named output chosen in the Guide (or Batocera's menu) is left alone. Returns the
+    output switched to, or ""."""
+    if chosen not in ("", "auto"):
+        return ""
+    sinks = _pactl_json("sinks") if sinks is None else sinks
+    best = preferred(sinks)
+    if default is None:
+        default = subprocess.run(["pactl", "get-default-sink"], capture_output=True, text=True).stdout.strip()
+    if not best or best == default:
+        return ""
+    subprocess.run(["pactl", "set-default-sink", best], capture_output=True)
+    move_playing(best)
+    return best
 
 
 def move_playing(sink: str) -> None:

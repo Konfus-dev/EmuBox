@@ -123,7 +123,8 @@ menus stays, also when you run the installer again.
 **Guide** opens EmuBox's own quick menu, over the menus or a running game:
 
 - **Settings**: the system volume and mute, the **sound output** (by the names you know them by:
-  the TV's own name, your headphones'; kept for the next start), the **menu music** on or off, the
+  the TV's own name, your headphones'; kept for the next start; **Automatic** puts sound on headphones
+  whenever any are connected (Bluetooth, a USB headset, the headphone socket) and on HDMI otherwise), the **menu music** on or off, the
   menu sound set and its volume, **Bluetooth** (is the adapter working, which controllers are
   connected and their battery, and **Pair a controller**: hold the controller's pair button, B
   stops looking), the lights' basics
