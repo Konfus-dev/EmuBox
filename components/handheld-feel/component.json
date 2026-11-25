@@ -1,0 +1,44 @@
+{
+  "title": "Snappier Game Boy controls",
+  "question": "Make Game Boy, Game Boy Color and GBA games feel better on an Xbox pad: one frame of run-ahead (less lag), RT held to run (B), LT held to fast-forward, and a stick that turns less easily into diagonals?",
+  "default": true,
+  "order": 38,
+  "files": [
+    {
+      "from": "files/handheld.keys",
+      "to": "system/configs/evmapy/gb.keys"
+    },
+    {
+      "from": "files/handheld.keys",
+      "to": "system/configs/evmapy/gbc.keys"
+    },
+    {
+      "from": "files/handheld.keys",
+      "to": "system/configs/evmapy/gba.keys"
+    }
+  ],
+  "batocera_defaults": {
+    "gb.runahead": "1",
+    "gb.secondinstance": "1",
+    "gb.retroarch.input_axis_threshold": "0.6",
+    "gb.retroarch.input_player1_btn_r2": "0",
+    "gb.retroarch.input_player2_btn_r2": "0",
+    "gb.retroarch.input_player3_btn_r2": "0",
+    "gb.retroarch.input_player4_btn_r2": "0",
+    "gbc.runahead": "1",
+    "gbc.secondinstance": "1",
+    "gbc.retroarch.input_axis_threshold": "0.6",
+    "gbc.retroarch.input_player1_btn_r2": "0",
+    "gbc.retroarch.input_player2_btn_r2": "0",
+    "gbc.retroarch.input_player3_btn_r2": "0",
+    "gbc.retroarch.input_player4_btn_r2": "0",
+    "gba.runahead": "1",
+    "gba.secondinstance": "1",
+    "gba.retroarch.input_axis_threshold": "0.6",
+    "gba.retroarch.input_player1_btn_r2": "0",
+    "gba.retroarch.input_player2_btn_r2": "0",
+    "gba.retroarch.input_player3_btn_r2": "0",
+    "gba.retroarch.input_player4_btn_r2": "0"
+  },
+  "after": "Game Boy, GBC and GBA: RT runs (it is B), LT held fast-forwards, run-ahead is on (Game Settings > Latency reduction). The d-pad is still the most precise for grid movement."
+}
