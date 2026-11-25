@@ -40,7 +40,7 @@ class Pads:
         # screen (Guide) is usually still down: taken now, its release would reach only us, and a
         # game underneath would think it held for ever. In RetroArch, Guide is the hotkey button,
         # and while the hotkey is held its menus ignore the controller (2026-11-24).
-        self.not_yet: set[evdev.InputDevice] = set()
+        self.not_yet: list[evdev.InputDevice] = []      # a list: input devices cannot go in a set
         for path in paths or evdev.list_devices():
             try:
                 device = evdev.InputDevice(path)
@@ -48,7 +48,7 @@ class Pads:
                     device.close()
                     continue
                 if device.active_keys():
-                    self.not_yet.add(device)
+                    self.not_yet.append(device)
                 else:
                     device.grab()
             except OSError:
@@ -63,9 +63,9 @@ class Pads:
             try:
                 if not device.active_keys():
                     device.grab()
-                    self.not_yet.discard(device)
+                    self.not_yet.remove(device)
             except OSError:
-                self.not_yet.discard(device)
+                self.not_yet.remove(device)
 
     def _grab_rest(self) -> bool:
         """Something held for long (a stuck button): take the controller anyway."""

@@ -1,0 +1,100 @@
+{
+    "actions_player1": [
+        {
+            "trigger": "b",
+            "type": "key",
+            "target": "KEY_ENTER",
+            "description": "Xbox A: confirm / talk (RPG Maker C: Enter)"
+        },
+        {
+            "trigger": "a",
+            "type": "key",
+            "target": "KEY_ESC",
+            "description": "Xbox B: back / menu (RPG Maker B: Esc)"
+        },
+        {
+            "trigger": "y",
+            "type": "key",
+            "target": "KEY_LEFTSHIFT",
+            "description": "Xbox X: run, sort (RPG Maker A: Shift)"
+        },
+        {
+            "trigger": "x",
+            "type": "key",
+            "target": "KEY_D",
+            "description": "Xbox Y: RPG Maker Z (D)"
+        },
+        {
+            "trigger": "pageup",
+            "type": "key",
+            "target": "KEY_Q",
+            "description": "LB: page left (L: Q)"
+        },
+        {
+            "trigger": "pagedown",
+            "type": "key",
+            "target": "KEY_W",
+            "description": "RB: page right (R: W)"
+        },
+        {
+            "trigger": "start",
+            "type": "key",
+            "target": "KEY_ESC",
+            "description": "Start: menu"
+        },
+        {
+            "trigger": "select",
+            "type": "key",
+            "target": "KEY_S",
+            "description": "Back: RPG Maker Y (S)"
+        },
+        {
+            "trigger": "up",
+            "type": "key",
+            "target": "KEY_UP",
+            "description": "Up"
+        },
+        {
+            "trigger": "down",
+            "type": "key",
+            "target": "KEY_DOWN",
+            "description": "Down"
+        },
+        {
+            "trigger": "left",
+            "type": "key",
+            "target": "KEY_LEFT",
+            "description": "Left"
+        },
+        {
+            "trigger": "right",
+            "type": "key",
+            "target": "KEY_RIGHT",
+            "description": "Right"
+        },
+        {
+            "trigger": "joystick1up",
+            "type": "key",
+            "target": "KEY_UP",
+            "description": "Up"
+        },
+        {
+            "trigger": "joystick1down",
+            "type": "key",
+            "target": "KEY_DOWN",
+            "description": "Down"
+        },
+        {
+            "trigger": "joystick1left",
+            "type": "key",
+            "target": "KEY_LEFT",
+            "description": "Left"
+        },
+        {
+            "trigger": "joystick1right",
+            "type": "key",
+            "target": "KEY_RIGHT",
+            "description": "Right"
+        }
+    ]
+}

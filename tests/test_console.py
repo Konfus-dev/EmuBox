@@ -1156,6 +1156,9 @@ class PadTakingTests(unittest.TestCase):
         from evdev import ecodes as e
 
         class FakePad:
+            __hash__ = None                    # like evdev.InputDevice: it cannot go in a set
+            def __eq__(self, other):
+                return self is other
             def __init__(self, held):
                 self.held, self.grabbed, self.fd = list(held), False, 99
             def capabilities(self):
