@@ -167,6 +167,15 @@ be listed. What a file does is told by its name: `scroll.wav`, `select.wav`, `ba
 pictures; it needs GStreamer). A sound a set lacks is taken from EmuBox's. Until you choose a set in the menu, one with "xbox" in its name is used when there is one. Such sets are yours and
 stay out of the repository.
 
+### RPG Maker games on Windows (Wine)
+
+Fan games made with RPG Maker XP/VX (Pokémon Essentials ones, for example) read only the keyboard,
+and Batocera has no controller mapping for Windows games. The installer gives each such game in
+`roms/windows/<Game>.pc/` a `padto.keys`: Xbox A confirms, B goes back, X runs, the d-pad and left
+stick move, LB/RB turn pages (Hotkey+Start still quits). A game whose `Game.exe` is mkxp-z also gets an
+`mkxp.json` that starts it full screen. A file a game already has is left alone, so your own
+mapping wins. (Batocera names buttons by position: its "b" is the bottom button, Xbox A.)
+
 ## Your BIOS files and games
 
 These are yours, so they are not in this repository. Keep each in a **library**: a folder with one

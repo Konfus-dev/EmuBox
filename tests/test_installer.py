@@ -343,6 +343,24 @@ class ComponentTests(Drive):
         self.assertIn('name="EnableSounds" value="false"', es.read_text())
         self.assertIn("global.autosave=0", conf.read_text())
 
+    def test_rpg_maker_games_get_a_controller_mapping_and_full_screen(self):
+        game = self.root / "roms/windows/Fan Game.pc"
+        make_file(game / "Game.ini").write_text("[Game]\nLibrary=RGSS102J.dll\n")
+        make_file(game / "Game.exe").write_bytes(b"MZ... mkxp.json ...")
+        other = self.root / "roms/windows/Other.pc"
+        make_file(other / "Game.ini").write_text("[Game]\nLibrary=RGSS104E.dll\n")
+        make_file(other / "padto.keys").write_text("mine")              # the user's own: kept
+        make_file(self.root / "roms/windows/Not RPG Maker.pc/game.exe")
+        run(self.root, "--yes", "--with", "discord")
+        import json as _json
+        keys = _json.loads((game / "padto.keys").read_text())["actions_player1"]
+        by = {k["trigger"]: k["target"] for k in keys}
+        self.assertEqual((by["b"], by["a"], by["y"]), ("KEY_ENTER", "KEY_ESC", "KEY_LEFTSHIFT"))   # Xbox A, B, X
+        self.assertTrue(_json.loads((game / "mkxp.json").read_text())["fullscreen"])
+        self.assertEqual((other / "padto.keys").read_text(), "mine")
+        self.assertFalse((other / "mkxp.json").exists())                   # RPG Maker's own player
+        self.assertFalse((self.root / "roms/windows/Not RPG Maker.pc/padto.keys").exists())
+
     @staticmethod
     def repo_vmpads():
         import importlib.util
