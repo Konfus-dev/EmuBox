@@ -1,8 +1,22 @@
 {
   "title": "Xbox button labels in Nintendo games",
-  "question": "Make the Xbox pad's A, B, X and Y do what A, B, X and Y do in Nintendo games (Game Boy, GBA, NES, SNES, DS...)? Without, Batocera goes by position: the Xbox A button is the Nintendo B.",
+  "question": "Make the Xbox pad's A, B, X and Y do what A, B, X and Y do in Nintendo games (Game Boy, GBA, NES, SNES, DS, 3DS, GameCube, Switch, Wii U)? Without, Batocera goes by position: the Xbox A button is the Nintendo B.",
   "default": true,
   "order": 37,
+  "files": [
+    {
+      "from": "files/labels.py",
+      "to": "system/emubox/button-labels/labels.py"
+    },
+    {
+      "from": "files/emubox_buttonlabels",
+      "to": "system/services/emubox_buttonlabels",
+      "mode": "755"
+    }
+  ],
+  "services": [
+    "emubox_buttonlabels"
+  ],
   "batocera_defaults": {
     "nes.retroarch.input_player1_btn_a": "0",
     "nes.retroarch.input_player1_btn_b": "8",
@@ -245,5 +259,5 @@
     "pokemini.retroarch.input_player4_btn_x": "1",
     "pokemini.retroarch.input_player4_btn_y": "9"
   },
-  "after": "In Nintendo games run by RetroArch, the Xbox A button is A and B is B (X and Y likewise). To go back for one system, remove its <system>.retroarch.input_playerN_btn_* lines from batocera.conf."
+  "after": "In every Nintendo system the Xbox A button is A and B is B (X and Y likewise). RetroArch systems: <system>.retroarch.input_playerN_btn_* lines in batocera.conf (remove one system's to go back). Standalone emulators: the emubox_buttonlabels service (System Settings > Services)."
 }

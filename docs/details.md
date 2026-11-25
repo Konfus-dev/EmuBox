@@ -57,6 +57,7 @@ things or update; it only copies what is missing.
 | **ROM-hack patcher** | Drop a `.ips`/`.bps`/`.ups` file in `patches` and it is applied at boot |
 | **Play settings** | Auto-save, rewind on 8/16-bit systems, a light CRT shader, a tidier network share |
 | **Bluetooth controllers** | Offered when preparing a drive on a PC with paired controllers: copies the pairings so the same controller works in Linux and Batocera without re-pairing. To keep Linux, Windows and Batocera sharing pairings all the time, see bt-share in MacWinBuntu |
+| **Xbox button labels in Nintendo games** | Batocera binds the Xbox pad by position, so in Nintendo games the Xbox A button is the console's B. This makes A, B, X and Y do what their labels say in every Nintendo system: RetroArch ones (Game Boy, GBA, NES, SNES, DS...) through batocera.conf, and the standalone 3DS, Switch, Wii U, GameCube and DS emulators through the emubox_buttonlabels service (it changes Batocera's button tables in memory at each start, and leaves one alone if an update changed it). PlayStation, Sega and the rest stay by position |
 | **Wi-Fi** | Asks for the network name and password, so Batocera connects by itself |
 | **ScreenScraper account** | For box art, videos and descriptions; with the picture style and extras already chosen |
 | **RetroAchievements account** | Trophies for older games |

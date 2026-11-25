@@ -784,3 +784,42 @@ class SizeTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("Warning:", out.getvalue())
         self.assertEqual(sorted(p.name for p in (self.root / "system").iterdir()), ["batocera.conf"])
+
+
+class ButtonLabelTests(unittest.TestCase):
+    """The standalone emulators' tables get the labels swapped exactly, and only when they are
+    exactly as checked: anything else is left alone (a Batocera update must not be guessed at)."""
+
+    def setUp(self):
+        import importlib.util
+        path = REPO / "components/button-labels/files/labels.py"
+        spec = importlib.util.spec_from_file_location("labels", path)
+        self.labels = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.labels)
+
+    def test_a_table_is_swapped_once_and_nothing_else_changes(self):
+        with tempfile.TemporaryDirectory() as folder:
+            gen = Path(folder) / "azahar"
+            gen.mkdir()
+            original = ('x = 1\n    m = {\n            "button_a":      "a",\n            "button_b":      "b",\n'
+                        '            "button_x":      "x",\n            "button_y":      "y",\n    }\n'
+                        'other = {"button_a":      "a",}\n')
+            (gen / "azaharGenerator.py").write_text(original)
+            notes = self.labels.apply(Path(folder))
+            text = (gen / "azaharGenerator.py").read_text()
+            self.assertIn('"button_a":      "b",', text)
+            self.assertIn('"button_y":      "x",', text)
+            self.assertIn('other = {"button_a":      "a",}', text)          # only the first table
+            self.assertIn("azahar/azaharGenerator.py: labels set", notes)
+            self.labels.apply(Path(folder))
+            self.assertEqual((gen / "azaharGenerator.py").read_text(), text)  # once
+
+    def test_an_unexpected_table_is_left_alone(self):
+        with tempfile.TemporaryDirectory() as folder:
+            gen = Path(folder) / "citron"
+            gen.mkdir()
+            changed_by_an_update = 'm = {\n "button_a": "a",\n "button_b": "b",\n}\n'
+            (gen / "citronGenerator.py").write_text(changed_by_an_update)
+            notes = self.labels.apply(Path(folder))
+            self.assertEqual((gen / "citronGenerator.py").read_text(), changed_by_an_update)
+            self.assertIn("citron/citronGenerator.py: not as expected (a Batocera update?), left alone", notes)
