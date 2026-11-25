@@ -38,6 +38,11 @@
       "from": "files/es-scripts/emubox-screensaver.sh",
       "to": "system/configs/emulationstation/scripts/screensaver-stop/emubox-screensaver.sh",
       "mode": "755"
+    },
+    {
+      "from": "files/scripts/emubox-launch-logs.sh",
+      "to": "system/scripts/emubox-launch-logs.sh",
+      "mode": "755"
     }
   ],
   "services": [
