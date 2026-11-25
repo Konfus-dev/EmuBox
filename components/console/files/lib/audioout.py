@@ -14,16 +14,39 @@ import json
 import re
 import subprocess
 import sys
+import time
 
 
-def outputs() -> list[tuple[str, str]]:
-    """(name, friendly name) of every output, "auto" first."""
+def _pactl_json(*what: str) -> list[dict]:
     try:
-        sinks = json.loads(subprocess.run(["pactl", "-f", "json", "list", "sinks"], capture_output=True,
+        found = json.loads(subprocess.run(["pactl", "-f", "json", "list", *what], capture_output=True,
                                           text=True, timeout=5).stdout or "[]")
     except (OSError, subprocess.SubprocessError, ValueError):
-        sinks = []
-    return [("auto", "Automatic")] + [(s["name"], friendly(s)) for s in sinks if s.get("name")]
+        return []
+    return found if isinstance(found, list) else []
+
+
+def outputs(sinks: list[dict] | None = None, cards: list[dict] | None = None) -> list[tuple[str, str]]:
+    """(name, friendly name) of every output, "auto" first. A sound card switched off (its profile
+    "off", as an HDMI card can be) has no output yet: it is offered as "card:<card>:<profile>",
+    its best plugged-in output profile, and switched on when chosen."""
+    sinks = _pactl_json("sinks") if sinks is None else sinks
+    cards = _pactl_json("cards") if cards is None else cards
+    found = [("auto", "Automatic")] + [(s["name"], friendly(s)) for s in sinks if s.get("name")]
+    for card in cards:
+        if card.get("active_profile") != "off":
+            continue
+        profiles = card.get("profiles", {})
+        usable = [n for n, p in profiles.items()
+                  if n.startswith("output:") and "+input" not in n and p.get("available", True)]
+        if usable:
+            best = sorted(usable, key=lambda n: (not n.endswith("hdmi-stereo"), "extra" in n, n))[0]
+            props = card.get("properties", {})
+            fake_sink = {"name": f"{card.get('name', '')}.{best.split(':', 1)[1]}",
+                         "description": props.get("device.description", card.get("name", "")),
+                         "properties": {"device.bus": props.get("device.bus", ""), "node.nick": ""}}
+            found.append((f"card:{card['name']}:{best}", friendly(fake_sink)))
+    return found
 
 
 def friendly(sink: dict) -> str:
@@ -70,8 +93,32 @@ def step(by: int) -> None:
     now = current()
     i = names.index(now) if now in names else 0
     target = names[(i + by) % len(names)]
+    if target.startswith("card:"):           # switch the card on first; its output then appears
+        _, card, profile = target.split(":", 2)
+        subprocess.run(["pactl", "set-card-profile", card, profile])
+        target = ""
+        for _ in range(20):
+            sink = next((s["name"] for s in _pactl_json("sinks")
+                         if s.get("properties", {}).get("device.name") == card), "")
+            if sink:
+                target = sink
+                break
+            time.sleep(0.1)
+        if not target:
+            return
     if subprocess.run(["batocera-audio", "set", target]).returncode == 0:
         subprocess.run(["batocera-settings-set", "audio.device", target])
+        move_playing(target)
+
+
+def move_playing(sink: str) -> None:
+    """Sounds already playing (the menu music, a game, an app) move to the new output too;
+    otherwise they would stay on the old one until they start again."""
+    if sink == "auto":
+        return
+    for stream in _pactl_json("sink-inputs"):
+        if "index" in stream:
+            subprocess.run(["pactl", "move-sink-input", str(stream["index"]), sink], capture_output=True)
 
 
 def main(argv: list[str]) -> int:

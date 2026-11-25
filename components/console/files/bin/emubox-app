@@ -348,6 +348,10 @@ PY
         timeout 5 bluetoothctl show 2>&1 | grep -E "^Controller|Powered|Pairable" | sed 's/^/  /'
         timeout 5 bluetoothctl devices Paired 2>&1 | sed 's/^/  paired: /'
         dmesg 2>/dev/null | grep -iE "bluetooth|btusb|hci0" | tail -n 8 | sed 's/^/  /'
+        # Sound: what is chosen, where it really goes, and the cards (an HDMI card can be "off").
+        echo "sound: chosen audio.device=$(batocera-settings-get audio.device 2>/dev/null), playing to $(pactl get-default-sink 2>/dev/null)"
+        pactl list short sinks 2>/dev/null | sed 's/^/  sink: /'
+        pactl list short cards 2>/dev/null | sed 's/^/  card: /'
     } >>"$LOG" 2>&1
 }
 

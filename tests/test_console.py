@@ -1130,3 +1130,18 @@ class PadCheckTests(unittest.TestCase):
             cfg = Path(folder) / "es_input.cfg"
             cfg.write_text('<inputList>\n\t<inputConfig type="joystick" deviceName="Pad" deviceGUID="ABC">\n</inputList>\n')
             self.assertEqual(padcheck.entries([cfg, Path(folder) / "none"]), [("Pad", "abc")])
+
+
+class SoundOutputTests(unittest.TestCase):
+    def test_outputs_have_names_you_know_and_a_switched_off_tv_is_offered(self):
+        import audioout
+        sinks = [{"name": "alsa_output.pci-0000_02_00.1.hdmi-stereo", "description": "GB203 Digital Stereo (HDMI)",
+                  "properties": {"node.nick": "LG TV SSCR2", "device.bus": "pci"}},
+                 {"name": "bluez_output.88_C9.1", "description": "WH-1000XM5", "properties": {"device.bus": "bluetooth"}}]
+        self.assertEqual(audioout.outputs(sinks, []), [("auto", "Automatic"),
+                                                       ("alsa_output.pci-0000_02_00.1.hdmi-stereo", "LG TV SSCR2 (HDMI)"),
+                                                       ("bluez_output.88_C9.1", "WH-1000XM5 (Bluetooth)")])
+        off = [{"name": "alsa_card.pci-0000_02_00.1", "active_profile": "off", "properties": {"device.bus": "pci"},
+                "profiles": {"off": {}, "output:hdmi-stereo-extra1": {"available": False},
+                             "output:hdmi-stereo": {"available": True}}}]
+        self.assertEqual(audioout.outputs([], off)[1], ("card:alsa_card.pci-0000_02_00.1:output:hdmi-stereo", "TV (HDMI)"))
