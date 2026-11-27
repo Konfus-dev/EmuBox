@@ -54,6 +54,7 @@ PLACE_MAX = 32767         # the range of the pointer placer's axes: the whole sc
 DEVICE_SETTLE_S = 1.0     # a new input device is heard by the window manager only after a moment
 SCROLL_SPEED = 14         # wheel notches per second with the stick fully over
 TRIGGER_PULLED = 0.5
+NOT_TAKEN_S = 2.0         # in front this long without the controller: worth a line in the log
 HOLD_B_S = 0.8            # B held this long leaves the app (hides it), wherever you are in it
 
 # xpad reports the X button as BTN_NORTH and Y as BTN_WEST; we follow the labels.
@@ -70,6 +71,11 @@ MOUSE_BUTTONS = {"click": e.BTN_LEFT, "rightclick": e.BTN_RIGHT}
 def log(*words) -> None:
     if DEBUG:
         print(*words, file=sys.stderr, flush=True)
+
+
+def note(*words) -> None:
+    """Always written to the log (emubox.log): the few things worth knowing afterwards."""
+    print(time.strftime("%F %T"), "pad:", *words, file=sys.stderr, flush=True)
 
 
 def wlrctl(*args: str) -> subprocess.CompletedProcess:
@@ -109,6 +115,9 @@ class Pad:
         self.devices: list[evdev.InputDevice] = []
         self.selector = selectors.DefaultSelector()
         self.grabbed = False
+        self.why_not = ""                                 # why the last try to take the pads failed
+        self.wanted_since: float | None = None            # since when we should have had them
+        self.told = ""                                    # the reason last written to the log
         self.hands_off_until = 0.0
         self.waiting_for: subprocess.Popen | None = None  # the on-screen keyboard, while open
         self.down: dict[str, object] = {}                 # button -> the action it started
@@ -173,10 +182,15 @@ class Pad:
         # menu): its release would reach only us, and the program underneath would think it held
         # for ever. The caller tries again a moment later.
         try:
-            if any(device.active_keys() for device in self.devices):
-                return False
+            for device in self.devices:
+                held = device.active_keys()
+                if held:
+                    self.why_not = f"{device.name!r} ({device.path}) has buttons held: {held}"
+                    return False
         except OSError:
             pass
+        if not self.devices:
+            self.why_not = "no controller found"
         taken = []
         for device in list(self.devices):
             try:
@@ -188,11 +202,26 @@ class Pad:
                     continue
                 for other in taken:
                     other.ungrab()
+                self.why_not = f"{device.name!r} ({device.path}) is held by another program: {error}"
                 return False
         self.grabbed = bool(taken)
         if self.grabbed:
             log("took the controller")
         return self.grabbed
+
+    def _tell(self, wanted: bool, now: float) -> None:
+        """Say in the log when the app is in front but its controller could not be taken for a
+        while: presses then go to the menus underneath instead (heard on real hardware,
+        2026-11-27: Start in the Browser opened Batocera's menu behind it). Once per reason."""
+        if not wanted or self.grabbed:
+            if self.told and self.grabbed:
+                note(f"{self.name}: took the controller after all")
+            self.wanted_since, self.told = None, ""
+            return
+        self.wanted_since = self.wanted_since or now
+        if now - self.wanted_since >= NOT_TAKEN_S and self.why_not != self.told:
+            self.told = self.why_not
+            note(f"{self.name}: in front, but the controller is not ours: {self.why_not or 'unknown'}")
 
     def release(self) -> None:
         if not self.grabbed:
@@ -430,9 +459,10 @@ class Pad:
                         self.b_since = None
                         self._act("back", True)
                     if wanted and not self.grabbed:
-                        self.grab()  # fails quietly while someone else holds the pad
+                        self.grab()  # fails while someone else holds the pad, or a button is down
                     elif not wanted and self.grabbed:
                         self.release()
+                    self._tell(wanted, now)
                 timeout = TICK_S if moving else max(0.0, next_poll - time.monotonic())
                 for key, _ in self.selector.select(timeout):
                     device = key.fileobj
