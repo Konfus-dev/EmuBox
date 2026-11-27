@@ -374,6 +374,51 @@ class ComponentTests(Drive):
         run(self.root, "--yes", "--with", "discord")
         self.assertEqual((third / "mkxp.json").read_text(), text)         # once
 
+    def test_mkxp_games_start_with_glx(self):
+        """Wine's EGL finds no pixel format on an NVIDIA card (XWayland), so the game never opens."""
+        game = self.root / "roms/windows/Fan Game.pc"
+        make_file(game / "Game.ini").write_text("[Game]\nLibrary=RGSS102J.dll\n")
+        make_file(game / "Game.exe").write_bytes(b"MZ... mkxp.json ...")
+        make_file(game / "autorun.cmd").write_text("CMD=Game.exe\n")
+        bare = self.root / "roms/windows/Bare.pc"                          # no autorun.cmd yet
+        make_file(bare / "Game.ini").write_text("[Game]\nLibrary=RGSS104E.dll\n")
+        make_file(bare / "Game.exe").write_bytes(b"MZ mkxp.json")
+        moved = self.root / "roms/windows/Moved.pc"                        # starts elsewhere: left alone
+        make_file(moved / "Game.ini").write_text("[Game]\nLibrary=RGSS104E.dll\n")
+        make_file(moved / "Game.exe").write_bytes(b"MZ mkxp.json")
+        make_file(moved / "autorun.cmd").write_text("DIR=bin\nCMD=Other.exe\n")
+        plain = self.root / "roms/windows/Plain.pc"                        # RPG Maker's own player: no OpenGL
+        make_file(plain / "Game.ini").write_text("[Game]\nLibrary=RGSS104E.dll\n")
+        make_file(plain / "Game.exe").write_bytes(b"MZ")
+        make_file(plain / "autorun.cmd").write_text("CMD=Game.exe\n")
+        run(self.root, "--yes", "--with", "discord")
+        self.assertEqual((game / "autorun.cmd").read_text(), "CMD=cmd /c emubox-start.bat\n")
+        self.assertEqual((game / "autorun.cmd.before-emubox").read_text(), "CMD=Game.exe\n")
+        bat = (game / "emubox-start.bat").read_bytes().decode()
+        self.assertIn('reg add "HKCU\\Software\\Wine\\X11 Driver" /v UseEGL /t REG_SZ /d N /f >nul\r\n', bat)
+        self.assertTrue(bat.endswith("\r\nGame.exe\r\n"))
+        self.assertEqual((bare / "autorun.cmd").read_text(), "CMD=cmd /c emubox-start.bat\n")
+        self.assertFalse((bare / "autorun.cmd.before-emubox").exists())
+        self.assertTrue((bare / "emubox-start.bat").read_bytes().decode().endswith("\r\nGame.exe\r\n"))
+        self.assertEqual((moved / "autorun.cmd").read_text(), "DIR=bin\nCMD=Other.exe\n")
+        self.assertFalse((moved / "emubox-start.bat").exists())
+        self.assertEqual((plain / "autorun.cmd").read_text(), "CMD=Game.exe\n")
+        self.assertFalse((plain / "emubox-start.bat").exists())
+        # The game's own reading of the controller is switched off: it took A as cancel while the
+        # mapping sent Enter, so every press was both.
+        self.assertIn('reg add "HKLM\\System\\CurrentControlSet\\Services\\winebus" /v DisableInput /t REG_DWORD /d 1 /f >nul\r\n', bat)
+        self.assertIn('reg add "HKLM\\System\\CurrentControlSet\\Services\\winebus" /v "Enable SDL" /t REG_DWORD /d 0 /f >nul\r\n', bat)
+        run(self.root, "--yes", "--with", "discord")                       # once
+        self.assertEqual((game / "autorun.cmd.before-emubox").read_text(), "CMD=Game.exe\n")
+        self.assertEqual((game / "emubox-start.bat").read_bytes().decode(), bat)
+        # An older start file (GLX only, another program) is brought up to date, its command kept.
+        (game / "emubox-start.bat").write_bytes(b"@echo off\r\nrem old\r\nPlay.exe -x\r\n")
+        run(self.root, "--yes", "--with", "discord")
+        renewed = (game / "emubox-start.bat").read_bytes().decode()
+        self.assertIn("winebus", renewed)
+        self.assertTrue(renewed.endswith("\r\nPlay.exe -x\r\n"))
+        self.assertEqual((game / "autorun.cmd").read_text(), "CMD=cmd /c emubox-start.bat\n")
+
     def test_xbox_labels_in_nintendo_games(self):
         conf = self.root / "system/batocera.conf"
         run(self.root, "--yes", "--with", "button-labels")

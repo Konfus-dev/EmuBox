@@ -178,6 +178,14 @@ stick move, LB/RB turn pages (Hotkey+Start still quits). A game whose `Game.exe`
 `mkxp.json` that starts it full screen. A file a game already has is left alone, so your own
 mapping wins. (Batocera names buttons by position: its "b" is the bottom button, Xbox A.)
 
+An mkxp-z game is also started through a small `emubox-start.bat` (its `autorun.cmd` points at it,
+the original kept as `autorun.cmd.before-emubox`). Batocera's Wine asks for OpenGL through EGL, which
+an NVIDIA card does not offer to Windows games there, so the game stopped with "No matching GL pixel
+format available". The `.bat` tells Wine to use GLX instead (`UseEGL=N`), then starts the game. A
+game whose `autorun.cmd` starts it from another folder (`DIR=`) is left alone. The same `.bat` keeps the
+controller itself away from the game (Wine's `winebus` `DisableInput`, from the second start on): mkxp-z
+reads it too, with Xbox A as cancel, so every press was confirm and cancel at once.
+
 ## Your BIOS files and games
 
 These are yours, so they are not in this repository. Keep each in a **library**: a folder with one
