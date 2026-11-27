@@ -34,6 +34,10 @@ mkdir -p "$RUN" "$(dirname "$LOG")"
 export HOME=/userdata/system XDG_RUNTIME_DIR=/var/run
 export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}" DISPLAY="${DISPLAY:-:0}"
 export XDG_SESSION_TYPE=wayland XDG_CURRENT_DESKTOP=labwc:wlroots
+# A web page an app wants shown (a sign-in, a link) opens in EmuBox's web view: Batocera has no
+# xdg-open and no browser, so nothing opened (bin/emubox-open).
+export BROWSER="$ROOT/bin/emubox-open"
+case ":$PATH:" in *":$ROOT/bin/shims:"*) ;; *) export PATH="$ROOT/bin/shims:$PATH" ;; esac
 
 # The apps need a D-Bus session of their own (Batocera has none): flatpak's
 # sandbox helper lives on it, and so do the players' media controls.

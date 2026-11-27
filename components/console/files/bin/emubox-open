@@ -1,0 +1,36 @@
+#!/bin/bash
+# Open a web address in EmuBox's web view (the Browser app's, so its sign-ins are the same).
+#
+#   emubox-open https://example.org
+#
+# Batocera has no xdg-open and no browser of its own, so a program that wants to show a page
+# (Claude signing in, a link clicked in a terminal) opened nothing (2026-11-27). Apps started by
+# emubox-app get this as $BROWSER and as "xdg-open" (bin/shims), which is where programs look.
+# Only web addresses: anything else is refused, as there is nothing here to open it with.
+
+ROOT=$(dirname "$(dirname "$(readlink -f "$0")")")
+LOG=${EMUBOX_LOG:-/userdata/system/logs/emubox.log}
+
+address=$1
+case $address in
+http://* | https://*) ;;
+*) echo "emubox-open: only web addresses (http:// or https://) can be opened here" >&2; exit 2 ;;
+esac
+
+export HOME=/userdata/system XDG_RUNTIME_DIR=/var/run
+export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}" DISPLAY="${DISPLAY:-:0}"
+export XDG_SESSION_TYPE=wayland XDG_CURRENT_DESKTOP=labwc:wlroots
+
+# The site's name only: a sign-in address carries a one-time secret that has no place in a log.
+site=${address#*://}; site=${site%%[/?#]*}
+echo "$(date '+%F %T') opening $site in the web view" >>"$LOG" 2>/dev/null
+
+# One Browser at a time (two would share one sign-in store): an open one moves to the new page.
+if pgrep -f -- "[w]ebview.py .*--id browser\$" >/dev/null; then
+    pkill -f -- "[w]ebview.py .*--id browser\$"
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+        pgrep -f -- "[w]ebview.py .*--id browser\$" >/dev/null || break
+        sleep 0.1
+    done
+fi
+setsid python3 "$ROOT/lib/webview.py" "$address" --id browser >>"$LOG" 2>&1 </dev/null &

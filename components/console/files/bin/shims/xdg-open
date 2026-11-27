@@ -1,0 +1,3 @@
+#!/bin/bash
+# What programs run to show a web page; Batocera has none, so EmuBox's web view answers (bin/emubox-open).
+exec "$(dirname "$(dirname "$(readlink -f "$0")")")/emubox-open" "$@"

@@ -7,6 +7,7 @@ The pieces that make a desktop program behave like a console app on Batocera. Ev
 | Tool | What it does | Use it by itself |
 | --- | --- | --- |
 | `bin/emubox-app` | Opens, hides and quits apps; downloads them on first use; sends play/pause/next to whatever is playing | `emubox-app open discord`, `emubox-app back`, `emubox-app media Next`, `emubox-app fetch Steam com.valvesoftware.Steam` |
+| `bin/emubox-open` | Opens a web address in the Browser's web view. Batocera has no `xdg-open` and no browser, so apps started by `emubox-app` get this as `$BROWSER` and as `xdg-open` (`bin/shims`): a sign-in page or a link opens instead of nothing | `emubox-open https://example.org` |
 | `lib/pad.py` | Turns the controller into keys and a mouse pointer while one app has the focus, and lets go for the keyboard, the in-game menu and your game | `python3 pad.py apps/<id>/app.json` |
 | `lib/osk.py` | On-screen keyboard driven by the controller, with button prompts; types into whatever is in front | `python3 osk.py` (again with `--toggle` to close) |
 | `lib/notice.py` | Full-screen "please wait" around a slow command, with its latest output and B to cancel; used for an app's first download | `python3 notice.py "Downloading X" -- command` |

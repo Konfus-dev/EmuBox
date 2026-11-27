@@ -1216,3 +1216,47 @@ class HeadphonesFirstTests(unittest.TestCase):
             self.assertEqual(audioout.prefer_headphones(tv["name"], [tv, headset], default=tv["name"]), "")  # your choice stays
         self.assertIn(["pactl", "set-default-sink", headset["name"]], ran)
         self.assertIn(["moved", headset["name"]], ran)
+
+
+class OpenALinkTests(unittest.TestCase):
+    """Batocera has no xdg-open and no browser: a program wanting a web page shown opened nothing."""
+    BIN = REPO / "components/console/files/bin"
+
+    def run_open(self, program: Path, *arguments: str):
+        with tempfile.TemporaryDirectory() as folder:
+            stubs, said = Path(folder) / "stubs", Path(folder) / "said"
+            stubs.mkdir()
+            for name, body in (("python3", f'echo "$@" >>"{said}"'), ("pgrep", "exit 1"), ("pkill", "exit 0"),
+                               ("setsid", 'exec "$@"')):
+                (stubs / name).write_text(f"#!/bin/bash\n{body}\n")
+                (stubs / name).chmod(0o755)
+            import os
+            env = {**os.environ, "PATH": f"{stubs}:{os.environ['PATH']}", "EMUBOX_LOG": str(Path(folder) / "log")}
+            done = subprocess.run(["bash", str(program), *arguments], env=env, capture_output=True, text=True)
+            for _ in range(50):                      # the web view is started in the background
+                if said.exists():
+                    break
+                import time
+                time.sleep(0.02)
+            log = (Path(folder) / "log").read_text() if (Path(folder) / "log").exists() else ""
+            return done, said.read_text() if said.exists() else "", log
+
+    def test_a_web_address_opens_in_the_browsers_web_view(self):
+        address = "https://claude.ai/oauth/authorize?code=secret"
+        for program in (self.BIN / "emubox-open", self.BIN / "shims/xdg-open"):
+            done, said, log = self.run_open(program, address)
+            self.assertEqual(done.returncode, 0, done.stderr)
+            self.assertIn(f"lib/webview.py {address} --id browser", said)
+            self.assertIn("opening claude.ai in the web view", log)
+            self.assertNotIn("secret", log)          # a sign-in address is not for the log
+
+    def test_anything_else_is_refused(self):
+        for what in ("/userdata/roms/readme.txt", "file:///etc/passwd", "", "mailto:someone@example.org"):
+            done, said, _log = self.run_open(self.BIN / "emubox-open", what)
+            self.assertEqual(done.returncode, 2)
+            self.assertEqual(said, "")
+
+    def test_apps_are_told_where_to_open_pages(self):
+        text = (self.BIN / "emubox-app").read_text()
+        self.assertIn('export BROWSER="$ROOT/bin/emubox-open"', text)
+        self.assertIn('export PATH="$ROOT/bin/shims:$PATH"', text)
